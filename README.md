@@ -2,6 +2,8 @@
 
 **Autonomous algorithmic trading system with three quantitative strategies, a backtesting engine with Sharpe ratio and max drawdown analysis, automated risk management, and real-time dashboard — paper trading only via Alpaca API.**
 
+[![CI](https://github.com/Danny-397/trading-bot-/actions/workflows/ci.yml/badge.svg)](https://github.com/Danny-397/trading-bot-/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.0-000000?style=flat&logo=flask)](https://flask.palletsprojects.com)
 [![Alpaca](https://img.shields.io/badge/Alpaca-Paper_Trading_Only-FFCD00?style=flat)](https://alpaca.markets)
@@ -223,6 +225,12 @@ trading-bot-/
 **Frontend (Vercel):**
 1. New Project → connect repo → set root to `frontend/`
 2. Update `API_BASE` in `app.js` with your Render URL before deploying
+
+---
+
+## License
+
+[MIT](LICENSE) — free to use, fork, and build on with attribution.
 
 ---
 

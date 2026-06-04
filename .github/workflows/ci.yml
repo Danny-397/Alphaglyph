@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend: lint + syntax + smoke test ─────────────────────────────────
+  backend:
+    name: Backend — lint & smoke test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check (py_compile)
+        run: |
+          python -m py_compile app.py
+          python -m py_compile bot.py
+          python -m py_compile strategies.py
+          python -m py_compile backtest.py
+          python -m py_compile risk.py
+          python -m py_compile database.py
+
+      - name: Lint (flake8)
+        run: |
+          pip install flake8
+          flake8 .
+
+      - name: Smoke test — DB init with dummy keys
+        env:
+          ALPACA_API_KEY: ci_dummy_key
+          ALPACA_SECRET_KEY: ci_dummy_secret
+        run: python -c "import database; database.init_db(); print('DB init OK')"
+
+  # ── Security: dependency audit ───────────────────────────────────────────
+  security:
+    name: Dependency security audit
+    runs-on: ubuntu-latest
+    # Non-blocking: a CVE in a pinned dep shows as a warning, not a build failure.
+    # Fix by bumping the affected package version, then re-pin.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit pinned dependencies
+        run: pip-audit -r backend/requirements.txt

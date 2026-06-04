@@ -1,0 +1,15 @@
+[flake8]
+max-line-length = 120
+extend-ignore =
+    # line break before/after binary operator — both styles are fine
+    W503,
+    W504,
+    # allow single blank line between top-level functions in compact helper blocks
+    E302,
+    E303
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env
