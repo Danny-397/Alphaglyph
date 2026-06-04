@@ -3,12 +3,22 @@ import os
 from datetime import datetime
 import numpy as np
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tradebot.db')
+# Allow DATABASE_PATH env var so Render's persistent disk can be used.
+# On Render: set DATABASE_PATH=/data/tradebot.db and mount a disk at /data/.
+# Without this, the DB lives on Render's ephemeral filesystem and is wiped on every deploy.
+DB_PATH = os.getenv(
+    'DATABASE_PATH',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tradebot.db')
+)
 
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    # WAL mode: allows concurrent reads while the bot thread writes snapshots.
+    # Without this, Flask API reads and the bot write thread can collide and
+    # produce "database is locked" errors.
+    conn.execute('PRAGMA journal_mode=WAL')
     return conn
 
 

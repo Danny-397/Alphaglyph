@@ -36,6 +36,9 @@ jobs:
           python -m py_compile backtest.py
           python -m py_compile risk.py
           python -m py_compile database.py
+          python -m py_compile features.py
+          python -m py_compile regime.py
+          python -m py_compile gunicorn.conf.py
 
       - name: Lint (flake8)
         run: |

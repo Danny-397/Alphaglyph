@@ -215,16 +215,42 @@ trading-bot-/
 
 ## Deployment
 
-**Backend (Render):**
-1. Push to GitHub
-2. New Web Service → connect repo → set root to `backend/`
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `gunicorn app:app`
-5. Add environment variables: `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`
+### Backend (Render)
 
-**Frontend (Vercel):**
-1. New Project → connect repo → set root to `frontend/`
-2. Update `API_BASE` in `app.js` with your Render URL before deploying
+1. Push to GitHub
+2. New Web Service → connect repo → set root directory to `backend/`
+3. Build command: `pip install -r requirements.txt`
+4. Start command: `gunicorn app:app` *(gunicorn.conf.py is auto-detected — sets workers=1, timeout=120)*
+5. Add environment variables:
+
+| Variable | Value |
+|---|---|
+| `ALPACA_API_KEY` | Your paper trading API key |
+| `ALPACA_SECRET_KEY` | Your paper trading secret key |
+| `DATABASE_PATH` | `/data/tradebot.db` *(see persistent disk note below)* |
+| `CORS_ORIGINS` | `https://your-project.vercel.app` *(after Vercel deploy)* |
+
+### Frontend (Vercel)
+
+1. New Project → connect repo → set root directory to `frontend/`
+2. **Before deploying:** update `API_BASE` in [frontend/app.js](frontend/app.js) with your Render URL
+
+---
+
+### ⚠️ Deployment Gotchas
+
+**Persistent database (important)**
+Render's free tier has an ephemeral filesystem — without action, `tradebot.db` is wiped on every deploy and all trade history is lost.
+
+Fix: In your Render service, go to **Disks → Add Disk**, mount it at `/data`, and set `DATABASE_PATH=/data/tradebot.db` as an environment variable. The $0.25/GB/month disk preserves your SQLite DB across deploys.
+
+**Render free tier spins down**
+Free tier services stop after 15 minutes of inactivity. The trading bot loop dies when this happens. The service wakes up on the next HTTP request (cold start ~30s), but the bot won't resume automatically until you press Start on the dashboard.
+
+Options: upgrade to Render's paid tier ($7/month), or set up an external cron ping (e.g., UptimeRobot on a free plan) to hit `/health` every 10 minutes and keep the service alive.
+
+**Workers must stay at 1**
+`gunicorn.conf.py` enforces `workers = 1`. Do not override this. Multiple workers = multiple bot threads = duplicate Alpaca orders on the same account.
 
 ---
 

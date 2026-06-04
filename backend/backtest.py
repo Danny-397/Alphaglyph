@@ -118,6 +118,7 @@ def run_backtest(strategy: str, tickers: list[str],
         split_date = (s + timedelta(days=int((e - s).days * 0.70))).strftime('%Y-%m-%d')
 
     # ── Pre-compute regime series from SPY (market proxy) ─────────────────
+    # spy_raw is reused below for the benchmark — download once only.
     regime_series: pd.Series | None = None
     spy_raw = feat.fetch_ohlcv('SPY', start=start_date, end=end_date)
     if spy_raw is not None and len(spy_raw) >= 30:
@@ -302,8 +303,8 @@ def run_backtest(strategy: str, tickers: list[str],
         ann_r  = (final_value / initial_capital) ** (1 / years) - 1
         calmar = round(ann_r / (max_dd / 100), 2)
 
-    # SPY buy-and-hold benchmark
-    spy_df           = feat.fetch_ohlcv('SPY', start=start_date, end=end_date)
+    # SPY buy-and-hold benchmark — reuse the already-downloaded spy_raw
+    spy_df           = spy_raw
     benchmark_return = 0.0
     spy_curve        = []
     if spy_df is not None and len(spy_df) > 1:
