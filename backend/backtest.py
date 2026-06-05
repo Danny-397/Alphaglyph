@@ -36,6 +36,7 @@ import monte_carlo as mc
 import portfolio as portopt
 import regime as reg
 import risk
+import stats as st
 
 logger = logging.getLogger(__name__)
 
@@ -403,6 +404,16 @@ def run_backtest(
     # ── Monte Carlo validation ─────────────────────────────────────────────
     mc_result = mc.run_simulation(port_hist, initial_capital, sharpe)
 
+    # ── Deflated Sharpe Ratio (corrects for multiple-testing bias) ─────────
+    # n_strategies = 4 valid strategies + adaptive = 5 total tested
+    port_rets = (np.diff([p['value'] for p in port_hist]) /
+                 np.array([p['value'] for p in port_hist[:-1]]))
+    dsr_result = (st.deflated_sharpe_ratio(port_rets, n_strategies=5)
+                  if len(port_rets) >= 10 else None)
+
+    # ── Fama-French 3-factor decomposition ────────────────────────────────
+    ff3_result = st.fama_french_decomposition(port_hist)
+
     return {
         'metrics': {
             'total_return':     round(net_return,    2),
@@ -425,6 +436,8 @@ def run_backtest(
             'benchmark_return': round(benchmark_return, 2),
         },
         'monte_carlo':        mc_result,
+        'deflated_sharpe':    dsr_result,
+        'fama_french':        ff3_result,
         'markowitz_weights':  markowitz_weights if use_markowitz else None,
         'regime_breakdown':   _regime_breakdown(sell_trades),
         'equity_curve':     port_hist,

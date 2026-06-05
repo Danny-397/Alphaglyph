@@ -40,6 +40,7 @@ jobs:
           python -m py_compile regime.py
           python -m py_compile monte_carlo.py
           python -m py_compile portfolio.py
+          python -m py_compile stats.py
           python -m py_compile gunicorn.conf.py
 
       - name: Lint (flake8)
