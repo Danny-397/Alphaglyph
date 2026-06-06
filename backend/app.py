@@ -175,13 +175,24 @@ def get_watchlist():
     return jsonify(strategies.WATCHLIST)
 
 
+@app.route('/api/validate_ticker')
+def validate_ticker():
+    """Check whether a ticker exists. status: valid | not_found | rate_limited."""
+    symbol = request.args.get('symbol', '').strip().upper()
+    if not symbol:
+        return jsonify({'valid': False, 'symbol': '', 'status': 'not_found'}), 400
+    status = features.validate_symbol(symbol)
+    return jsonify({'valid': status == 'valid', 'symbol': symbol, 'status': status})
+
+
 # ── Backtesting ───────────────────────────────────────────────────────────────
 
 @app.route('/api/backtest', methods=['POST'])
 def run_backtest():
     data            = request.get_json() or {}
     strategy        = data.get('strategy', 'adaptive')
-    tickers         = data.get('tickers', ['AAPL', 'MSFT', 'SPY'])
+    tickers         = [t.strip().upper() for t in (data.get('tickers') or [])
+                       if isinstance(t, str) and t.strip()]
     start_date      = data.get('start_date',
                                (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date        = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))

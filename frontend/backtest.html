@@ -55,16 +55,14 @@
 
         <!-- Tickers -->
         <div class="form-group">
-          <label class="form-label">Tickers (click to toggle)</label>
-          <div class="chip-grid" id="bt-tickers">
-            <div class="ticker-chip selected" data-ticker="AAPL">AAPL</div>
-            <div class="ticker-chip selected" data-ticker="MSFT">MSFT</div>
-            <div class="ticker-chip selected" data-ticker="NVDA">NVDA</div>
-            <div class="ticker-chip selected" data-ticker="GOOGL">GOOGL</div>
-            <div class="ticker-chip selected" data-ticker="TSLA">TSLA</div>
-            <div class="ticker-chip selected" data-ticker="JPM">JPM</div>
-            <div class="ticker-chip selected" data-ticker="SPY">SPY</div>
+          <label class="form-label">Tickers</label>
+          <div class="ticker-input-row">
+            <input type="text" id="bt-ticker-input" placeholder="Type a ticker, e.g. AAPL"
+                   maxlength="8" autocomplete="off" spellcheck="false">
+            <button type="button" class="btn btn-sm" id="bt-ticker-add">Add</button>
           </div>
+          <div class="ticker-error" id="bt-ticker-error" hidden></div>
+          <div class="chip-grid" id="bt-tickers"></div>
         </div>
 
         <!-- Date range -->

@@ -609,10 +609,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 .ticker-chip:hover  { border-color: var(--blue); color: var(--blue); }
 .ticker-chip.selected {
+  display:      inline-flex;
+  align-items:  center;
+  gap:          6px;
   border-color: var(--blue);
   background:   var(--blue-dim);
   color:        var(--blue);
 }
+
+/* Free-text ticker input */
+.ticker-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ticker-input-row input {
+  flex: 1;
+  text-transform: uppercase;
+}
+.ticker-input-row .btn { flex-shrink: 0; }
+
+.ticker-error {
+  font-size: 12px;
+  color: var(--red);
+  background: var(--red-dim);
+  border: 1px solid rgba(248,81,73,.3);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  margin-bottom: 8px;
+}
+
+/* Remove (×) button inside a ticker chip */
+.chip-x {
+  border: none;
+  background: transparent;
+  color: var(--blue);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: .65;
+  transition: opacity .15s;
+}
+.chip-x:hover { opacity: 1; }
 
 /* ── Risk buttons ───────────────────────────────────────────────────────── */
 .risk-btn-group {

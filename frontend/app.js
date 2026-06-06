@@ -297,9 +297,62 @@ function initBacktest() {
   el('bt-start').value = daysAgo(365)
   el('bt-end').value   = today()
 
-  el('bt-tickers').querySelectorAll('.ticker-chip').forEach(chip => {
-    chip.addEventListener('click', () => chip.classList.toggle('selected'))
+  // ── Ticker management (free-text input, validated against the backend) ──
+  let btTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
+  const tickerInput = el('bt-ticker-input')
+  const tickerAddBtn = el('bt-ticker-add')
+  const tickerErr   = el('bt-ticker-error')
+
+  function renderTickerChips() {
+    if (!btTickers.length) {
+      el('bt-tickers').innerHTML =
+        '<span style="font-size:12px;color:var(--muted);">No tickers added yet.</span>'
+      return
+    }
+    el('bt-tickers').innerHTML = btTickers.map(t =>
+      `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`
+    ).join('')
+    el('bt-tickers').querySelectorAll('.chip-x').forEach(b =>
+      b.addEventListener('click', () => {
+        btTickers = btTickers.filter(x => x !== b.dataset.ticker)
+        renderTickerChips()
+      })
+    )
+  }
+
+  function showTickerErr(msg) { tickerErr.textContent = msg; tickerErr.hidden = false }
+  function hideTickerErr()    { tickerErr.hidden = true }
+
+  async function addTicker() {
+    const sym = (tickerInput.value || '').trim().toUpperCase()
+    hideTickerErr()
+    if (!sym) return
+    if (btTickers.includes(sym)) { tickerInput.value = ''; return }
+
+    tickerAddBtn.disabled = true
+    tickerAddBtn.textContent = '…'
+    const res = await api('/api/validate_ticker?symbol=' + encodeURIComponent(sym))
+    tickerAddBtn.disabled = false
+    tickerAddBtn.textContent = 'Add'
+
+    if (res && res.status === 'valid') {
+      btTickers.push(res.symbol)
+      renderTickerChips()
+      tickerInput.value = ''
+      tickerInput.focus()
+    } else if (res && res.status === 'rate_limited') {
+      showTickerErr('Couldn’t verify "' + sym + '" right now (data provider busy). Try again in a moment.')
+    } else {
+      showTickerErr('"' + sym + '" doesn’t exist. Enter a valid ticker symbol.')
+      tickerInput.select()
+    }
+  }
+
+  tickerAddBtn.addEventListener('click', addTicker)
+  tickerInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addTicker() }
   })
+  renderTickerChips()
 
   el('bt-risk-btns').querySelectorAll('.risk-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -311,9 +364,8 @@ function initBacktest() {
   el('run-btn').addEventListener('click', runBacktest)
 
   async function runBacktest() {
-    const tickers = [...el('bt-tickers').querySelectorAll('.ticker-chip.selected')]
-      .map(c => c.dataset.ticker)
-    if (!tickers.length) { alert('Select at least one ticker.'); return }
+    const tickers = [...btTickers]
+    if (!tickers.length) { alert('Add at least one ticker.'); return }
 
     const riskEl = el('bt-risk-btns').querySelector('.risk-btn.active')
     const commPct = parseFloat(el('bt-commission').value) || 0.10
