@@ -12,4 +12,4 @@
 //
 // Local development: leave empty — app.js falls back to localhost:5000.
 // ──────────────────────────────────────────────────────────────────────────
-window.RENDER_URL = ''
+window.RENDER_URL = 'https://trading-bot-jy87.onrender.com'
