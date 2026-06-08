@@ -26,6 +26,7 @@ FEATURE_COLS
 """
 
 import io
+import os
 import logging
 import time
 from datetime import datetime, timedelta
@@ -64,6 +65,61 @@ _PERIOD_DAYS = {
 def _is_rate_limit(exc) -> bool:
     s = str(exc).lower()
     return 'rate' in s or 'too many' in s or '429' in s
+
+
+# ── Source 0: Tiingo (primary when TIINGO_API_KEY is set — cloud-reliable) ────
+
+_TIINGO_BASE = 'https://api.tiingo.com/tiingo/daily'
+
+
+def _try_tiingo(ticker, period, start, end):
+    """
+    Tiingo end-of-day prices. Free tier, reliable from datacenter IPs.
+    Requires the TIINGO_API_KEY environment variable; returns ('skip') if unset.
+    Returns (DataFrame | None, status) where status is 'ok'|'nodata'|'rate_limited'|'skip'.
+    Uses adjusted OHLCV to mirror yfinance's auto_adjust=True.
+    """
+    token = os.getenv('TIINGO_API_KEY', '').strip()
+    if not token:
+        return None, 'skip'
+
+    if start and end:
+        s_date, e_date = start, end
+    else:
+        days = _PERIOD_DAYS.get(period, 220)
+        e_date = datetime.now().strftime('%Y-%m-%d')
+        s_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+
+    url = f'{_TIINGO_BASE}/{ticker}/prices'
+    params = {'startDate': s_date, 'endDate': e_date, 'token': token, 'format': 'json'}
+    try:
+        resp = requests.get(url, params=params, timeout=15,
+                            headers={'Content-Type': 'application/json'})
+        if resp.status_code == 404:
+            return None, 'nodata'          # ticker not found — authoritative
+        if resp.status_code == 429:
+            return None, 'rate_limited'
+        if resp.status_code in (401, 403):
+            logger.warning('Tiingo: invalid or missing API key (HTTP %s)', resp.status_code)
+            return None, 'skip'
+        resp.raise_for_status()
+        rows = resp.json()
+        if not rows:
+            return None, 'nodata'
+        df = pd.DataFrame(rows)
+        df['date'] = pd.to_datetime(df['date'], utc=True).dt.tz_localize(None)
+        df = df.set_index('date').sort_index()
+        out = pd.DataFrame({
+            'Open':   df['adjOpen'],
+            'High':   df['adjHigh'],
+            'Low':    df['adjLow'],
+            'Close':  df['adjClose'],
+            'Volume': df['adjVolume'],
+        }).dropna()
+        return (out, 'ok') if not out.empty else (None, 'nodata')
+    except Exception as exc:
+        logger.warning('Tiingo fetch failed for %s: %s', ticker, exc)
+        return None, 'skip'
 
 
 # ── Source 1: yfinance (with retry/backoff) ───────────────────────────────────
@@ -163,18 +219,37 @@ def _download(ticker: str, period: str, interval: str,
     if hit and (time.time() - hit[0]) < _CACHE_TTL:
         return hit[1].copy()
 
-    df, status = _try_yfinance(ticker, period, interval, start, end)
-    if df is None and interval == '1d':
-        # yfinance gave no data or was rate-limited — try Stooq (daily only)
-        df = _try_stooq(ticker, period, start, end)
-        if df is not None:
-            status = 'ok'
+    statuses = []
 
-    if df is not None and not df.empty:
+    def _cache_return(df):
         _CACHE[key] = (time.time(), df)
         return df.copy()
 
-    if status == 'rate_limited':
+    # 1. Tiingo (primary when an API key is configured)
+    df, st = _try_tiingo(ticker, period, start, end)
+    if df is not None and not df.empty:
+        return _cache_return(df)
+    if st != 'skip':
+        statuses.append(st)
+
+    # 2. yfinance (free, no key, but heavily rate-limited)
+    df, st = _try_yfinance(ticker, period, interval, start, end)
+    if df is not None and not df.empty:
+        return _cache_return(df)
+    statuses.append(st)
+
+    # 3. Stooq (free fallback, daily only)
+    if interval == '1d':
+        df = _try_stooq(ticker, period, start, end)
+        if df is not None and not df.empty:
+            return _cache_return(df)
+
+    # Nothing returned data. A definitive 'nodata' (e.g. Tiingo 404) wins —
+    # treat the symbol as invalid. Otherwise, if any source was rate-limited,
+    # surface that so the UI can say "try again" rather than "doesn't exist".
+    if 'nodata' in statuses:
+        return None
+    if 'rate_limited' in statuses:
         raise RuntimeError('rate_limited')
     return None
 

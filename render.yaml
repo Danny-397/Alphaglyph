@@ -26,6 +26,12 @@ services:
         value: "3.11.9"            # pandas/numpy/scipy ship wheels for 3.11;
                                    # newer Pythons force a slow source build that fails
 
+      - key: TIINGO_API_KEY
+        sync: false          # free key from https://www.tiingo.com — primary
+                             # market-data source (yfinance/Stooq are unreliable
+                             # from cloud IPs). Without it, backtests may fail
+                             # to fetch data on Render.
+
       - key: CORS_ORIGINS
         sync: false          # set to your Vercel URL after frontend deploy
                              # e.g. https://your-project.vercel.app

@@ -125,7 +125,9 @@ Indicators: **ADX** (Wilder's smoothing), **Bollinger Band Width** (consolidatio
 |---|---|---|
 | Python | 3.11+ | Runtime |
 | Flask | 3.0 | REST API |
-| yfinance | 0.2 | Real-time and historical OHLCV data |
+| Tiingo | API | Primary market data (free key; reliable from cloud) |
+| yfinance | 0.2 | Fallback market data (free, no key) |
+| Stooq | — | Secondary fallback (free, no key) |
 | pandas | 2.2 | Time-series data manipulation |
 | numpy | 1.26 | Indicator maths, matrix operations |
 | scipy | 1.13 | Quadratic programming (Markowitz SLSQP) |
@@ -275,9 +277,14 @@ All environment variables are **optional** — the app runs out of the box with 
 
 | Variable | Required | Description |
 |---|---|---|
+| `TIINGO_API_KEY` | No (recommended) | Free key from [tiingo.com](https://www.tiingo.com). Primary market-data source — yfinance/Stooq are rate-limited and often blocked on cloud IPs, so set this for reliable backtesting in production. |
 | `PORT` | No | Flask port (default: 5000) |
 | `DATABASE_PATH` | No | SQLite path (default: `backend/tradebot.db`). Set to `/data/tradebot.db` on Render for persistence. |
 | `CORS_ORIGINS` | No | Allowed CORS origins (default: `*`). Set to your Vercel URL in production. |
+
+### Market data sources
+
+TradeBot tries data sources in order: **Tiingo** (if `TIINGO_API_KEY` is set) → **yfinance** → **Stooq**. The first to return data wins, and results are cached in-process for 15 minutes. yfinance and Stooq are free but heavily rate-limited (especially from datacenter IPs); Tiingo's free tier is reliable from anywhere, which is why it's recommended for deployment.
 
 ---
 
