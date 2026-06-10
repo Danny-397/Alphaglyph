@@ -300,5 +300,29 @@ def stop_bot() -> tuple[bool, str]:
     return True, 'Stop signal sent'
 
 
+def resume_if_running() -> bool:
+    """
+    Restart the bot loop on process startup if the persisted state says it was
+    running. Called once at app import time.
+
+    Render's free tier spins the service down after inactivity and restarts the
+    process on the next request; gunicorn can also recycle the worker. Either
+    event kills the in-memory bot thread, so without this the dashboard would
+    show "stopped" after every restart. Unlike start_bot(), this preserves the
+    existing started_at and initial_value so the return baseline isn't reset.
+    """
+    global _bot_thread
+    if _bot_thread and _bot_thread.is_alive():
+        return False
+    state = database.get_bot_state()
+    if not (state and state.get('is_running')):
+        return False
+    _stop_event.clear()
+    _bot_thread = threading.Thread(target=_bot_loop, daemon=True, name='tradebot')
+    _bot_thread.start()
+    _log('Bot auto-resumed after process restart')
+    return True
+
+
 def is_running() -> bool:
     return _bot_thread is not None and _bot_thread.is_alive()

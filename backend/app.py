@@ -40,6 +40,10 @@ _cors_origins = os.getenv('CORS_ORIGINS', '*')
 CORS(app, origins=_cors_origins)
 database.init_db()
 simulator.init_simulator()
+# Render free tier spins the process down on inactivity and gunicorn can recycle
+# the worker — either kills the in-memory bot thread. Resume it from persisted
+# state so the dashboard doesn't show "stopped" after a restart.
+bot.resume_if_running()
 
 VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive',)
 
