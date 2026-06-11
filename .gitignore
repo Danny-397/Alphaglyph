@@ -4,6 +4,10 @@
 # SQLite database — runtime data, not source code
 backend/tradebot.db
 
+# ML training data — rebuilt by ml/dataset.py, too large for git
+# (the exported backend/ml_model.onnx + meta JSON ARE committed)
+ml/data/
+
 # Python
 __pycache__/
 *.py[cod]

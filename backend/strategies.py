@@ -85,30 +85,25 @@ def macd_signal(ticker: str) -> tuple[str | None, float | None]:
     return 'HOLD', price
 
 
-# ── Strategy 4 — ML (stub) ────────────────────────────────────────────────────
-
-# ── HOW TO ACTIVATE THIS STRATEGY ─────────────────────────────────────────────
-# 1. Train your model on features.FEATURE_COLS and save it:
-#       import joblib
-#       joblib.dump(model, 'backend/ml_model.pkl')
-#
-# 2. Uncomment the two lines below to load the model at startup:
-#       import joblib
-#       _ml_model = joblib.load('ml_model.pkl')
-#
-# 3. In ml_signal(), replace `return 'HOLD', price` with:
-#       row = df[feat.FEATURE_COLS].iloc[-1].values.reshape(1, -1)
-#       signal = _ml_model.predict(row)[0]   # expects 'BUY', 'SELL', or 'HOLD'
-#       return signal, price
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Strategy 4 — ML transformer ───────────────────────────────────────────────
+# A multi-modal transformer (price + indicators + macro + news sentiment)
+# trained offline (see ml/README.md) and served via ONNX by ml_runtime.py.
+# Predicts a return distribution, direction probability, and vol forecast
+# over the next 5 trading days; trades only when direction AND the median
+# of the return distribution agree.  Holds gracefully if no model file is
+# deployed yet.
 
 def ml_signal(ticker: str) -> tuple[str | None, float | None]:
-    """ML strategy — returns HOLD until model is loaded (see comments above)."""
+    import ml_runtime
+    if ml_runtime.is_available():
+        return ml_runtime.live_signal(ticker)
+
+    # No trained model deployed — behave like a HOLD strategy, don't crash.
     df = feat.get_feature_df(ticker, period='6mo')
     if df is None or df.empty:
         return None, None
     price = float(df['Close'].iloc[-1])
-    logger.info('ML model not yet loaded — HOLD for %s', ticker)
+    logger.info('ML model not deployed — HOLD for %s (train with ml/train.py)', ticker)
     return 'HOLD', price
 
 

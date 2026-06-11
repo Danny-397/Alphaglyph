@@ -42,7 +42,12 @@ jobs:
           python -m py_compile portfolio.py
           python -m py_compile simulator.py
           python -m py_compile stats.py
+          python -m py_compile ml_features.py
+          python -m py_compile ml_runtime.py
           python -m py_compile gunicorn.conf.py
+          python -m py_compile ../ml/model.py
+          python -m py_compile ../ml/dataset.py
+          python -m py_compile ../ml/train.py
 
       - name: Lint (flake8)
         run: |

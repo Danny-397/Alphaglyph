@@ -1,0 +1,9 @@
+# Training-side dependencies (Colab / local GPU box) — NOT installed on the
+# server. The deployed bot only needs onnxruntime (see backend/requirements.txt).
+torch>=2.2
+onnx>=1.15
+onnxruntime>=1.17
+numpy>=1.26
+pandas>=2.2
+requests>=2.31
+yfinance>=0.2.54

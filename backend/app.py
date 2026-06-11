@@ -18,6 +18,7 @@ import backtest as backtester
 import bot
 import database
 import features  # noqa: F401 — imported so startup errors surface early
+import ml_runtime
 import portfolio as portopt
 import regime as reg
 import risk
@@ -209,6 +210,14 @@ def indicators():
 @app.route('/api/watchlist')
 def get_watchlist():
     return jsonify(strategies.WATCHLIST)
+
+
+@app.route('/api/ml/info')
+def ml_info():
+    """ML transformer status: whether a trained model is deployed, its
+    architecture, validation/test metrics, and decision thresholds.
+    The frontend uses this to enable the ML strategy option."""
+    return jsonify(ml_runtime.get_info())
 
 
 @app.route('/api/validate_ticker')

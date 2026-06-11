@@ -58,7 +58,8 @@ def _kelly(wins: list, losses: list, half: bool = True) -> float | None:
 
 # ── Signal generation ──────────────────────────────────────────────────────────
 
-def _add_signals(df: pd.DataFrame, strategy: str) -> pd.DataFrame:
+def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '') -> pd.DataFrame:
+    raw = df.copy()                  # ml branch needs unmodified OHLCV
     df = feat.compute_features(df)
     df.dropna(inplace=True)
 
@@ -78,7 +79,20 @@ def _add_signals(df: pd.DataFrame, strategy: str) -> pd.DataFrame:
             (df['macd_line'].shift(1) >= df['macd_signal'].shift(1)) &
             (df['macd_line'] < df['macd_signal'])
         )
-    elif strategy in ('ml', 'hold'):
+    elif strategy == 'ml':
+        # Transformer signals: one batched ONNX call over every window in the
+        # range.  Each day's window ends on that day — no look-ahead.  Without
+        # a deployed model this stays all-zero (no trades) instead of failing.
+        import ml_runtime
+        ml_sigs = ml_runtime.backtest_signals(raw, ticker or 'SPY')
+        if ml_sigs is not None:
+            ml_sigs = ml_sigs.reindex(df.index).fillna(0).astype(int)
+            buy  = ml_sigs == 1
+            sell = ml_sigs == -1
+        else:
+            buy  = pd.Series(False, index=df.index)
+            sell = pd.Series(False, index=df.index)
+    elif strategy == 'hold':
         buy  = pd.Series(False, index=df.index)
         sell = pd.Series(False, index=df.index)
     else:
@@ -195,7 +209,7 @@ def run_backtest(
                 tagged[f'signal_{strat}'] = sf['signal'].reindex(tagged.index).fillna(0)
             data[ticker] = tagged
         else:
-            data[ticker] = _add_signals(raw, strategy)
+            data[ticker] = _add_signals(raw, strategy, ticker)
 
     if not data:
         return {'error': 'No sufficient data for the selected tickers and date range.'}

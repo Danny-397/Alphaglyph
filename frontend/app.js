@@ -21,7 +21,24 @@ const STRATEGY_LABELS = {
   ma_crossover: 'MA Crossover',
   rsi:          'RSI Mean Reversion',
   macd:         'MACD Momentum',
-  ml:           'ML (Stub)',
+  ml:           'ML Transformer',
+}
+
+// Enable the ML strategy option in a <select> once the backend reports a
+// trained model is deployed (until then it stays disabled with a hint).
+async function enableMlOption(selectEl) {
+  if (!selectEl) return
+  const info = await api('/api/ml/info')
+  const opt  = selectEl.querySelector('option[value="ml"]')
+  if (!opt) return
+  if (info && info.loaded) {
+    opt.disabled    = false
+    opt.textContent = 'ML Transformer'
+    opt.title       = `v${info.version} — ${Number(info.n_params).toLocaleString()} params, ` +
+                      `test AUC ${info.test_metrics?.auc ?? info.val_metrics?.auc ?? '—'}`
+  } else {
+    opt.textContent = 'ML Transformer (not trained yet)'
+  }
 }
 
 const REGIME_COLORS = {
@@ -148,6 +165,8 @@ function initDashboard() {
   const startStopBtn   = el('start-stop-btn')
   const strategySelect = el('strategy-select')
   const riskBtns       = el('risk-btns')
+
+  enableMlOption(strategySelect)
 
   startStopBtn.addEventListener('click', async () => {
     startStopBtn.disabled = true
@@ -340,6 +359,8 @@ function initBacktest() {
 
   el('bt-start').value = daysAgo(365)
   el('bt-end').value   = today()
+
+  enableMlOption(el('bt-strategy'))
 
   // ── Ticker management (free-text input, validated against the backend) ──
   let btTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
