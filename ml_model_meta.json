@@ -1,0 +1,77 @@
+{
+  "version": "20260612-1643",
+  "created": "2026-06-12T16:43:08.511494",
+  "architecture": "multi-modal transformer encoder (3 layers, d_model 64, 4 heads, multi-task heads)",
+  "n_params": 105735,
+  "seq_len": 60,
+  "horizon": 5,
+  "features": [
+    "f_log_ret",
+    "f_hl_range",
+    "f_oc_ret",
+    "f_vol_z",
+    "f_rsi",
+    "f_macd",
+    "f_sma_ratio",
+    "f_ret_5d",
+    "f_vix",
+    "f_term_spread",
+    "f_fedfunds",
+    "f_news_tone",
+    "f_tone_mom"
+  ],
+  "feature_means": [
+    0.0006261884118430316,
+    0.019604407250881195,
+    0.0002473031636327505,
+    -0.0022007806692272425,
+    0.07491866499185562,
+    -9.37096501729684e-06,
+    0.009603429585695267,
+    0.0039320094510912895,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "feature_stds": [
+    0.01799142360687256,
+    0.013913503848016262,
+    0.01404796727001667,
+    1.0457569360733032,
+    0.23871637880802155,
+    0.006002194248139858,
+    0.040987346321344376,
+    0.03931864723563194,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "clip": 5.0,
+  "thresholds": {
+    "buy_prob": 0.56,
+    "sell_prob": 0.45
+  },
+  "splits": {
+    "train_end": "2021-12-31",
+    "val_end": "2023-06-30",
+    "purge_days": 10
+  },
+  "val_metrics": {
+    "loss": 0.7132380169923188,
+    "auc": 0.5367,
+    "acc": 0.515
+  },
+  "test_metrics": {
+    "loss": 0.7072227954864502,
+    "auc": 0.5118,
+    "acc": 0.5403,
+    "buy_coverage": 0.2515,
+    "buy_avg_fwd_logret": 0.00491
+  },
+  "n_tickers": 85,
+  "modality_dropout": 0.15
+}
