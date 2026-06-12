@@ -202,6 +202,34 @@ function initDashboard() {
     if (history)  updateEquityChart(history)
     if (trades)   updateTradesFeed(trades)
     if (activity) updateActivityLog(activity)
+    updateTrackRecord(status, history)
+  }
+
+  // Live track-record strip: derives "tracking since" from the first portfolio
+  // snapshot (the true start of the current record), the day count, and the
+  // return since inception. Honest about being paper-traded.
+  function updateTrackRecord(status, history) {
+    const bar = el('track-record')
+    if (!bar) return
+    const first = (history && history.length) ? history[0] : null
+    const sinceISO = (first && first.timestamp) || (status && status.started_at) || null
+
+    if (sinceISO) {
+      const since = new Date(sinceISO)
+      const days  = Math.max(1, Math.floor((Date.now() - since.getTime()) / 86400000) + 1)
+      el('tr-since').textContent  = 'Tracking since ' +
+        since.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      el('tr-days').textContent   = 'Day ' + days
+      const ret = status && status.portfolio ? status.portfolio.total_return : null
+      const rEl = el('tr-return')
+      rEl.textContent = ret == null ? '—' : fmtPct(ret) + ' since start'
+      rEl.className   = 'tr-item ' + clr(ret)
+      el('tr-since').hidden = el('tr-days').hidden = rEl.hidden = false
+    } else {
+      // No record yet — keep the strip but hide the dynamic stats.
+      el('tr-since').hidden = el('tr-days').hidden = el('tr-return').hidden = true
+    }
+    bar.hidden = false
   }
 
   function updateFromStatus(s) {

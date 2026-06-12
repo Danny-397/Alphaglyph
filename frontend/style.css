@@ -1070,6 +1070,57 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .info:hover::after,
 .info:focus::after { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── Live track-record strip ────────────────────────────────────────────── */
+.track-record {
+  display:        flex;
+  align-items:    center;
+  flex-wrap:      wrap;
+  gap:            14px;
+  padding:        10px 16px;
+  margin-bottom:  20px;
+  background:     linear-gradient(90deg, rgba(46,160,67,0.10), rgba(46,160,67,0.02) 60%, transparent);
+  border:         1px solid var(--border);
+  border-left:    3px solid var(--green);
+  border-radius:  var(--radius);
+  font-family:    var(--font-mono);
+  font-size:      12px;
+}
+.tr-live {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            7px;
+  font-weight:    700;
+  letter-spacing: 1.5px;
+  color:          var(--green);
+}
+.tr-live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 0 rgba(63,185,80,0.6);
+  animation: tr-pulse 2s infinite;
+}
+@keyframes tr-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(63,185,80,0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(63,185,80,0); }
+  100% { box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+}
+.tr-item {
+  color:        var(--text);
+  font-weight:  600;
+  padding-left: 14px;
+  border-left:  1px solid var(--border);
+}
+.tr-note {
+  margin-left: auto;
+  color:       var(--muted);
+  font-size:   11px;
+  letter-spacing: .3px;
+}
+@media (max-width: 640px) {
+  .tr-note { margin-left: 0; width: 100%; }
+}
+
 /* ── First-run onboarding banner ────────────────────────────────────────── */
 .onboard {
   display:       flex;
