@@ -242,13 +242,18 @@ def main():
           f"avg 5-day fwd log-ret on signals {edge:+.4f}")
 
     # ── ONNX export + parity check ─────────────────────────────────────────
+    # dynamo=False forces the legacy TorchScript exporter. PyTorch's newer
+    # dynamo exporter mishandles the TransformerEncoder's attention reshape with
+    # a dynamic batch axis (produces a broken Reshape), whereas the legacy path
+    # exports this model correctly and is exactly what dynamic_axes targets.
     model.eval().cpu()
-    dummy = torch.randn(1, mlf.SEQ_LEN, n_features)
+    dummy = torch.randn(2, mlf.SEQ_LEN, n_features)
     torch.onnx.export(
         model, dummy, ONNX_OUT, opset_version=17,
         input_names=['input'], output_names=['direction', 'quantiles', 'volatility'],
         dynamic_axes={'input': {0: 'batch'}, 'direction': {0: 'batch'},
                       'quantiles': {0: 'batch'}, 'volatility': {0: 'batch'}},
+        dynamo=False,
     )
     import onnxruntime as ort
     sess  = ort.InferenceSession(ONNX_OUT, providers=['CPUExecutionProvider'])
