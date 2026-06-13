@@ -8,6 +8,9 @@ backend/alphaglyph.db
 # (the exported backend/ml_model.onnx + meta JSON ARE committed)
 ml/data/
 
+# Personal interview/essay prep — not for the public repo
+STUDY_GUIDE.md
+
 # Python
 __pycache__/
 *.py[cod]
