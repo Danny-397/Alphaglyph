@@ -348,7 +348,12 @@ def optimize_portfolio():
 def health():
     # Exempt: UptimeRobot (or similar) pings this frequently to keep the free
     # Render instance warm — it must never be rate limited.
-    return jsonify({'status': 'ok', 'ts': datetime.utcnow().isoformat()})
+    return jsonify({
+        'status': 'ok',
+        'ts':     datetime.utcnow().isoformat(),
+        # 'postgres' = persistent (survives redeploys); 'sqlite' = ephemeral.
+        'db':     'postgres' if database._USE_PG else 'sqlite',
+    })
 
 
 if __name__ == '__main__':
