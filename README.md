@@ -9,7 +9,7 @@
 [![Paper Trading](https://img.shields.io/badge/Paper_Trading-Simulated-FFCD00?style=flat)](#)
 [![SciPy](https://img.shields.io/badge/SciPy-1.13-8CAAE6?style=flat&logo=scipy)](https://scipy.org)
 
-> **Live demo:** `[Add Render URL after deployment]`
+> **Live demo:** [alphaglyph.org](https://alphaglyph.org)
 
 ---
 
