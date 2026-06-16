@@ -10,3 +10,4 @@ python-dotenv==1.0.1
 pytz==2024.1
 gunicorn==22.0.0
 onnxruntime==1.19.2
+psycopg2-binary==2.9.9
