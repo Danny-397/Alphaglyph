@@ -1,6 +1,6 @@
-# ◈ AlphaGlyph — Quantitative Research Platform
+# ◈ AlphaGlyph — A Quant & ML Paper-Trading Bot
 
-**A paper-trading algorithmic system that not only executes quantitative strategies, but rigorously validates whether its own performance is statistically real — using the same mathematical tools employed by institutional quant funds.**
+**An algorithmic paper-trading bot that trades real market prices with simulated capital — using classical quantitative strategies, a multi-modal machine-learning transformer, and market-regime detection — then rigorously validates whether its own edge is statistically real, with the same mathematical tools institutional quant funds use.**
 
 [![CI](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml/badge.svg)](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
