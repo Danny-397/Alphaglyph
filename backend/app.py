@@ -348,9 +348,19 @@ def optimize_portfolio():
 def health():
     # Exempt: UptimeRobot (or similar) pings this frequently to keep the free
     # Render instance warm — it must never be rate limited.
+    #
+    # Self-healing watchdog: if the persisted state says the bot should be
+    # running but its thread has died (e.g. after a restart), restart it. With
+    # a 5-minute keep-warm ping this means the bot can never stay down for long.
+    # Wrapped so a hiccup here never makes the health check fail.
+    try:
+        bot.resume_if_running()
+    except Exception as exc:
+        logger.warning('health watchdog resume failed: %s', exc)
     return jsonify({
         'status': 'ok',
         'ts':     datetime.utcnow().isoformat(),
+        'running': bot.is_running(),
         # 'postgres' = persistent (survives redeploys); 'sqlite' = ephemeral.
         'db':     'postgres' if database._USE_PG else 'sqlite',
     })
