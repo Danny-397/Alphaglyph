@@ -418,3 +418,20 @@ a { color: inherit; text-decoration: none; }
   .hero h1 { font-size: 2.1rem; }
   .footer-grid { flex-direction: column; }
 }
+
+@media (max-width: 480px) {
+  .container,
+  .lp-nav-inner,
+  .stats-inner { padding-left: 16px; padding-right: 16px; }
+  .hero { padding: 52px 0 44px; }
+  .hero h1 { font-size: 1.85rem; }
+  .hero-sub { font-size: 1.02rem; }
+  .section { padding: 52px 0; }
+  /* Full-width, stacked call-to-action buttons are far easier to tap */
+  .hero-cta,
+  .cta-btns { flex-direction: column; align-items: stretch; }
+  .hero-cta .btn,
+  .cta-btns .btn { width: 100%; }
+  .section-head h2,
+  .cta h2 { font-size: 1.6rem; }
+}

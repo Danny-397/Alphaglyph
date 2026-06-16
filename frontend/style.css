@@ -1255,7 +1255,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .hero-row          { flex-direction: column; }
+  .hero-row          { gap: 12px; }
   .stats-grid        { grid-template-columns: 1fr 1fr; }
   .two-col           { grid-template-columns: 1fr; }
   .research-grid     { grid-template-columns: 1fr; }
@@ -1271,4 +1271,53 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr; }
   .hero-stat-value { font-size: 22px; }
+}
+
+/* ── Mobile refinements ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* 16px inputs stop iOS Safari from auto-zooming when a field is focused */
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select, .input, .select { font-size: 16px; }
+  .btn { padding: 10px 18px; }            /* comfortable tap target */
+}
+
+@media (max-width: 640px) {
+  /* Top nav: compact, swipeable, never overflows the screen */
+  .navbar         { padding: 0 12px; gap: 10px; }
+  .nav-brand-sub,
+  .nav-badge      { display: none; }
+  .nav-brand-name { font-size: 15px; letter-spacing: .5px; }
+  .nav-links {
+    gap:             2px;
+    flex-wrap:       nowrap;
+    overflow-x:      auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-link { padding: 7px 11px; font-size: 12.5px; }
+
+  /* Tighter spacing so content isn't cramped against the edges */
+  .page-wrap      { padding: 62px 10px 28px; }
+  .card           { padding: 15px; }
+  .page-header h1 { font-size: 20px; }
+
+  /* Hero metric tiles: two per row instead of one tall column */
+  .hero-row        { gap: 10px; }
+  .hero-stat       { min-width: calc(50% - 6px); padding: 15px 16px; }
+  .hero-stat-value { font-size: 23px; }
+
+  /* Data tables: smooth horizontal scroll with tighter cells */
+  .table-wrap     { -webkit-overflow-scrolling: touch; }
+  .data-table th,
+  .data-table td  { padding: 8px 10px; }
+
+  /* Status bar wraps cleanly without stray separators */
+  .status-bar     { gap: 8px 10px; }
+  .status-bar-sep { display: none; }
+
+  /* Tab strips stay swipeable */
+  .tab-list { -webkit-overflow-scrolling: touch; }
 }
