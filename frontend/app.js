@@ -167,9 +167,12 @@ function initTabs(root) {
 //  DASHBOARD
 // ════════════════════════════════════════════════════════════════════════════
 function initDashboard() {
-  let eqChart       = null
-  let botRunning    = false
+  let eqChart        = null
+  let botRunning     = false
   let controlsLocked = false   // true on a public demo when the viewer isn't the owner
+  let watchCount     = 0       // how many tickers the bot scans (for the narration)
+
+  api('/api/watchlist').then(w => { if (Array.isArray(w)) watchCount = w.length })
 
   initTabs(document.body)
 
@@ -238,6 +241,51 @@ function initDashboard() {
     if (trades)   updateTradesFeed(trades)
     if (activity) updateActivityLog(activity)
     updateTrackRecord(status, history)
+    updateBotNow(status, activity)
+  }
+
+  // Plain-English narration of what the bot is doing right now — so a visitor
+  // who can't control the bot still understands they're watching it work live.
+  function updateBotNow(s, activity) {
+    const now = el('bot-now')
+    if (!now) return
+    if (!s) { now.textContent = 'Connecting to the live bot…'; return }
+
+    const stocks   = watchCount ? `<strong>${watchCount}</strong> stocks` : 'its watchlist'
+    const pos      = (s.portfolio && s.portfolio.active_positions) || 0
+    const posTxt   = pos ? `holding <strong>${pos}</strong> position${pos === 1 ? '' : 's'}`
+                         : 'holding no positions right now'
+    const stratNm  = STRATEGY_LABELS[s.strategy] || s.strategy || 'adaptive'
+
+    if (!s.is_running) {
+      now.innerHTML = 'The bot is <strong>paused</strong>. When running, it scans the ' +
+        'market every 5 minutes and trades on its own signals.'
+    } else if (s.market_open) {
+      let regimeTxt = ''
+      if (s.regime) {
+        const r  = s.regime.label || s.regime.regime
+        const rs = s.regime.strategy ? (STRATEGY_LABELS[s.regime.strategy] || s.regime.strategy) : null
+        regimeTxt = ` It reads the market as <strong>${r}</strong>` +
+                    (rs ? `, so it's using the <strong>${rs}</strong> strategy.` : '.')
+      }
+      now.innerHTML = `🟢 <strong>Live and trading.</strong> Every 5 minutes it scans ${stocks}, ` +
+        `checks its risk limits, and acts on its signals — ${posTxt}, ` +
+        `<strong>${s.daily_trades || 0}</strong> trade${(s.daily_trades || 0) === 1 ? '' : 's'} today.` +
+        regimeTxt
+    } else {
+      now.innerHTML = `The market is <strong>closed</strong>, so the bot is monitoring and will ` +
+        `resume scanning ${stocks} at the next open. Strategy ready: <strong>${stratNm}</strong>; ${posTxt}.`
+    }
+
+    const last = el('bot-last')
+    if (last) {
+      if (activity && activity.length) {
+        last.innerHTML = '<strong>Latest:</strong> ' + activity[0]
+        last.hidden = false
+      } else {
+        last.hidden = true
+      }
+    }
   }
 
   // Live track-record strip: derives "tracking since" from the first portfolio
