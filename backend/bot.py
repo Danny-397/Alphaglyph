@@ -269,9 +269,16 @@ def _trading_cycle(configured_strategy: str):
 def _bot_loop():
     _log('Bot started')
     while not _stop_event.is_set():
-        state    = database.get_bot_state()
-        strategy = state['strategy'] if state else 'adaptive'
-        _trading_cycle(strategy)
+        # The whole body is guarded: a transient hiccup (e.g. a brief database
+        # blip) must NEVER kill the loop thread — it should log and try again
+        # next cycle. Previously an unguarded get_bot_state() here could crash
+        # the thread silently while the web process kept running.
+        try:
+            state    = database.get_bot_state()
+            strategy = state['strategy'] if state else 'adaptive'
+            _trading_cycle(strategy)
+        except Exception as exc:
+            logger.exception('Bot loop error (continuing next cycle): %s', exc)
         _stop_event.wait(300)
     _log('Bot stopped')
 
