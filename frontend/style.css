@@ -1070,6 +1070,37 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .info:hover::after,
 .info:focus::after { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── "Watch it trade" funnel banner ─────────────────────────────────────── */
+.see-trade {
+  display:       flex;
+  align-items:   center;
+  gap:           14px;
+  padding:       12px 18px;
+  margin-bottom: 20px;
+  background:    linear-gradient(90deg, rgba(46,160,67,0.10), transparent 70%);
+  border:        1px solid var(--green-line, var(--border));
+  border-left:   3px solid var(--green);
+  border-radius: var(--radius);
+}
+.st-icon {
+  flex-shrink:     0;
+  width:           30px;
+  height:          30px;
+  border-radius:   50%;
+  background:      var(--green-dim);
+  color:           var(--green);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       12px;
+}
+.st-text { flex: 1; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.st-text strong { color: var(--text); }
+.see-trade .btn { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .see-trade { flex-direction: column; align-items: flex-start; }
+}
+
 /* ── Live activity narration card ───────────────────────────────────────── */
 .live-activity .section-header {
   display:     flex;
