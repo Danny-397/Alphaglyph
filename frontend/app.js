@@ -8,6 +8,22 @@
 const _isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
 const API_BASE = window.RENDER_URL || (_isLocal ? 'http://localhost:5000' : '')
 
+// Owner token for bot controls. The owner unlocks the dashboard once by
+// visiting it with ?admin=<token>; it's stored in the browser and the URL is
+// cleaned. Sent as a header on every API call (harmless on read endpoints).
+const ADMIN_TOKEN = (() => {
+  try {
+    const url = new URL(location.href)
+    const q = url.searchParams.get('admin')
+    if (q) {
+      localStorage.setItem('ag_admin', q)
+      url.searchParams.delete('admin')
+      history.replaceState({}, '', url.toString())
+    }
+    return localStorage.getItem('ag_admin') || ''
+  } catch (_) { return '' }
+})()
+
 if (!_isLocal && !window.RENDER_URL) {
   console.error(
     '%c⚠ AlphaGlyph: RENDER_URL is not set in config.js.\n' +
@@ -52,8 +68,12 @@ const REGIME_COLORS = {
 async function api(path, opts = {}) {
   try {
     const r = await fetch(API_BASE + path, {
-      headers: { 'Content-Type': 'application/json' },
       ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(ADMIN_TOKEN ? { 'X-Admin-Token': ADMIN_TOKEN } : {}),
+        ...(opts.headers || {}),
+      },
     })
     if (!r.ok) throw new Error('HTTP ' + r.status)
     return r.json()
@@ -147,8 +167,9 @@ function initTabs(root) {
 //  DASHBOARD
 // ════════════════════════════════════════════════════════════════════════════
 function initDashboard() {
-  let eqChart    = null
-  let botRunning = false
+  let eqChart       = null
+  let botRunning    = false
+  let controlsLocked = false   // true on a public demo when the viewer isn't the owner
 
   initTabs(document.body)
 
@@ -169,6 +190,7 @@ function initDashboard() {
   enableMlOption(strategySelect)
 
   startStopBtn.addEventListener('click', async () => {
+    if (controlsLocked) return
     startStopBtn.disabled = true
     if (botRunning) {
       await api('/api/stop', { method: 'POST' })
@@ -180,16 +202,29 @@ function initDashboard() {
   })
 
   strategySelect.addEventListener('change', async () => {
+    if (controlsLocked) return
     await api('/api/strategy', { method: 'POST', body: JSON.stringify({ strategy: strategySelect.value }) })
   })
 
   riskBtns.querySelectorAll('.risk-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (controlsLocked) return
       riskBtns.querySelectorAll('.risk-btn').forEach(b => b.classList.remove('active'))
       btn.classList.add('active')
       await api('/api/risk_tolerance', { method: 'POST', body: JSON.stringify({ tolerance: btn.dataset.risk }) })
     })
   })
+
+  // Lock the bot controls for non-owners on a public demo (server enforces it
+  // too; this just makes the UI honest instead of showing dead buttons).
+  function applyControlAccess(s) {
+    const locked = !!s.admin_required && !ADMIN_TOKEN
+    controlsLocked = locked
+    strategySelect.disabled = locked
+    riskBtns.querySelectorAll('.risk-btn').forEach(b => { b.disabled = locked })
+    const note = el('control-note')
+    if (note) note.hidden = !locked
+  }
 
   async function refreshAll() {
     const [status, history, trades, activity] = await Promise.all([
@@ -244,10 +279,12 @@ function initDashboard() {
     mkt.textContent = s.market_open ? 'MARKET OPEN' : 'MARKET CLOSED'
     mkt.className   = 'badge ' + (s.market_open ? 'badge-green' : 'badge-red')
 
+    applyControlAccess(s)
     startStopBtn.textContent = s.is_running ? 'STOP BOT' : 'START BOT'
     startStopBtn.className   = 'btn ' + (s.is_running ? 'btn-danger' : 'btn-primary')
     startStopBtn.style.width = '100%'
     startStopBtn.style.marginTop = '4px'
+    if (controlsLocked) startStopBtn.disabled = true
 
     if (strategySelect.value !== s.strategy && s.strategy)
       strategySelect.value = s.strategy

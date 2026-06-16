@@ -1070,6 +1070,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .info:hover::after,
 .info:focus::after { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── Owner-only controls note ───────────────────────────────────────────── */
+.control-note {
+  margin-top:  10px;
+  font-size:   11.5px;
+  line-height: 1.5;
+  color:       var(--muted);
+  text-align:  center;
+}
+.control-note a { color: var(--green); }
+
 /* ── Live track-record strip ────────────────────────────────────────────── */
 .track-record {
   display:        flex;

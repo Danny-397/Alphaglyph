@@ -35,10 +35,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
-# Render terminates TLS at a single proxy hop and forwards the real client IP
-# in X-Forwarded-For. Trust exactly one hop so rate limiting keys on the actual
-# visitor's IP rather than the proxy (otherwise everyone shares one bucket).
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 # CORS: in production, replace the origins list with your Vercel URL to lock
@@ -48,6 +44,21 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 _cors_origins = os.getenv('CORS_ORIGINS', '*')
 CORS(app, origins=_cors_origins)
 
+
+def _client_ip() -> str:
+    """
+    Real client IP for rate limiting. Render's edge network sits in front of
+    the app and its proxy IP *rotates* between requests, so keying on
+    remote_addr (even via ProxyFix) puts every request in a different bucket
+    and the limits never bite. The original visitor is the left-most entry of
+    X-Forwarded-For, which is stable per client — so key on that.
+    """
+    fwd = request.headers.get('X-Forwarded-For', '')
+    if fwd:
+        return fwd.split(',')[0].strip()
+    return get_remote_address()
+
+
 # Per-IP rate limiting. The dashboard polls ~24 req/min per open tab, so the
 # default ceiling is generous enough for normal use (several tabs) while still
 # stopping a script that floods the API. The expensive endpoints (backtest,
@@ -56,7 +67,7 @@ CORS(app, origins=_cors_origins)
 # Storage is in-process memory, which is correct here because gunicorn runs a
 # single worker (see gunicorn.conf.py).
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_client_ip,
     app=app,
     default_limits=['200 per minute', '5000 per day'],
     storage_uri='memory://',
@@ -69,6 +80,26 @@ def ratelimit_handler(exc):
         'error': 'Rate limit exceeded — please slow down and try again shortly.',
         'limit': str(exc.description),
     }), 429
+
+
+# ── Owner-only controls ─────────────────────────────────────────────────────
+# Set ADMIN_TOKEN on the server to make the bot controls (start/stop/strategy/
+# risk) owner-only on a public demo, so visitors can't stop or hijack the bot.
+# When unset, controls stay open (local/dev). The owner unlocks the dashboard
+# by visiting it once with ?admin=<token> (stored in the browser thereafter).
+ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', '').strip()
+
+
+def _admin_ok() -> bool:
+    if not ADMIN_TOKEN:
+        return True
+    sent = (request.headers.get('X-Admin-Token', '')
+            or request.args.get('admin', '')).strip()
+    return sent == ADMIN_TOKEN
+
+
+def _deny_admin():
+    return jsonify({'error': 'Bot controls are owner-only on this live demo.'}), 403
 
 
 database.init_db()
@@ -107,11 +138,14 @@ def get_status():
         'live_metrics':    live_metrics,
         'regime':          regime_info,
         'kelly_fraction':  round(kelly * 100, 2) if kelly else None,
+        'admin_required':  bool(ADMIN_TOKEN),
     })
 
 
 @app.route('/api/start', methods=['POST'])
 def start():
+    if not _admin_ok():
+        return _deny_admin()
     data     = request.get_json() or {}
     strategy = data.get('strategy', 'adaptive')
     if strategy not in VALID_STRATEGIES:
@@ -123,12 +157,16 @@ def start():
 
 @app.route('/api/stop', methods=['POST'])
 def stop():
+    if not _admin_ok():
+        return _deny_admin()
     success, msg = bot.stop_bot()
     return jsonify({'success': success, 'message': msg})
 
 
 @app.route('/api/strategy', methods=['POST'])
 def set_strategy():
+    if not _admin_ok():
+        return _deny_admin()
     data     = request.get_json() or {}
     strategy = data.get('strategy')
     if strategy not in VALID_STRATEGIES:
@@ -139,6 +177,8 @@ def set_strategy():
 
 @app.route('/api/risk_tolerance', methods=['POST'])
 def set_risk_tolerance():
+    if not _admin_ok():
+        return _deny_admin()
     data      = request.get_json() or {}
     tolerance = data.get('tolerance', 'moderate')
     if tolerance not in ('conservative', 'moderate', 'aggressive'):
