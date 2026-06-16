@@ -297,6 +297,19 @@ function initDashboard() {
     const first = (history && history.length) ? history[0] : null
     const sinceISO = (first && first.timestamp) || (status && status.started_at) || null
 
+    // Show the configuration being tracked (e.g. "Adaptive · Moderate risk").
+    const cfg = el('tr-config')
+    if (cfg && status) {
+      const STRAT_SHORT = {
+        adaptive: 'Adaptive', ma_crossover: 'MA Crossover',
+        rsi: 'RSI', macd: 'MACD', ml: 'ML Transformer',
+      }
+      const strat = STRAT_SHORT[status.strategy] || status.strategy || 'Adaptive'
+      const risk  = (status.risk_tolerance || 'moderate')
+      cfg.textContent = strat + ' · ' + risk.charAt(0).toUpperCase() + risk.slice(1) + ' risk'
+      cfg.hidden = false
+    }
+
     if (sinceISO) {
       const since = new Date(sinceISO)
       const days  = Math.max(1, Math.floor((Date.now() - since.getTime()) / 86400000) + 1)
