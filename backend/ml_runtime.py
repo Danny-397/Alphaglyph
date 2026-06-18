@@ -49,6 +49,12 @@ _session  = None          # onnxruntime.InferenceSession (lazy)
 _meta     = None          # parsed ml_model_meta.json
 _load_err = None          # remembered failure so we don't retry every cycle
 
+# Short cache for the interactive ML Insights panel — predictions only change on
+# new daily bars, so this keeps the panel snappy without re-running inference on
+# every poll/visitor.
+_PRED_CACHE: dict = {}
+_PRED_TTL = 1800          # 30 minutes
+
 
 # ── Loading ────────────────────────────────────────────────────────────────────
 
@@ -127,9 +133,9 @@ def predict_batch(X: np.ndarray) -> dict | None:
         return None
 
 
-def _prepare_windows(ohlcv: pd.DataFrame, ticker: str):
+def _prepare_windows(ohlcv: pd.DataFrame, ticker: str, include_sentiment: bool | None = None):
     """OHLCV → normalised model windows using the meta's train-split stats."""
-    frame = mlf.build_feature_frame(ohlcv, ticker)
+    frame = mlf.build_feature_frame(ohlcv, ticker, include_sentiment=include_sentiment)
     if frame is None:
         return None, []
     X, dates = mlf.windows_from_frame(frame, int(_meta['seq_len']))
@@ -177,6 +183,64 @@ def live_signal(ticker: str) -> tuple[str | None, float | None]:
 
     sig = _map_signals(pred['p_up'], pred['quantiles'][:, 2])[0]
     return ('BUY' if sig == 1 else 'SELL' if sig == -1 else 'HOLD'), price
+
+
+def live_prediction(ticker: str) -> dict | None:
+    """
+    Full transformer prediction for one ticker's latest window — the rich output
+    the BUY/SELL/HOLD signal is distilled from. Used by the ML Insights panel so
+    users can see what the model actually forecasts, not just the final action.
+
+    Returns a dict with the direction probability, the q10–q90 return
+    distribution (as percentages over the horizon), the annualised vol forecast,
+    and the mapped signal — or None when the model isn't loaded.
+    """
+    if not _ensure_loaded():
+        return None
+
+    import time
+    hit = _PRED_CACHE.get(ticker)
+    if hit and (time.time() - hit[0]) < _PRED_TTL:
+        return hit[1]
+
+    ohlcv = feat.fetch_ohlcv(ticker, period='1y')
+    if ohlcv is None or ohlcv.empty:
+        return {'ticker': ticker, 'available': False}
+    price = float(ohlcv['Close'].iloc[-1])
+
+    # Sentiment off here: GDELT is slow/rate-limited from cloud IPs (it
+    # self-disables and zero-fills in production anyway), so the interactive
+    # panel stays fast and bounded. The model handles the zero-fill gracefully.
+    X, _dates = _prepare_windows(ohlcv, ticker, include_sentiment=False)
+    if X is None:
+        return {'ticker': ticker, 'price': round(price, 2), 'available': False}
+    pred = predict_batch(X[-1:])
+    if pred is None:
+        return {'ticker': ticker, 'price': round(price, 2), 'available': False}
+
+    q     = pred['quantiles'][0]                         # [q10, q25, q50, q75, q90]
+    p_up  = float(pred['p_up'][0])
+    vol   = float(pred['vol'][0])
+    sig   = int(_map_signals(pred['p_up'], pred['quantiles'][:, 2])[0])
+    result = {
+        'ticker':    ticker,
+        'available': True,
+        'price':     round(price, 2),
+        'p_up':      round(p_up, 4),
+        'horizon':   int((_meta or {}).get('horizon', 5)),
+        # Quantiles are returns over the horizon — expose as percentages.
+        'quantiles': {
+            'q10': round(float(q[0]) * 100, 2),
+            'q25': round(float(q[1]) * 100, 2),
+            'q50': round(float(q[2]) * 100, 2),
+            'q75': round(float(q[3]) * 100, 2),
+            'q90': round(float(q[4]) * 100, 2),
+        },
+        'vol':    round(vol * 100, 2),                   # annualised vol forecast, %
+        'signal': 'BUY' if sig == 1 else 'SELL' if sig == -1 else 'HOLD',
+    }
+    _PRED_CACHE[ticker] = (time.time(), result)
+    return result
 
 
 def backtest_signals(ohlcv: pd.DataFrame, ticker: str) -> pd.Series | None:

@@ -1356,3 +1356,29 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .sb-feed-tkr  { font-weight: 700; min-width: 48px; }
 .sb-feed-meta { margin-left: auto; font-size: 11px; color: var(--muted); text-align: right; }
 @keyframes sbFeedIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* ── ML Insights panel ───────────────────────────────────────────────────── */
+.ml-insights .section-header { display: flex; align-items: center; }
+#ml-meta { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 400; font-family: var(--font-mono); }
+.ml-sub { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 2px 0 14px; }
+.ml-table td { vertical-align: middle; }
+.ml-px { font-size: 11px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+
+/* P(up) bar */
+.ml-prob { position: relative; height: 7px; width: 84px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+.ml-prob-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--muted); border-radius: 999px; }
+.ml-prob-fill.positive { background: var(--green); }
+.ml-prob-fill.negative { background: var(--red); }
+.ml-prob-val { font-size: 11px; font-family: var(--font-mono); margin-top: 3px; color: var(--muted); }
+.ml-prob-val.positive { color: var(--green); }
+.ml-prob-val.negative { color: var(--red); }
+
+/* Return distribution bar */
+.ml-dist { position: relative; height: 16px; min-width: 180px; background: var(--surface2); border-radius: 4px; }
+.ml-dist-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--border); z-index: 1; }
+.ml-dist-band { position: absolute; top: 5px; height: 6px; border-radius: 3px; opacity: 0.35; }
+.ml-dist-iqr  { position: absolute; top: 3px; height: 10px; border-radius: 3px; opacity: 0.7; }
+.ml-dist-band.pos, .ml-dist-iqr.pos { background: var(--green); }
+.ml-dist-band.neg, .ml-dist-iqr.neg { background: var(--red); }
+.ml-dist-med { position: absolute; top: 0; height: 16px; width: 2px; background: var(--text); z-index: 2; }
+.ml-dist-scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }

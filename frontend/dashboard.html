@@ -263,6 +263,36 @@
       </div>
     </div><!-- end .two-col -->
 
+    <!-- ML Transformer — live forecasts -->
+    <div class="card ml-insights" id="ml-insights" hidden style="margin-top:16px;">
+      <div class="section-header">
+        <span class="la-dot"></span>ML Transformer — Live Forecasts
+        <span id="ml-meta"></span>
+        <button class="btn btn-sm" id="ml-refresh" style="margin-left:8px;">↻</button>
+      </div>
+      <p class="ml-sub">
+        The transformer forecasts a full <strong>return distribution</strong> and direction probability over the
+        next <span id="ml-horizon">5</span> trading days for each stock. It only acts when the direction
+        classifier <em>and</em> the median of the distribution agree — so most reads are a deliberate HOLD.
+      </p>
+      <div class="table-wrap">
+        <table class="data-table ml-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>P(up)<i class="info" tabindex="0" data-tip="The model's probability that the return over the horizon is positive." aria-label="What is P(up)?"></i></th>
+              <th>Forecast return distribution (q10–q90)<i class="info" tabindex="0" data-tip="The model's predicted spread of outcomes: the band spans the 10th–90th percentile, the darker inner band the 25th–75th, and the tick marks the median. Wider = more uncertain." aria-label="What is the return distribution?"></i></th>
+              <th>Median</th>
+              <th>Signal</th>
+            </tr>
+          </thead>
+          <tbody id="ml-tbody">
+            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Loading the transformer’s live forecasts…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Full-width bottom: tabs for Trades + Activity -->
     <div class="card" style="margin-top:16px;">
       <div class="tab-list">

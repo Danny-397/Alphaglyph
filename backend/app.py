@@ -272,6 +272,122 @@ def ml_info():
     return jsonify(ml_runtime.get_info())
 
 
+@app.route('/api/ml/predictions')
+@limiter.limit('30 per minute')
+def ml_predictions():
+    """
+    Live transformer forecasts for the watchlist (or ?tickers=AAPL,MSFT).
+
+    For each ticker returns the direction probability, the q10–q90 return
+    distribution over the model's horizon, the vol forecast, and the mapped
+    signal — the rich output behind the BUY/SELL/HOLD action, for the ML
+    Insights panel. 503 if no model is deployed.
+    """
+    info = ml_runtime.get_info()
+    if not info.get('loaded'):
+        return jsonify({'loaded': False, 'reason': info.get('reason'), 'predictions': []}), 503
+
+    raw = request.args.get('tickers', '')
+    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or list(strategies.WATCHLIST)
+    tickers = tickers[:12]   # cap to keep the request bounded
+
+    preds = []
+    for t in tickers:
+        try:
+            p = ml_runtime.live_prediction(t)
+        except Exception as exc:
+            logger.warning('ml prediction failed for %s: %s', t, exc)
+            p = None
+        if p:
+            preds.append(p)
+
+    return jsonify({
+        'loaded':      True,
+        'horizon':     info.get('horizon'),
+        'version':     info.get('version'),
+        'predictions': preds,
+    })
+
+
+@app.route('/api/compare', methods=['POST'])
+@limiter.limit('15 per hour')
+def compare_strategies():
+    """
+    Run every strategy on the SAME tickers/period/capital and return a ranked
+    leaderboard (return, Sharpe, max drawdown, Calmar, win rate, trades) plus
+    each strategy's equity curve for an overlay chart.
+
+    Data is downloaded once per ticker and cached, so the N backtests share it.
+    """
+    data            = request.get_json() or {}
+    tickers         = [t.strip().upper() for t in (data.get('tickers') or [])
+                       if isinstance(t, str) and t.strip()]
+    start_date      = data.get('start_date',
+                               (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
+    end_date        = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+    initial_capital = float(data.get('initial_capital', 100_000))
+    risk_tolerance  = data.get('risk_tolerance', 'moderate')
+
+    if not tickers:
+        return jsonify({'error': 'At least one ticker required'}), 400
+    if not (1_000 <= initial_capital <= 10_000_000):
+        return jsonify({'error': 'Capital must be between $1,000 and $10,000,000'}), 400
+    if risk_tolerance not in ('conservative', 'moderate', 'aggressive'):
+        return jsonify({'error': 'Invalid risk tolerance'}), 400
+
+    candidates = ['adaptive', 'ma_crossover', 'rsi', 'macd']
+    if ml_runtime.get_info().get('loaded'):
+        candidates.append('ml')
+
+    LABELS = {'adaptive': 'Adaptive (Regime)', 'ma_crossover': 'MA Crossover',
+              'rsi': 'RSI Mean Reversion', 'macd': 'MACD Momentum', 'ml': 'ML Transformer'}
+
+    results = []
+    benchmark_return = None
+    spy_curve = []
+    for strat in candidates:
+        try:
+            r = backtester.run_backtest(
+                strat, tickers, start_date, end_date,
+                initial_capital, False, risk_tolerance, 0.001, 0.0005)
+        except Exception as exc:
+            logger.warning('compare: %s failed: %s', strat, exc)
+            results.append({'strategy': strat, 'label': LABELS.get(strat, strat), 'error': str(exc)})
+            continue
+        if 'error' in r:
+            results.append({'strategy': strat, 'label': LABELS.get(strat, strat), 'error': r['error']})
+            continue
+        m = r['metrics']
+        benchmark_return = m.get('benchmark_return')
+        if not spy_curve and r.get('spy_curve'):
+            spy_curve = r['spy_curve']
+        results.append({
+            'strategy':         strat,
+            'label':            LABELS.get(strat, strat),
+            'total_return':     m.get('total_return'),
+            'sharpe_ratio':     m.get('sharpe_ratio'),
+            'max_drawdown':     m.get('max_drawdown'),
+            'calmar_ratio':     m.get('calmar_ratio'),
+            'win_rate':         m.get('win_rate'),
+            'total_trades':     m.get('total_trades'),
+            'final_value':      m.get('final_value'),
+            'equity_curve':     r.get('equity_curve', []),
+        })
+
+    ranked = [r for r in results if 'error' not in r]
+    ranked.sort(key=lambda r: (r.get('total_return') is None, -(r.get('total_return') or 0)))
+    errored = [r for r in results if 'error' in r]
+
+    return jsonify({
+        'results':          ranked + errored,
+        'benchmark_return': benchmark_return,
+        'spy_curve':        spy_curve,
+        'tickers':          tickers,
+        'start_date':       start_date,
+        'end_date':         end_date,
+    })
+
+
 @app.route('/api/validate_ticker')
 def validate_ticker():
     """Check whether a ticker exists. status: valid | not_found | rate_limited."""

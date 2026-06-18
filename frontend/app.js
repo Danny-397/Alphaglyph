@@ -473,6 +473,67 @@ function initDashboard() {
     box.innerHTML = lines.map(l => `<div class="log-line">${l}</div>`).join('')
   }
 
+  // ── ML Transformer live forecasts ──────────────────────────────────────
+  // Loaded once on open (and on manual refresh), NOT in the 10s poll — the
+  // model output only changes on new daily bars and inference is comparatively
+  // expensive, so a 30-min server cache backs it.
+  async function loadMlInsights() {
+    const card  = el('ml-insights')
+    const tbody = el('ml-tbody')
+    if (!card || !tbody) return
+    const info = await api('/api/ml/info')
+    if (!info || !info.loaded) { card.hidden = true; return }   // no model → hide
+    card.hidden = false
+    el('ml-meta').textContent = `v${info.version} · ${Number(info.n_params || 0).toLocaleString()} params` +
+      (info.test_metrics?.auc ? ` · test AUC ${info.test_metrics.auc}` : '')
+    if (info.horizon) el('ml-horizon').textContent = info.horizon
+
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Running the transformer…</td></tr>`
+    const data = await api('/api/ml/predictions')
+    const preds = (data && data.predictions || []).filter(p => p.available)
+    if (!preds.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Forecasts momentarily unavailable — try refresh.</td></tr>`
+      return
+    }
+
+    // Shared domain so every row's distribution bar is comparable.
+    const lo = Math.min(...preds.map(p => p.quantiles.q10))
+    const hi = Math.max(...preds.map(p => p.quantiles.q90))
+    const span = (hi - lo) || 1
+    const pos = v => ((v - lo) / span) * 100   // % position within the track
+    const zero = pos(0)
+
+    tbody.innerHTML = preds.map(p => {
+      const q = p.quantiles
+      const pUp = Math.round(p.p_up * 100)
+      const upClr = p.p_up >= 0.55 ? 'positive' : p.p_up <= 0.45 ? 'negative' : ''
+      const sigCls = p.signal === 'BUY' ? 'badge-buy' : p.signal === 'SELL' ? 'badge-sell' : ''
+      const bandClr = q.q50 >= 0 ? 'pos' : 'neg'
+      return `<tr>
+        <td><strong>${p.ticker}</strong><div class="ml-px">${fmt$(p.price)}</div></td>
+        <td>
+          <div class="ml-prob"><div class="ml-prob-fill ${upClr}" style="width:${pUp}%"></div></div>
+          <div class="ml-prob-val ${upClr}">${pUp}%</div>
+        </td>
+        <td>
+          <div class="ml-dist">
+            <div class="ml-dist-zero" style="left:${zero}%"></div>
+            <div class="ml-dist-band ${bandClr}" style="left:${pos(q.q10)}%;width:${pos(q.q90) - pos(q.q10)}%"></div>
+            <div class="ml-dist-iqr ${bandClr}" style="left:${pos(q.q25)}%;width:${pos(q.q75) - pos(q.q25)}%"></div>
+            <div class="ml-dist-med" style="left:${pos(q.q50)}%"></div>
+          </div>
+          <div class="ml-dist-scale"><span>${fmtPct(q.q10, 1)}</span><span>${fmtPct(q.q90, 1)}</span></div>
+        </td>
+        <td class="${clr(q.q50)}"><strong>${fmtPct(q.q50, 1)}</strong></td>
+        <td><span class="badge ${sigCls}">${p.signal}</span></td>
+      </tr>`
+    }).join('')
+  }
+
+  const mlRefresh = el('ml-refresh')
+  if (mlRefresh) mlRefresh.addEventListener('click', loadMlInsights)
+  loadMlInsights()
+
   refreshAll()
   setInterval(refreshAll, 10000)
 }
@@ -484,6 +545,7 @@ function initBacktest() {
   let btChart  = null
   let mcChart  = null
   let ff3Chart = null
+  let cmpChart = null
 
   el('bt-start').value = daysAgo(365)
   el('bt-end').value   = today()
@@ -556,6 +618,126 @@ function initBacktest() {
 
   el('run-btn').addEventListener('click', runBacktest)
 
+  // ── Strategy leaderboard (compare all strategies) ──────────────────────────
+  const CMP_COLORS = {
+    adaptive: '#3fb950', ma_crossover: '#58a6ff', rsi: '#d2a8ff',
+    macd: '#e3913b', ml: '#f778ba',
+  }
+  const cmpBtn = el('compare-btn')
+  if (cmpBtn) cmpBtn.addEventListener('click', runCompare)
+
+  async function runCompare() {
+    const tickers = [...btTickers]
+    if (!tickers.length) { alert('Add at least one ticker.'); return }
+    const riskEl = el('bt-risk-btns').querySelector('.risk-btn.active')
+
+    el('empty-state').hidden       = true
+    el('results-container').hidden = true
+    el('compare-container').hidden = true
+    el('loading-state').hidden     = true
+    el('compare-loading').hidden   = false
+    cmpBtn.disabled = true
+    el('run-btn').disabled = true
+
+    const data = await api('/api/compare', {
+      method: 'POST',
+      body: JSON.stringify({
+        tickers,
+        start_date:      el('bt-start').value,
+        end_date:        el('bt-end').value,
+        initial_capital: parseFloat(el('bt-capital').value) || 100000,
+        risk_tolerance:  riskEl ? riskEl.dataset.risk : 'moderate',
+      }),
+    })
+
+    el('compare-loading').hidden = true
+    cmpBtn.disabled = false
+    el('run-btn').disabled = false
+
+    if (!data || data.error) {
+      el('empty-state').hidden = false
+      el('empty-state').querySelector('strong').textContent =
+        'Error: ' + (data?.error || 'Comparison failed — try again.')
+      return
+    }
+    renderCompare(data)
+    el('compare-container').hidden = false
+  }
+
+  function renderCompare(data) {
+    const ranked = (data.results || []).filter(r => !r.error)
+    const errored = (data.results || []).filter(r => r.error)
+    const bench = data.benchmark_return
+
+    el('cmp-meta').textContent =
+      `${(data.tickers || []).join(', ')} · ${data.start_date} → ${data.end_date}`
+
+    // ── Leaderboard table ──
+    el('cmp-tbody').innerHTML = ranked.map((r, i) => {
+      const vs = (r.total_return != null && bench != null) ? r.total_return - bench : null
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1)
+      return `<tr>
+        <td>${medal}</td>
+        <td><span style="color:${CMP_COLORS[r.strategy] || 'var(--text)'};font-weight:700;">${r.label}</span></td>
+        <td class="${clr(r.total_return)}"><strong>${fmtPct(r.total_return)}</strong></td>
+        <td class="${clr(vs)}">${vs == null ? '—' : fmtPct(vs)}</td>
+        <td class="${r.sharpe_ratio > 1 ? 'positive' : r.sharpe_ratio < 0 ? 'negative' : ''}">${fmtN(r.sharpe_ratio)}</td>
+        <td class="negative">${r.max_drawdown != null ? '-' + fmtN(r.max_drawdown) + '%' : '—'}</td>
+        <td>${fmtN(r.calmar_ratio)}</td>
+        <td>${r.win_rate != null ? r.win_rate + '%' : '—'}</td>
+        <td>${r.total_trades ?? '—'}</td>
+      </tr>`
+    }).join('')
+
+    const errEl = el('cmp-error')
+    if (errored.length) {
+      errEl.hidden = false
+      errEl.textContent = 'Skipped: ' + errored.map(e => e.label).join(', ') +
+        ' (no data or model unavailable).'
+    } else { errEl.hidden = true }
+
+    // ── Overlay equity chart ──
+    cmpChart = destroyChart(cmpChart)
+    const base = ranked.find(r => (r.equity_curve || []).length)
+    if (!base) return
+    const labels = base.equity_curve.map(p => p.date)
+    const byDate = curve => {
+      const m = {}; (curve || []).forEach(p => { m[p.date] = p.value }); return m
+    }
+    const datasets = ranked.map(r => {
+      const m = byDate(r.equity_curve)
+      return {
+        label: r.label,
+        data: labels.map(d => (m[d] != null ? m[d] : null)),
+        borderColor: CMP_COLORS[r.strategy] || '#8a978f',
+        borderWidth: 2, fill: false, tension: 0.2, pointRadius: 0, spanGaps: true,
+      }
+    })
+    const spyMap = byDate(data.spy_curve)
+    datasets.push({
+      label: 'SPY Benchmark', data: labels.map(d => (spyMap[d] != null ? spyMap[d] : null)),
+      borderColor: '#e3b341', borderWidth: 1.5, borderDash: [4, 4],
+      fill: false, tension: 0.2, pointRadius: 0, spanGaps: true,
+    })
+
+    cmpChart = new Chart(el('cmp-chart').getContext('2d'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
+          tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt$(c.parsed.y) } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0 } },
+          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+        },
+      },
+    })
+  }
+
   async function runBacktest() {
     const tickers = [...btTickers]
     if (!tickers.length) { alert('Add at least one ticker.'); return }
@@ -578,6 +760,7 @@ function initBacktest() {
 
     el('empty-state').hidden      = true
     el('results-container').hidden = true
+    el('compare-container').hidden = true
     el('loading-state').hidden    = false
     el('run-btn').disabled        = true
 

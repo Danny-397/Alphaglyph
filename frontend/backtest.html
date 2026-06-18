@@ -134,6 +134,13 @@
         <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center;line-height:1.5;">
           Downloads historical data then simulates the strategy day-by-day
         </p>
+
+        <button class="btn btn-sm" id="compare-btn" style="width:100%;margin-top:10px;">
+          ⚖  Compare all strategies
+        </button>
+        <p style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;line-height:1.5;">
+          Runs every strategy on the same tickers &amp; period and ranks them
+        </p>
       </aside>
 
       <!-- ── RIGHT: Results area ─────────────────────────────────────────── -->
@@ -154,6 +161,39 @@
             <div class="spinner"></div>
             <strong>Running backtest…</strong>
             <p>Fetching historical data and simulating trades day-by-day.</p>
+          </div>
+        </div>
+
+        <!-- Compare-all loading state -->
+        <div id="compare-loading" hidden>
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <strong>Comparing all strategies…</strong>
+            <p>Running every strategy on the same data. This takes a bit longer.</p>
+          </div>
+        </div>
+
+        <!-- Strategy leaderboard -->
+        <div id="compare-container" hidden>
+          <div class="card">
+            <div class="section-header">Strategy Leaderboard <span id="cmp-meta" style="margin-left:auto;font-size:11px;color:var(--muted);font-weight:400;"></span></div>
+            <p style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:14px;">
+              Every strategy run on the <em>same</em> tickers and period, ranked by net return. The same
+              risk management, Kelly sizing and costs apply to each — an apples-to-apples comparison.
+            </p>
+            <div class="chart-wrap" style="margin-bottom:16px;"><canvas id="cmp-chart"></canvas></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Strategy</th><th>Return</th><th>vs SPY</th>
+                    <th>Sharpe</th><th>Max DD</th><th>Calmar</th><th>Win %</th><th>Trades</th>
+                  </tr>
+                </thead>
+                <tbody id="cmp-tbody"></tbody>
+              </table>
+            </div>
+            <p id="cmp-error" hidden style="color:var(--muted);font-size:12px;margin-top:10px;"></p>
           </div>
         </div>
 
