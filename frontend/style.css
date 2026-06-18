@@ -1342,19 +1342,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: linear-gradient(90deg, var(--blue), var(--green));
   transition: width .12s linear;
 }
-.sb-feed-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+.sb-feed-item {
+  padding: 9px 10px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
   animation: sbFeedIn .25s ease;
 }
-.sb-feed-row:last-child { border-bottom: none; }
-.sb-feed-time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 78px; }
-.sb-feed-tkr  { font-weight: 700; min-width: 48px; }
-.sb-feed-meta { margin-left: auto; font-size: 11px; color: var(--muted); text-align: right; }
+.sb-feed-item:last-child { border-bottom: none; }
+.sb-feed-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.sb-feed-time  { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 78px; }
+.sb-feed-tkr   { font-weight: 700; min-width: 48px; }
+.sb-feed-trade { color: var(--muted); font-size: 12px; }
+.sb-feed-pnl   { margin-left: auto; font-size: 12px; font-family: var(--font-mono); }
+.sb-feed-why   { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
 @keyframes sbFeedIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 /* ── ML Insights panel ───────────────────────────────────────────────────── */
@@ -1382,3 +1381,34 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .ml-dist-band.neg, .ml-dist-iqr.neg { background: var(--red); }
 .ml-dist-med { position: absolute; top: 0; height: 16px; width: 2px; background: var(--text); z-index: 2; }
 .ml-dist-scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+
+/* Truncated "why" cell on the live trades table (full text on hover) */
+.ag-why {
+  color: var(--muted);
+  font-size: 11.5px;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sandbox first-run primer */
+.sb-primer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.sb-primer-steps { display: flex; flex-wrap: wrap; gap: 18px; flex: 1; font-size: 12.5px; color: var(--muted); }
+.sb-primer-steps span { display: inline-flex; align-items: center; gap: 7px; }
+.sb-primer-steps strong {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--blue-dim); color: var(--blue); font-size: 11px;
+}
+.sb-primer-steps em { color: var(--text); font-style: normal; font-weight: 600; }

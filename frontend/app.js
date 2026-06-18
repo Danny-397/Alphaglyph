@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   AlphaGlyph Research Platform — app.js
+   AlphaGlyph — Autonomous Trading Bot — app.js
    Vanilla JS · Chart.js 4 · No frameworks
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -62,6 +62,40 @@ const REGIME_COLORS = {
   TRENDING_DOWN:   '#f85149',
   RANGING:         '#e3b341',
   HIGH_VOLATILITY: '#e3913b',
+}
+
+// AlphaGlyph's whole point: the bot shows its work. Every trade is turned into a
+// plain-English reason a beginner can follow — what the strategy saw, in what
+// market, and why it acted. Used by the live dashboard and the My Bot sandbox.
+const REGIME_PHRASE = {
+  TRENDING_UP:     'an up-trending market',
+  TRENDING_DOWN:   'a down-trending market',
+  RANGING:         'a sideways, range-bound market',
+  HIGH_VOLATILITY: 'a high-volatility market',
+}
+const BUY_REASON = {
+  ma_crossover: 'the 20-day average crossed above the 50-day — momentum turning up',
+  rsi:          'RSI dropped into oversold territory — a mean-reversion bounce setup',
+  macd:         'MACD crossed above its signal line on rising volume',
+  ml:           'the ML transformer put the odds on the upside',
+}
+const SELL_REASON = {
+  stop_loss:    'price fell back to the trailing stop — locking in the move and capping downside',
+  take_profit:  'price hit the take-profit target',
+  sell_signal:  'the strategy flipped to a sell signal',
+  signal:       'the strategy flipped to a sell signal',
+}
+function tradeWhy(t) {
+  const where = REGIME_PHRASE[t.regime] || 'the current market'
+  if (t.action === 'BUY') {
+    const base = BUY_REASON[t.strategy] || 'the strategy flagged a buy signal'
+    return `Bought because ${base}, in ${where}.`
+  }
+  const why = SELL_REASON[t.reason] || 'an exit rule triggered'
+  let pnl = ''
+  if (t.pnl != null) pnl = ` Booked a ${t.pnl >= 0 ? 'gain' : 'loss'} of ${fmt$(Math.abs(t.pnl))}` +
+    (t.pnl_pct != null ? ` (${fmtPct(t.pnl_pct)})` : '') + '.'
+  return `Sold because ${why}.${pnl}`
 }
 
 // ── Utilities ───────────────────────────────────────────────────────────────
@@ -455,14 +489,15 @@ function initDashboard() {
     }
     tbody.innerHTML = trades.map(t => {
       const isBuy = t.action === 'BUY'
-      return `<tr>
+      const why = tradeWhy(t).replace(/"/g, '&quot;')
+      return `<tr title="${why}">
         <td>${(t.timestamp || '').slice(11, 19)}</td>
         <td><strong>${t.ticker}</strong></td>
         <td><span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span></td>
         <td>${fmt$(t.price)}</td>
         <td>${fmtN(t.shares, 0)}</td>
         <td class="${clr(t.pnl)}">${t.pnl != null ? fmt$(t.pnl) : '—'}</td>
-        <td>${t.pnl_pct != null ? fmtPct(t.pnl_pct) : '—'}</td>
+        <td class="ag-why" title="${why}">${why}</td>
       </tr>`
     }).join('')
   }
@@ -1331,6 +1366,17 @@ function initSandbox() {
 
   enableMlOption(el('sb-strategy'))
 
+  // First-run 3-step primer (dismissible, remembered)
+  const primer = el('sb-primer')
+  if (primer && !localStorage.getItem('sb_primer_dismissed')) {
+    primer.hidden = false
+    const close = el('sb-primer-close')
+    if (close) close.addEventListener('click', () => {
+      primer.hidden = true
+      localStorage.setItem('sb_primer_dismissed', '1')
+    })
+  }
+
   function renderChips() {
     const box = el('sb-tickers')
     if (!tickers.length) {
@@ -1596,19 +1642,22 @@ function initSandbox() {
 
   function pushFeed(t) {
     const box = el('sb-feed')
-    if (!box.querySelector('.sb-feed-row')) box.innerHTML = ''   // drop the placeholder
+    if (!box.querySelector('.sb-feed-item')) box.innerHTML = ''   // drop the placeholder
     const isBuy = t.action === 'BUY'
     const pnlTxt = (t.action === 'SELL' && t.pnl != null)
-      ? `<span class="${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
-    const row = document.createElement('div')
-    row.className = 'sb-feed-row'
-    row.innerHTML =
-      `<span class="sb-feed-time">${t.date}</span>` +
-      `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
-      `<span class="sb-feed-tkr">${t.ticker}</span>` +
-      `<span>${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>` +
-      `<span class="sb-feed-meta">${pnlTxt}${pnlTxt ? ' · ' : ''}${(t.reason || '').replace(/_/g, ' ')}${t.regime ? ' · ' + t.regime : ''}</span>`
-    box.insertBefore(row, box.firstChild)
+      ? `<span class="sb-feed-pnl ${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
+    const item = document.createElement('div')
+    item.className = 'sb-feed-item'
+    item.innerHTML =
+      `<div class="sb-feed-row">` +
+        `<span class="sb-feed-time">${t.date}</span>` +
+        `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
+        `<span class="sb-feed-tkr">${t.ticker}</span>` +
+        `<span class="sb-feed-trade">${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>` +
+        pnlTxt +
+      `</div>` +
+      `<div class="sb-feed-why">${tradeWhy(t)}</div>`
+    box.insertBefore(item, box.firstChild)
     while (box.children.length > 120) box.removeChild(box.lastChild)
   }
 
