@@ -98,6 +98,30 @@ function tradeWhy(t) {
   return `Sold because ${why}.${pnl}`
 }
 
+// ── Connection state (free-tier cold-start UX) ───────────────────────────────
+// Render's free instance sleeps after inactivity and takes ~30s to wake. Without
+// this the first loads just fail silently and the page looks broken. We detect
+// network-level failures (server unreachable) and show a friendly auto-retry
+// banner, then clear it the moment a request succeeds.
+let _connFails = 0
+function setConn(reachable) {
+  let b = document.getElementById('conn-banner')
+  if (reachable) {
+    _connFails = 0
+    if (b) b.classList.remove('show')
+    return
+  }
+  if (++_connFails < 2) return          // tolerate a single transient blip
+  if (!b) {
+    b = document.createElement('div')
+    b.id = 'conn-banner'
+    b.className = 'conn-banner'
+    b.innerHTML = '<span class="conn-dot"></span> Waking the bot up — the free server sleeps after inactivity and takes ~30s to start. Retrying automatically…'
+    document.body.appendChild(b)
+  }
+  b.classList.add('show')
+}
+
 // ── Utilities ───────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   try {
@@ -109,9 +133,13 @@ async function api(path, opts = {}) {
         ...(opts.headers || {}),
       },
     })
+    setConn(true)                        // we reached the server
     if (!r.ok) throw new Error('HTTP ' + r.status)
     return r.json()
   } catch (err) {
+    // A thrown TypeError means fetch itself failed (server asleep / unreachable),
+    // as opposed to an HTTP error from a server we did reach.
+    if (err instanceof TypeError) setConn(false)
     console.warn('API error:', path, err.message)
     return null
   }
@@ -1377,6 +1405,48 @@ function initSandbox() {
     })
   }
 
+  // ── One-click preset bots (zero-config launch) ─────────────────────────
+  const PRESETS = [
+    { icon: '🧠', name: 'AI Transformer Bot', desc: 'Trades on a machine-learning return forecast',
+      strategy: 'ml',       risk: 'moderate',     tickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'TSLA'] },
+    { icon: '🌦️', name: 'All-Weather Adaptive', desc: 'Auto-switches strategy to fit the market regime',
+      strategy: 'adaptive', risk: 'moderate',     tickers: ['SPY', 'AAPL', 'MSFT', 'NVDA', 'JPM'] },
+    { icon: '🚀', name: 'Momentum Chaser', desc: 'Rides strong trends with MACD on rising volume',
+      strategy: 'macd',     risk: 'aggressive',   tickers: ['NVDA', 'TSLA', 'AAPL', 'AMD'] },
+    { icon: '🪙', name: 'Bargain Hunter', desc: 'Buys oversold dips, trims overbought rips (RSI)',
+      strategy: 'rsi',      risk: 'conservative', tickers: ['SPY', 'MSFT', 'JPM', 'KO'] },
+  ]
+
+  function renderPresets() {
+    const grid = el('preset-grid')
+    if (!grid) return
+    grid.innerHTML = PRESETS.map((p, i) => `
+      <button class="preset-card" data-i="${i}" type="button">
+        <span class="preset-icon">${p.icon}</span>
+        <span class="preset-name">${p.name}</span>
+        <span class="preset-desc">${p.desc}</span>
+        <span class="preset-go">Launch →</span>
+      </button>`).join('')
+    grid.querySelectorAll('.preset-card').forEach(c =>
+      c.addEventListener('click', () => applyPreset(PRESETS[+c.dataset.i])))
+  }
+
+  function applyPreset(p) {
+    const sel = el('sb-strategy')
+    const opt = sel.querySelector(`option[value="${p.strategy}"]`)
+    if (opt) opt.disabled = false            // ensure ML is selectable even mid-load
+    sel.value = p.strategy
+    el('sb-capital').value = 100000
+    el('sb-window').value = '365'
+    el('sb-risk-btns').querySelectorAll('.risk-btn')
+      .forEach(b => b.classList.toggle('active', b.dataset.risk === p.risk))
+    tickers = [...p.tickers]
+    renderChips()
+    launch()
+  }
+
+  renderPresets()
+
   function renderChips() {
     const box = el('sb-tickers')
     if (!tickers.length) {
@@ -1450,7 +1520,10 @@ function initSandbox() {
     el('sb-loading').hidden = true
     el('sb-launch').disabled = false
 
-    if (!data || data.error) { showErr(data?.error || 'Could not start your bot — please try again.'); return }
+    if (!data || data.error) {
+      showErr(data?.error || 'Could not reach the bot — the free server may be waking up (~30s). Try again in a moment.')
+      return
+    }
     if (!data.equity_curve || !data.equity_curve.length) {
       showErr('Not enough price data for those stocks and window. Try different tickers or a longer history.')
       return
@@ -1488,6 +1561,8 @@ function initSandbox() {
     while (cursor < target) { cursor++; applyTradesUpTo(timeline[cursor].date) }
 
     configCard.hidden = true
+    const presetsEl = el('sandbox-presets')
+    if (presetsEl) presetsEl.hidden = true
     livePanel.hidden = false
     buildChart()
     renderAll()
@@ -1580,6 +1655,9 @@ function initSandbox() {
     localStorage.removeItem(LS_KEY)
     livePanel.hidden = true
     configCard.hidden = false
+    const presetsEl = el('sandbox-presets')
+    if (presetsEl) presetsEl.hidden = false
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   })
 
   // ── Rendering ──
