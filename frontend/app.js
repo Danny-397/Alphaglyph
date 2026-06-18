@@ -287,7 +287,7 @@ function initDashboard() {
       (info.test_metrics?.auc ? ` · test AUC ${info.test_metrics.auc}` : '')
     if (info.horizon) el('ml-horizon').textContent = info.horizon
 
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Running the transformer…</td></tr>`
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Running the transformer <span class="dots"><span></span><span></span><span></span></span></td></tr>`
     const data = await api('/api/ml/predictions')
     const preds = (data && data.predictions || []).filter(p => p.available)
     if (!preds.length) {
