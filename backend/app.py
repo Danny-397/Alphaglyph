@@ -15,14 +15,10 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 import backtest as backtester
-import bot
-import database
 import features  # noqa: F401 — imported so startup errors surface early
 import ml_runtime
 import portfolio as portopt
 import regime as reg
-import risk
-import simulator
 import strategies
 
 load_dotenv()
@@ -82,39 +78,15 @@ def ratelimit_handler(exc):
     }), 429
 
 
-# ── Owner-only controls ─────────────────────────────────────────────────────
-# Set ADMIN_TOKEN on the server to make the bot controls (start/stop/strategy/
-# risk) owner-only on a public demo, so visitors can't stop or hijack the bot.
-# When unset, controls stay open (local/dev). The owner unlocks the dashboard
-# by visiting it once with ?admin=<token> (stored in the browser thereafter).
-ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', '').strip()
-
-
-def _admin_ok() -> bool:
-    if not ADMIN_TOKEN:
-        return True
-    sent = (request.headers.get('X-Admin-Token', '')
-            or request.args.get('admin', '')).strip()
-    return sent == ADMIN_TOKEN
-
-
-def _deny_admin():
-    return jsonify({'error': 'Bot controls are owner-only on this live demo.'}), 403
-
-
-database.init_db()
-simulator.init_simulator()
-
-
 def _start_keepalive():
     """
     Keep the Render free instance awake by pinging its own public URL on a timer.
 
     Render spins the service down after ~15 min with no INBOUND traffic. A
     request to our own public URL is routed back through Render's edge as inbound
-    traffic, so it resets the idle timer — keeping the bot and site warm with no
-    external uptime service. (GitHub Actions cron is too throttled to rely on:
-    scheduled runs can lag by hours.) Hitting /health also drives a bot cycle.
+    traffic, so it resets the idle timer — keeping the site warm (fast ML
+    forecasts, charts, backtests) with no external uptime service. (GitHub
+    Actions cron is too throttled to rely on: scheduled runs can lag by hours.)
 
     Active only in production, where Render sets RENDER_EXTERNAL_URL.
     """
@@ -145,119 +117,25 @@ def _start_keepalive():
 
 
 _start_keepalive()
-# Render free tier spins the process down on inactivity and gunicorn can recycle
-# the worker — either kills the in-memory bot thread. The bot is now tick-driven
-# (cycles run on incoming requests, source of truth is the DB), so it can't stay
-# stopped. ensure_running_default() keeps the demo bot ON by default and resumes
-# the heartbeat after a restart. Set BOT_AUTOSTART=false to require a manual start.
-bot.ensure_running_default()
 
 VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive',)
-
-
-# ── Status / control ──────────────────────────────────────────────────────────
-
-@app.route('/api/status')
-def get_status():
-    # Every dashboard poll nudges the engine — if a trading cycle is due, it runs
-    # in the background. This is what keeps the bot alive without a long-running
-    # thread: traffic drives it. Non-blocking, so the status response stays fast.
-    try:
-        bot.maybe_run_cycle()
-    except Exception as exc:
-        logger.warning('status tick failed: %s', exc)
-
-    state         = database.get_bot_state()
-    strategy      = state['strategy']       if state else 'adaptive'
-    risk_tol      = state['risk_tolerance'] if state else 'moderate'
-    portfolio     = bot.get_portfolio_summary()
-    metrics       = database.get_performance_metrics(strategy)
-    live_metrics  = database.get_live_metrics()
-    regime_info   = bot.get_last_regime()
-    kelly         = database.compute_kelly_fraction(strategy)
-
-    return jsonify({
-        'is_running':      bot.is_running(),
-        'strategy':        strategy,
-        'risk_tolerance':  risk_tol,
-        'started_at':      state.get('started_at') if state else None,
-        'market_open':     risk.is_market_open(),
-        'daily_trades':    risk.get_daily_trade_count(),
-        'max_daily':       risk.get_risk_profile(risk_tol)['max_daily_trades'],
-        'portfolio':       portfolio,
-        'metrics':         metrics,
-        'live_metrics':    live_metrics,
-        'regime':          regime_info,
-        'kelly_fraction':  round(kelly * 100, 2) if kelly else None,
-        'admin_required':  bool(ADMIN_TOKEN),
-        'next_cycle_in':   bot.seconds_until_next_cycle(),
-        'cycle_seconds':   bot._CYCLE_SECONDS,
-    })
-
-
-@app.route('/api/start', methods=['POST'])
-def start():
-    if not _admin_ok():
-        return _deny_admin()
-    data     = request.get_json() or {}
-    strategy = data.get('strategy', 'adaptive')
-    if strategy not in VALID_STRATEGIES:
-        return jsonify({'error': 'Invalid strategy'}), 400
-    database.update_bot_state(strategy=strategy)
-    success, msg = bot.start_bot()
-    return jsonify({'success': success, 'message': msg})
-
-
-@app.route('/api/stop', methods=['POST'])
-def stop():
-    if not _admin_ok():
-        return _deny_admin()
-    success, msg = bot.stop_bot()
-    return jsonify({'success': success, 'message': msg})
-
-
-@app.route('/api/strategy', methods=['POST'])
-def set_strategy():
-    if not _admin_ok():
-        return _deny_admin()
-    data     = request.get_json() or {}
-    strategy = data.get('strategy')
-    if strategy not in VALID_STRATEGIES:
-        return jsonify({'error': 'Invalid strategy'}), 400
-    database.update_bot_state(strategy=strategy)
-    return jsonify({'success': True, 'strategy': strategy})
-
-
-@app.route('/api/risk_tolerance', methods=['POST'])
-def set_risk_tolerance():
-    if not _admin_ok():
-        return _deny_admin()
-    data      = request.get_json() or {}
-    tolerance = data.get('tolerance', 'moderate')
-    if tolerance not in ('conservative', 'moderate', 'aggressive'):
-        return jsonify({'error': 'Invalid risk tolerance'}), 400
-    database.update_bot_state(risk_tolerance=tolerance)
-    return jsonify({'success': True, 'risk_tolerance': tolerance,
-                    'profile': risk.get_risk_profile(tolerance)})
 
 
 # ── Regime ────────────────────────────────────────────────────────────────────
 
 @app.route('/api/regime')
 def get_regime():
-    """Detect current market regime from SPY and return the result."""
+    """Detect the current market regime from SPY (stateless — no bot/DB)."""
     try:
         spy_df = features.fetch_ohlcv('SPY', period='6mo')
         if spy_df is None or len(spy_df) < 60:
             return jsonify({'error': 'Insufficient SPY data'}), 503
         result = reg.detect_regime(spy_df)
-        state    = database.get_bot_state()
-        risk_tol = state.get('risk_tolerance', 'moderate') if state else 'moderate'
         return jsonify({
             'regime':      result.regime,
             'label':       result.label,
             'description': result.description,
-            'strategy':    reg.get_regime_strategy(result.regime, risk_tol),
+            'strategy':    reg.get_regime_strategy(result.regime, 'moderate'),
             'adx':         result.adx,
             'plus_di':     result.plus_di,
             'minus_di':    result.minus_di,
@@ -269,36 +147,6 @@ def get_regime():
 
 
 # ── Data endpoints ────────────────────────────────────────────────────────────
-
-@app.route('/api/trades')
-def get_trades():
-    limit    = request.args.get('limit', 20, type=int)
-    strategy = request.args.get('strategy')
-    return jsonify(database.get_trades(limit=limit, strategy=strategy))
-
-
-@app.route('/api/portfolio/history')
-def portfolio_history():
-    strategy = request.args.get('strategy')
-    limit    = request.args.get('limit', 500, type=int)
-    return jsonify(database.get_portfolio_history(strategy=strategy, limit=limit))
-
-
-@app.route('/api/activity')
-def activity():
-    return jsonify(bot.get_activity_log())
-
-
-@app.route('/api/indicators')
-def indicators():
-    strategy = request.args.get('strategy', 'ma_crossover')
-    if strategy not in VALID_STRATEGIES:
-        return jsonify({'error': 'Invalid strategy'}), 400
-    result = {}
-    for ticker in strategies.WATCHLIST:
-        result[ticker] = strategies.get_indicator_data(ticker, strategy)
-    return jsonify(result)
-
 
 @app.route('/api/watchlist')
 def get_watchlist():
@@ -539,25 +387,13 @@ def optimize_portfolio():
 @app.route('/health')
 @limiter.exempt
 def health():
-    # Exempt: UptimeRobot (or similar) pings this frequently to keep the free
-    # Render instance warm — it must never be rate limited.
-    #
-    # Self-healing watchdog: a keep-warm ping (UptimeRobot etc.) both resumes the
-    # heartbeat thread AND runs a trading cycle if one is due. With a ~5-minute
-    # ping the bot can never stay down. Wrapped so a hiccup never fails the check.
-    try:
-        bot.resume_if_running()
-        bot.maybe_run_cycle()
-    except Exception as exc:
-        logger.warning('health watchdog failed: %s', exc)
+    # Exempt from rate limiting: the keep-warm self-ping (and any external
+    # uptime monitor) hits this frequently to keep the free instance awake.
+    # The API is fully stateless — no bot, no database to report on.
     return jsonify({
-        'status':  'ok',
-        'ts':      datetime.utcnow().isoformat(),
-        'running': bot.is_running(),
-        'engine_thread': bot.engine_thread_alive(),
-        'next_cycle_in': bot.seconds_until_next_cycle(),
-        # 'postgres' = persistent (survives redeploys); 'sqlite' = ephemeral.
-        'db':      'postgres' if database._USE_PG else 'sqlite',
+        'status': 'ok',
+        'ts':     datetime.utcnow().isoformat(),
+        'ml':     'loaded' if ml_runtime.get_info().get('loaded') else 'unavailable',
     })
 
 

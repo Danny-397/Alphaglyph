@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AlphaGlyph — Live Dashboard</title>
+  <title>AlphaGlyph — Live Demo Bot</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
@@ -17,7 +17,6 @@
   <nav class="navbar">
     <div class="nav-brand">
       <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Alpha Glyph — α whose tail breaks out like a price path -->
         <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
         <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
         <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
@@ -38,233 +37,215 @@
   <!-- ── Main ───────────────────────────────────────────────────────────── -->
   <main class="page-wrap" data-page="dashboard">
 
-    <!-- Status bar -->
-    <div class="status-bar">
-      <div class="status-bar-item">
-        <span class="dot dot-red" id="bot-dot"></span>
-        <span id="bot-status-text" style="font-size:13px;font-weight:600;">BOT STOPPED</span>
-      </div>
-      <span class="status-bar-sep">|</span>
-      <div class="status-bar-item">
-        <span style="font-size:12px;color:var(--muted);">Strategy:</span>
-        <span id="strategy-label" style="font-size:13px;font-weight:600;color:var(--blue);">—</span>
-      </div>
-      <span class="status-bar-sep">|</span>
-      <div class="status-bar-item">
-        <span class="badge badge-red" id="market-status-badge">MARKET CLOSED</span>
-      </div>
-    </div>
-
-    <!-- Live track-record strip -->
-    <div class="track-record" id="track-record" hidden>
-      <span class="tr-live"><span class="tr-live-dot"></span>LIVE</span>
-      <span class="tr-item" id="tr-config" hidden></span>
-      <span class="tr-item" id="tr-since" hidden></span>
-      <span class="tr-item" id="tr-days" hidden></span>
-      <span class="tr-item" id="tr-return" hidden></span>
-      <span class="tr-note">simulated capital · real market prices · no real money, ever</span>
-    </div>
-
-    <!-- Funnel visitors to their own personal bot, where they're in control -->
-    <div class="see-trade">
-      <span class="st-icon" aria-hidden="true">▶</span>
-      <div class="st-text">
-        <strong>This bot is the owner's.</strong> Want one of your own? Build a bot with any strategy
-        (including the ML transformer), your risk level and your stocks, and watch it trade live —
-        right in your browser, never stops.
-      </div>
-      <a href="sandbox.html" class="btn btn-primary btn-sm">Run your own bot →</a>
-    </div>
-
-    <!-- First-run onboarding banner (dismissible) -->
-    <div class="onboard" id="onboard" hidden>
-      <div class="onboard-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
-        </svg>
-      </div>
-      <div class="onboard-text">
-        <strong>New here?</strong> AlphaGlyph trades with simulated money at real market prices — no real funds, ever.
-        Click <strong>Start Bot</strong> for live paper trading, or run a backtest to watch a strategy play out instantly on historical data.
-      </div>
-      <div class="onboard-actions">
-        <a href="backtest.html" class="btn btn-primary btn-sm">Run a backtest →</a>
-        <button class="onboard-close" id="onboard-close" aria-label="Dismiss">×</button>
-      </div>
-    </div>
-
-    <!-- Hero metrics row -->
-    <div class="hero-row">
-      <div class="hero-stat">
-        <div class="hero-stat-label">Portfolio Value<i class="info" tabindex="0" data-tip="Total account value — cash plus the market value of every open position." aria-label="What is portfolio value?"></i></div>
-        <div class="hero-stat-value" id="hero-value">$—</div>
-      </div>
-      <div class="hero-stat">
-        <div class="hero-stat-label">Total Return<i class="info" tabindex="0" data-tip="Percent change in total portfolio value since the bot started trading." aria-label="What is total return?"></i></div>
-        <div class="hero-stat-value" id="hero-return">—</div>
-      </div>
-      <div class="hero-stat">
-        <div class="hero-stat-label">Invested<i class="info" tabindex="0" data-tip="Market value of all open positions. Whatever isn’t invested is held as cash." aria-label="What is invested?"></i></div>
-        <div class="hero-stat-value" id="hero-daily">—</div>
-      </div>
-      <div class="hero-stat">
-        <div class="hero-stat-label">Active Positions</div>
-        <div class="hero-stat-value" id="hero-positions">0</div>
-      </div>
-    </div>
-
-    <!-- Two-column layout -->
-    <div class="two-col">
-
-      <!-- Left column -->
+    <div class="page-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
       <div>
+        <h1>Live Demo Bot</h1>
+        <p>
+          A bot trading right now in <em>your</em> browser — on real market prices, explaining every
+          move in plain English. Below it: the market regime, the ML transformer's live forecasts,
+          and a Stock Explorer. Want to change the strategy, stocks, or risk?
+        </p>
+      </div>
+      <a href="sandbox.html" class="btn btn-primary">Build your own bot →</a>
+    </div>
 
-        <!-- Live activity narration -->
-        <div class="card live-activity" id="live-activity-card" style="margin-bottom:16px;">
-          <div class="section-header">
-            <span class="la-dot"></span>What the bot is doing right now
-          </div>
-          <div class="bot-now" id="bot-now">Connecting to the live bot…</div>
-          <div class="bot-last" id="bot-last" hidden></div>
+    <!-- Starting indicator (hidden once the demo bot is live) -->
+    <div id="sb-demo-loading" class="card" style="margin-bottom:16px;text-align:center;color:var(--muted);font-size:13px;padding:28px;">
+      ▶ Starting a live demo bot — fetching real prices and running a strategy…
+    </div>
+
+    <!-- ── Bot config (hidden on the dashboard; drives the shared engine) ── -->
+    <div class="card" id="sandbox-config" hidden style="margin-bottom:16px;">
+      <div class="section-header">Configure</div>
+      <div class="config-grid">
+        <div class="form-group">
+          <label class="form-label">Strategy</label>
+          <select id="sb-strategy">
+            <option value="adaptive">Adaptive (Regime-Based)</option>
+            <option value="ma_crossover">MA Crossover</option>
+            <option value="rsi">RSI Mean Reversion</option>
+            <option value="macd">MACD Momentum</option>
+            <option value="ml" disabled>ML Transformer (not trained yet)</option>
+          </select>
         </div>
-
-        <!-- Equity curve -->
-        <div class="card chart-section" style="margin-bottom:16px;">
-          <div class="section-header">Portfolio Performance</div>
-          <div class="chart-wrap">
-            <canvas id="eq-chart"></canvas>
-          </div>
+        <div class="form-group">
+          <label class="form-label">Starting Capital</label>
+          <input type="number" id="sb-capital" value="100000" min="1000" max="10000000" step="1000">
         </div>
-
-        <!-- Open Positions table -->
-        <div class="card">
-          <div class="section-header">Open Positions</div>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Ticker</th>
-                  <th>Shares</th>
-                  <th>Entry</th>
-                  <th>Current</th>
-                  <th>P&amp;L %</th>
-                  <th>Stop</th>
-                  <th>Target</th>
-                </tr>
-              </thead>
-              <tbody id="positions-tbody">
-                <tr>
-                  <td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">
-                    No open positions
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="form-group">
+          <label class="form-label">History Window</label>
+          <select id="sb-window">
+            <option value="180">Last 6 months</option>
+            <option value="365" selected>Last 1 year</option>
+            <option value="730">Last 2 years</option>
+            <option value="1825">Last 5 years</option>
+          </select>
         </div>
+        <div class="form-group">
+          <label class="form-label">Playback Speed</label>
+          <select id="sb-speed">
+            <option value="slow">Slow</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast</option>
+            <option value="instant">Instant</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Risk Tolerance</label>
+        <div class="risk-btn-group" id="sb-risk-btns">
+          <button class="risk-btn" data-risk="conservative">Conservative</button>
+          <button class="risk-btn active" data-risk="moderate">Moderate</button>
+          <button class="risk-btn" data-risk="aggressive">Aggressive</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stocks to Trade</label>
+        <div class="ticker-input-row">
+          <input type="text" id="sb-ticker-input" placeholder="Add a ticker" maxlength="8" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-sm" id="sb-ticker-add">Add</button>
+        </div>
+        <div class="ticker-error" id="sb-ticker-error" hidden></div>
+        <div class="chip-grid" id="sb-tickers" style="margin-top:10px;"></div>
+      </div>
+      <button class="btn btn-primary" id="sb-launch" style="width:100%;margin-top:8px;">▶ LAUNCH</button>
+      <div class="ticker-error" id="sb-error" hidden style="margin-top:10px;"></div>
+      <div id="sb-loading" hidden style="margin-top:14px;text-align:center;color:var(--muted);font-size:13px;">
+        Running the strategy…
+      </div>
+    </div>
 
+    <!-- ── LIVE BOT PANEL (shared engine) ──────────────────────────────── -->
+    <div id="sandbox-live" hidden>
+      <div class="status-bar" style="flex-wrap:wrap;gap:12px;">
+        <div class="status-bar-item">
+          <span class="dot dot-green" id="sb-dot"></span>
+          <span id="sb-state-text" style="font-size:13px;font-weight:600;">DEMO BOT LIVE</span>
+        </div>
+        <span class="status-bar-sep">|</span>
+        <div class="status-bar-item">
+          <span style="font-size:12px;color:var(--muted);">Strategy:</span>
+          <span id="sb-strategy-label" style="font-size:13px;font-weight:600;color:var(--blue);">—</span>
+        </div>
+        <span class="status-bar-sep">|</span>
+        <div class="status-bar-item">
+          <span style="font-size:12px;color:var(--muted);">Trading day:</span>
+          <span id="sb-simdate" style="font-size:13px;font-weight:600;font-family:var(--font-mono);">—</span>
+        </div>
+        <div class="status-bar-item" style="margin-left:auto;gap:8px;">
+          <button class="btn btn-sm" id="sb-playpause">⏸ Pause</button>
+          <select id="sb-speed-live" style="width:auto;padding:6px 10px;">
+            <option value="slow">Slow</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast</option>
+            <option value="instant">Instant</option>
+          </select>
+          <button class="btn btn-sm" id="sb-restart">↻ Restart</button>
+          <button class="btn btn-sm" id="sb-share">🔗 Share</button>
+          <button class="btn btn-sm" id="sb-reconfigure">✎ New Bot</button>
+        </div>
       </div>
 
-      <!-- Right column -->
-      <div>
+      <div class="sb-progress-track"><div class="sb-progress-fill" id="sb-progress"></div></div>
 
-        <!-- Bot Controls -->
-        <div class="card" id="controls-card" style="margin-bottom:16px;">
-          <div class="section-header">Bot Controls</div>
-
-          <div class="form-group">
-            <label class="form-label">Strategy</label>
-            <select id="strategy-select">
-              <option value="adaptive">Adaptive (Regime-Based)</option>
-              <option value="ma_crossover">MA Crossover</option>
-              <option value="rsi">RSI Mean Reversion</option>
-              <option value="macd">MACD Momentum</option>
-              <option value="ml" disabled>ML Transformer (not trained yet)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Risk Tolerance</label>
-            <div class="risk-btn-group" id="risk-btns">
-              <button class="risk-btn" data-risk="conservative">Conservative</button>
-              <button class="risk-btn active" data-risk="moderate">Moderate</button>
-              <button class="risk-btn" data-risk="aggressive">Aggressive</button>
-            </div>
-          </div>
-
-          <button class="btn btn-primary" id="start-stop-btn" style="width:100%;margin-top:4px;">
-            START BOT
-          </button>
-          <p class="control-note" id="control-note" hidden>
-            🔒 This is the owner's live bot. Want your own? <a href="sandbox.html"><strong>Run Your Own Bot →</strong></a>
-            — pick any strategy, risk and stocks and watch it trade live in your browser. You can also explore the
-            <a href="backtest.html">Backtest</a> and <a href="portfolio.html">Portfolio</a> tools.
-          </p>
+      <div class="sb-verdict" id="sb-verdict" hidden>
+        <div class="sb-verdict-headline" id="sb-verdict-headline"></div>
+        <div class="sb-verdict-text" id="sb-verdict-text"></div>
+        <div class="sb-verdict-actions">
+          <button class="btn btn-primary btn-sm" id="sb-verdict-again">↻ Replay</button>
+          <button class="btn btn-sm" id="sb-verdict-new">Build your own</button>
         </div>
-
-        <!-- Market Regime -->
-        <div class="card" id="regime-card" style="margin-bottom:16px;">
-          <div class="section-header">Market Regime</div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-            <span class="regime-badge" id="regime-badge">UNKNOWN</span>
-          </div>
-          <div id="regime-description" style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5;">
-            Waiting for data…
-          </div>
-          <div class="regime-metric-row">
-            <span class="regime-metric-label">ADX (Trend Strength)<i class="info" tabindex="0" data-tip="Average Directional Index — how strong the trend is, regardless of direction. Above 25 means a strong trend; below 20 means the market is drifting sideways." aria-label="What is ADX?"></i></span>
-            <span class="regime-metric-value" id="ri-adx">—</span>
-          </div>
-          <div class="regime-metric-row">
-            <span class="regime-metric-label">30-Day Volatility<i class="info" tabindex="0" data-tip="How much prices have swung over the last 30 days, annualized. Higher means a choppier, riskier market." aria-label="What is 30-day volatility?"></i></span>
-            <span class="regime-metric-value" id="ri-vol">—</span>
-          </div>
-          <div class="regime-metric-row">
-            <span class="regime-metric-label">BB Width<i class="info" tabindex="0" data-tip="Bollinger Band Width — how far apart the price bands sit. Narrow bands signal a quiet, coiled market that often precedes a big move." aria-label="What is Bollinger Band Width?"></i></span>
-            <span class="regime-metric-value" id="ri-bbw">—</span>
-          </div>
-          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
-            <span style="font-size:11px;color:var(--muted);">RECOMMENDED STRATEGY</span>
-            <div id="regime-strategy" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--blue);margin-top:4px;">—</div>
-          </div>
-        </div>
-
-        <!-- Performance Stats -->
-        <div class="card">
-          <div class="section-header">Performance</div>
-          <div class="perf-grid">
-            <div class="perf-item">
-              <div class="perf-label">Win Rate<i class="info" tabindex="0" data-tip="The share of closed trades that ended in a profit." aria-label="What is win rate?"></i></div>
-              <div class="perf-value" id="perf-winrate">—</div>
-            </div>
-            <div class="perf-item">
-              <div class="perf-label">Sharpe<i class="info" tabindex="0" data-tip="Return earned per unit of risk. Above 1 is good; above 2 is excellent." aria-label="What is the Sharpe ratio?"></i></div>
-              <div class="perf-value" id="perf-sharpe">—</div>
-            </div>
-            <div class="perf-item">
-              <div class="perf-label">Max Drawdown<i class="info" tabindex="0" data-tip="The largest drop from a peak to a later low — the worst dip you would have had to sit through." aria-label="What is max drawdown?"></i></div>
-              <div class="perf-value" id="perf-drawdown">—</div>
-            </div>
-            <div class="perf-item">
-              <div class="perf-label">Kelly Fraction<i class="info" tabindex="0" data-tip="The mathematically optimal share of capital to risk per trade, derived from the bot's historical win rate and average payoff." aria-label="What is the Kelly fraction?"></i></div>
-              <div class="perf-value" id="perf-kelly">—</div>
-            </div>
-            <div class="perf-item">
-              <div class="perf-label">Total Trades</div>
-              <div class="perf-value" id="perf-trades">—</div>
-            </div>
-            <div class="perf-item">
-              <div class="perf-label">Daily Trades<i class="info" tabindex="0" data-tip="Trades made today versus the daily cap set by your risk profile." aria-label="What are daily trades?"></i></div>
-              <div class="perf-value" id="perf-daily">—</div>
-            </div>
-          </div>
-        </div>
-
       </div>
-    </div><!-- end .two-col -->
+
+      <div class="hero-row">
+        <div class="hero-stat"><div class="hero-stat-label">Portfolio Value</div><div class="hero-stat-value" id="sb-value">$—</div></div>
+        <div class="hero-stat"><div class="hero-stat-label">Total Return</div><div class="hero-stat-value" id="sb-return">—</div></div>
+        <div class="hero-stat"><div class="hero-stat-label">Cash</div><div class="hero-stat-value" id="sb-cash">—</div></div>
+        <div class="hero-stat"><div class="hero-stat-label">Open Positions</div><div class="hero-stat-value" id="sb-positions-count">0</div></div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="card chart-section" style="margin-bottom:16px;">
+            <div class="section-header">Demo Bot vs. Buy &amp; Hold (SPY)</div>
+            <div class="chart-wrap"><canvas id="sb-chart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="section-header">Open Positions</div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Ticker</th><th>Shares</th><th>Entry</th><th>Opened</th><th>Strategy</th></tr></thead>
+                <tbody id="sb-positions-tbody">
+                  <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open positions yet</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="section-header">Bot's Current Regime</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+              <span class="regime-badge" id="sb-regime-badge">—</span>
+            </div>
+            <div id="sb-regime-note" style="font-size:12px;color:var(--muted);line-height:1.5;">
+              The bot tags every trade with the market regime it detected at the time.
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-header">Performance So Far</div>
+            <div class="perf-grid">
+              <div class="perf-item"><div class="perf-label">Win Rate</div><div class="perf-value" id="sb-winrate">—</div></div>
+              <div class="perf-item"><div class="perf-label">Closed Trades</div><div class="perf-value" id="sb-trades">0</div></div>
+              <div class="perf-item"><div class="perf-label">Best Trade</div><div class="perf-value" id="sb-best">—</div></div>
+              <div class="perf-item"><div class="perf-label">Worst Trade</div><div class="perf-value" id="sb-worst">—</div></div>
+              <div class="perf-item"><div class="perf-label">Invested</div><div class="perf-value" id="sb-invested">—</div></div>
+              <div class="perf-item"><div class="perf-label">vs SPY</div><div class="perf-value" id="sb-vsspy">—</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="section-header"><span class="la-dot"></span>Live Trade Feed — every move explained</div>
+        <div class="scroll-box" id="sb-feed" style="max-height:320px;">
+          <div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">The bot's trades will appear here as it runs…</div>
+        </div>
+      </div>
+    </div><!-- end live panel -->
+
+    <!-- ── Market Intelligence (stateless) ─────────────────────────────── -->
+    <div class="section-divider" style="margin:26px 0 4px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;">
+      Live Market Intelligence
+    </div>
+
+    <!-- Market Regime -->
+    <div class="card" id="regime-card" style="margin-bottom:16px;">
+      <div class="section-header">Market Regime <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— detected live from SPY</span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <span class="regime-badge" id="regime-badge">UNKNOWN</span>
+      </div>
+      <div id="regime-description" style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5;">Waiting for data…</div>
+      <div class="regime-metric-row">
+        <span class="regime-metric-label">ADX (Trend Strength)<i class="info" tabindex="0" data-tip="Average Directional Index — how strong the trend is, regardless of direction. Above 25 means a strong trend; below 20 means the market is drifting sideways." aria-label="What is ADX?"></i></span>
+        <span class="regime-metric-value" id="ri-adx">—</span>
+      </div>
+      <div class="regime-metric-row">
+        <span class="regime-metric-label">30-Day Volatility<i class="info" tabindex="0" data-tip="How much prices have swung over the last 30 days, annualized. Higher means a choppier, riskier market." aria-label="What is 30-day volatility?"></i></span>
+        <span class="regime-metric-value" id="ri-vol">—</span>
+      </div>
+      <div class="regime-metric-row">
+        <span class="regime-metric-label">BB Width<i class="info" tabindex="0" data-tip="Bollinger Band Width — how far apart the price bands sit. Narrow bands signal a quiet, coiled market that often precedes a big move." aria-label="What is Bollinger Band Width?"></i></span>
+        <span class="regime-metric-value" id="ri-bbw">—</span>
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        <span style="font-size:11px;color:var(--muted);">STRATEGY THIS REGIME FAVORS</span>
+        <div id="regime-strategy" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--blue);margin-top:4px;">—</div>
+      </div>
+    </div>
 
     <!-- ML Transformer — live forecasts -->
-    <div class="card ml-insights" id="ml-insights" hidden style="margin-top:16px;">
+    <div class="card ml-insights" id="ml-insights" hidden style="margin-bottom:16px;">
       <div class="section-header">
         <span class="la-dot"></span>ML Transformer — Live Forecasts
         <span id="ml-meta"></span>
@@ -272,8 +253,7 @@
       </div>
       <p class="ml-sub">
         The transformer forecasts a full <strong>return distribution</strong> and direction probability over the
-        next <span id="ml-horizon">5</span> trading days for each stock. It only acts when the direction
-        classifier <em>and</em> the median of the distribution agree — so most reads are a deliberate HOLD.
+        next <span id="ml-horizon">5</span> trading days for each stock. Click a row to inspect it in the Stock Explorer.
       </p>
       <div class="table-wrap">
         <table class="data-table ml-table">
@@ -293,8 +273,8 @@
       </div>
     </div>
 
-    <!-- Stock Explorer — see what a strategy sees on any stock -->
-    <div class="card" id="stock-explorer" style="margin-top:16px;">
+    <!-- Stock Explorer -->
+    <div class="card" id="stock-explorer">
       <div class="se-head">
         <span class="se-title">Stock Explorer</span>
         <select id="se-ticker" aria-label="Stock"></select>
@@ -316,47 +296,6 @@
         <canvas id="se-subchart"></canvas>
       </div>
       <div id="se-empty" hidden style="text-align:center;color:var(--muted);padding:24px;font-size:13px;"></div>
-    </div>
-
-    <!-- Full-width bottom: tabs for Trades + Activity -->
-    <div class="card" style="margin-top:16px;">
-      <div class="tab-list">
-        <button class="tab-btn active" data-tab="trades-tab">Recent Trades</button>
-        <button class="tab-btn" data-tab="activity-tab">Activity Log</button>
-      </div>
-
-      <div class="tab-panel active" id="trades-tab">
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Ticker</th>
-                <th>Action</th>
-                <th>Price</th>
-                <th>Shares</th>
-                <th>P&amp;L</th>
-                <th>Why</th>
-              </tr>
-            </thead>
-            <tbody id="trades-tbody">
-              <tr>
-                <td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">
-                  No trades yet — start the bot to begin trading
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="tab-panel" id="activity-tab">
-        <div class="scroll-box" id="activity-log">
-          <div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">
-            Waiting for bot activity…
-          </div>
-        </div>
-      </div>
     </div>
 
   </main>
