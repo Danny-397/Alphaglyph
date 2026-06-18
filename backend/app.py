@@ -104,6 +104,47 @@ def _deny_admin():
 
 database.init_db()
 simulator.init_simulator()
+
+
+def _start_keepalive():
+    """
+    Keep the Render free instance awake by pinging its own public URL on a timer.
+
+    Render spins the service down after ~15 min with no INBOUND traffic. A
+    request to our own public URL is routed back through Render's edge as inbound
+    traffic, so it resets the idle timer — keeping the bot and site warm with no
+    external uptime service. (GitHub Actions cron is too throttled to rely on:
+    scheduled runs can lag by hours.) Hitting /health also drives a bot cycle.
+
+    Active only in production, where Render sets RENDER_EXTERNAL_URL.
+    """
+    import threading
+    import time
+
+    url = os.getenv('RENDER_EXTERNAL_URL', '').strip()
+    if not url:
+        host = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
+        url = f'https://{host}' if host else ''
+    if not url:
+        return  # not on Render (local/dev) — nothing to keep warm
+
+    target = url.rstrip('/') + '/health'
+    interval = int(os.getenv('KEEPALIVE_SECONDS', '600'))  # 10 min < 15 min timeout
+
+    def loop():
+        import requests
+        while True:
+            time.sleep(interval)
+            try:
+                requests.get(target, timeout=20)
+            except Exception as exc:
+                logger.warning('keepalive ping failed: %s', exc)
+
+    threading.Thread(target=loop, daemon=True, name='keepalive').start()
+    logger.info('Self-keepalive enabled → %s every %ds', target, interval)
+
+
+_start_keepalive()
 # Render free tier spins the process down on inactivity and gunicorn can recycle
 # the worker — either kills the in-memory bot thread. The bot is now tick-driven
 # (cycles run on incoming requests, source of truth is the DB), so it can't stay
