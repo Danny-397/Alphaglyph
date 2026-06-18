@@ -17,9 +17,10 @@ Anti-overfitting decisions made HERE, before the model ever sees data:
                              model to learn market behaviour, not ticker quirks.
                              (Features are price-scale invariant to allow this.)
 
-  Date-based splits          Train ≤ 2021-12-31, validation 2022-01-01 →
-                             2023-06-30, test 2023-07-01 → today.  Splitting
-                             by date (never randomly!) means validation is
+  Date-based 60/20/20        Train = oldest 60% of trading days, validation =
+                             next 20%, test = most recent 20% (cutoffs computed
+                             from the data's own date range). Splitting by date
+                             (never randomly!) means validation and test are
                              always strictly in the model's future.
 
   Purge gaps                 10 trading days are dropped at each boundary so
@@ -53,10 +54,14 @@ OUT_FILE = os.path.join(OUT_DIR, 'dataset.npz')
 
 START_DATE = '2012-01-01'
 
-# Splits (by the window's PREDICTION date). PURGE_DAYS trading days are
-# dropped after each boundary so no label horizon crosses a split.
-TRAIN_END  = '2021-12-31'
-VAL_END    = '2023-06-30'
+# Chronological 60 / 20 / 20 split (train / validation / test), computed in
+# build() from the data's OWN date range: train is the oldest 60% of trading
+# days, validation the next 20%, test the most recent 20%. Splitting by DATE
+# (never randomly) keeps validation and test strictly in the model's future.
+# PURGE_DAYS trading days are dropped after each boundary so no label horizon
+# crosses a split (leakage control, López de Prado).
+TRAIN_FRAC = 0.60
+VAL_FRAC   = 0.20      # test is the remaining 0.20
 PURGE_DAYS = 10
 
 # ~80 liquid large-caps across sectors. Liquid names have the cleanest data
@@ -137,6 +142,17 @@ def build():
 
     if not kept:
         raise SystemExit('No tickers succeeded — check TIINGO_API_KEY and connectivity.')
+
+    # ── Chronological 60/20/20 cutoffs from the data's own date range ──────
+    # Union of every prediction date, then the 60th and 80th percentiles. This
+    # makes the split exactly 60% train / 20% validation / 20% test by trading
+    # day, adapting automatically as the dataset grows.
+    all_dates = sorted({d for t in kept for d in arrays[f'd_{t}'].tolist()})
+    n_dates   = len(all_dates)
+    TRAIN_END = all_dates[int(n_dates * TRAIN_FRAC)]
+    VAL_END   = all_dates[int(n_dates * (TRAIN_FRAC + VAL_FRAC))]
+    print(f'\nsplit (60/20/20 by date, {n_dates} trading days): '
+          f'train ≤ {TRAIN_END} | val ≤ {VAL_END} | test ≤ {all_dates[-1]}', flush=True)
 
     # ── Train-split normalisation stats (train rows only, all tickers) ────
     train_rows = []

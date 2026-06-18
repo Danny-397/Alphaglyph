@@ -254,7 +254,11 @@ def backtest_signals(ohlcv: pd.DataFrame, ticker: str) -> pd.Series | None:
     """
     if not _ensure_loaded():
         return None
-    X, dates = _prepare_windows(ohlcv, ticker)
+    # Sentiment off: GDELT is slow/rate-limited and would make a multi-ticker
+    # backtest time out. The model was trained with modality dropout to run
+    # without it (zero-filled), and the live signal path does the same — so
+    # backtest and live stay consistent.
+    X, dates = _prepare_windows(ohlcv, ticker, include_sentiment=False)
     if X is None:
         return None
     pred = predict_batch(X)

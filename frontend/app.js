@@ -515,6 +515,32 @@ function initBacktest() {
 
   enableMlOption(el('bt-strategy'))
 
+  // ── ML out-of-sample guard ─────────────────────────────────────────────
+  // The transformer is trained once (chronological 60/20/20). To show it
+  // "actually working", an ML backtest must run only on dates AFTER its
+  // train+validation cutoff — data the model never saw. We read that cutoff
+  // from the model meta and push the start date out-of-sample automatically.
+  let mlCutoff = null   // { train_end, val_end, purge_days }
+  api('/api/ml/info').then(info => {
+    if (info && info.loaded && info.splits) { mlCutoff = info.splits; applyMlOOS() }
+  })
+
+  function applyMlOOS() {
+    const note = el('bt-ml-note')
+    const isMl = el('bt-strategy').value === 'ml'
+    if (!note) return
+    if (!isMl || !mlCutoff) { note.hidden = true; return }
+    const valEnd = mlCutoff.val_end
+    if (el('bt-start').value < valEnd) el('bt-start').value = valEnd
+    note.innerHTML =
+      `🧠 Trained on data through <strong>${mlCutoff.train_end}</strong>, validated through ` +
+      `<strong>${valEnd}</strong>. So you see the model working on data it never trained on, ` +
+      `this backtest runs <strong>out-of-sample from ${valEnd}</strong>.`
+    note.hidden = false
+  }
+
+  el('bt-strategy').addEventListener('change', applyMlOOS)
+
   // ── Ticker management (free-text input, validated against the backend) ──
   let btTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
   const tickerInput = el('bt-ticker-input')
@@ -708,10 +734,19 @@ function initBacktest() {
     const riskEl = el('bt-risk-btns').querySelector('.risk-btn.active')
     const commPct = parseFloat(el('bt-commission').value) || 0.10
     const slipPct = parseFloat(el('bt-slippage').value)  || 0.05
+
+    // Keep ML backtests strictly out-of-sample (after the model's val cutoff).
+    let startDate = el('bt-start').value
+    if (el('bt-strategy').value === 'ml' && mlCutoff && startDate < mlCutoff.val_end) {
+      startDate = mlCutoff.val_end
+      el('bt-start').value = startDate
+      applyMlOOS()
+    }
+
     const payload = {
       strategy:        el('bt-strategy').value,
       tickers,
-      start_date:      el('bt-start').value,
+      start_date:      startDate,
       end_date:        el('bt-end').value,
       initial_capital: parseFloat(el('bt-capital').value) || 100000,
       walk_forward:    el('bt-walkforward').checked,

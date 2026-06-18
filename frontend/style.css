@@ -1513,3 +1513,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* ML Insights rows are clickable (open the Stock Explorer) */
 .ml-row { cursor: pointer; transition: background .12s; }
 .ml-row:hover { background: var(--surface2); }
+
+/* ML out-of-sample note on the backtest page */
+.bt-ml-note {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--blue-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
