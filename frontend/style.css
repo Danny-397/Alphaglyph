@@ -1456,3 +1456,43 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   animation: connPulse 1s ease-in-out infinite;
 }
 @keyframes connPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* ── Sandbox end-of-run verdict ──────────────────────────────────────────── */
+.sb-verdict {
+  background: linear-gradient(180deg, rgba(63,185,80,0.06), transparent), var(--surface);
+  border: 1px solid var(--blue);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  animation: sbFeedIn .3s ease;
+}
+.sb-verdict-headline { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.sb-verdict-text { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+.sb-verdict-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Guided tour (first-visit coachmarks) ────────────────────────────────── */
+.tour-highlight {
+  position: relative;
+  z-index: 1000;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px var(--blue), 0 0 0 9999px rgba(0,0,0,0.62);
+  transition: box-shadow .2s;
+}
+.tour-tip {
+  position: fixed;
+  z-index: 1001;
+  max-width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.tour-tip-title { font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+.tour-tip-body  { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin-bottom: 12px; }
+.tour-tip-foot  { display: flex; align-items: center; justify-content: space-between; }
+.tour-tip-foot span { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+.tour-tip-skip {
+  background: none; border: none; color: var(--muted); font-size: 11px;
+  cursor: pointer; text-decoration: underline; padding: 0; margin-right: auto;
+}

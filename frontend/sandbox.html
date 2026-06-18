@@ -164,12 +164,23 @@
             <option value="instant">Instant</option>
           </select>
           <button class="btn btn-sm" id="sb-restart">↻ Restart</button>
+          <button class="btn btn-sm" id="sb-share">🔗 Share</button>
           <button class="btn btn-sm" id="sb-reconfigure">✎ New Bot</button>
         </div>
       </div>
 
       <!-- progress -->
       <div class="sb-progress-track"><div class="sb-progress-fill" id="sb-progress"></div></div>
+
+      <!-- End-of-run verdict (plain-English wrap-up) -->
+      <div class="sb-verdict" id="sb-verdict" hidden>
+        <div class="sb-verdict-headline" id="sb-verdict-headline"></div>
+        <div class="sb-verdict-text" id="sb-verdict-text"></div>
+        <div class="sb-verdict-actions">
+          <button class="btn btn-primary btn-sm" id="sb-verdict-again">↻ Replay</button>
+          <button class="btn btn-sm" id="sb-verdict-new">Try another bot</button>
+        </div>
+      </div>
 
       <!-- Hero metrics -->
       <div class="hero-row">

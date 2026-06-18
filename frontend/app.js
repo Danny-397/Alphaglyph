@@ -595,7 +595,66 @@ function initDashboard() {
 
   const mlRefresh = el('ml-refresh')
   if (mlRefresh) mlRefresh.addEventListener('click', loadMlInsights)
-  loadMlInsights()
+  // Kick off the ML panel, then offer the first-visit tour once layout settles.
+  loadMlInsights().then(() => setTimeout(maybeStartTour, 500))
+
+  // ── First-visit guided tour (coachmarks) ───────────────────────────────
+  function maybeStartTour() {
+    if (localStorage.getItem('tb_tour_done')) return
+    startTour()
+  }
+
+  function startTour() {
+    const steps = [
+      { sel: '#live-activity-card', title: 'Meet the live bot',
+        body: 'This is the bot trading right now — it narrates exactly what it’s doing, and why, every few minutes.' },
+      { sel: '#ml-insights', title: 'Watch the AI think',
+        body: 'The ML transformer’s live forecasts: the odds of an up-move and a full return distribution for each stock.' },
+      { sel: '.see-trade', title: 'Run your own',
+        body: 'Build your own bot in one click — pick a strategy, watch it trade and explain itself. No code.' },
+    ].filter(s => { const e = document.querySelector(s.sel); return e && e.offsetParent !== null })
+    if (!steps.length) { localStorage.setItem('tb_tour_done', '1'); return }
+
+    let i = 0, curEl = null
+    const tip = document.createElement('div')
+    tip.className = 'tour-tip'
+    document.body.appendChild(tip)
+
+    function cleanup() {
+      if (curEl) curEl.classList.remove('tour-highlight')
+      tip.remove()
+      localStorage.setItem('tb_tour_done', '1')
+    }
+    function show() {
+      if (curEl) curEl.classList.remove('tour-highlight')
+      const st = steps[i]
+      const e = document.querySelector(st.sel)
+      if (!e) return cleanup()
+      curEl = e
+      e.classList.add('tour-highlight')
+      e.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      tip.innerHTML =
+        `<div class="tour-tip-title">${st.title}</div>` +
+        `<div class="tour-tip-body">${st.body}</div>` +
+        `<div class="tour-tip-foot">` +
+          `<button class="tour-tip-skip" id="tour-skip">Skip</button>` +
+          `<span>${i + 1} / ${steps.length}</span>` +
+          `<button class="btn btn-sm btn-primary" id="tour-next" style="margin-left:10px;">${i === steps.length - 1 ? 'Got it' : 'Next'}</button>` +
+        `</div>`
+      requestAnimationFrame(() => {
+        const r = e.getBoundingClientRect()
+        const tr = tip.getBoundingClientRect()
+        let top = r.bottom + 12
+        if (top + tr.height > window.innerHeight - 12) top = Math.max(66, r.top - tr.height - 12)
+        const left = Math.min(Math.max(12, r.left), window.innerWidth - tr.width - 12)
+        tip.style.top = top + 'px'
+        tip.style.left = left + 'px'
+      })
+      el('tour-next').onclick = () => { i++; (i >= steps.length) ? cleanup() : show() }
+      el('tour-skip').onclick = cleanup
+    }
+    show()
+  }
 
   refreshAll()
   setInterval(refreshAll, 10000)
@@ -1616,6 +1675,7 @@ function initSandbox() {
   }
 
   function play() {
+    const v = el('sb-verdict'); if (v) v.hidden = true
     if (cursor >= timeline.length - 1) resetState()   // at the end → replay
     playing = true
     el('sb-playpause').textContent = '⏸ Pause'
@@ -1641,6 +1701,45 @@ function initSandbox() {
     el('sb-dot').className = 'dot dot-green'
     el('sb-state-text').textContent = 'CAUGHT UP TO TODAY'
     el('sb-playpause').textContent = '↻ Replay'
+    showVerdict()
+  }
+
+  // Plain-English wrap-up of how the bot did — closes the loop satisfyingly.
+  function showVerdict() {
+    const v = el('sb-verdict'); if (!v) return
+    const finalVal = timeline[timeline.length - 1].value
+    const ret   = (finalVal - capital) / capital * 100
+    const spyRet = lastSpy ? (lastSpy - capital) / capital * 100 : null
+    const vs    = spyRet != null ? ret - spyRet : null
+    const wins  = closed.filter(p => p > 0).length
+    const wr    = closed.length ? Math.round(wins / closed.length * 100) : null
+    const sells = trades.filter(t => t.action === 'SELL' && t.pnl != null)
+    let bestT = null
+    sells.forEach(t => { if (!bestT || t.pnl > bestT.pnl) bestT = t })
+
+    el('sb-verdict-headline').innerHTML =
+      `${ret >= 0 ? '📈' : '📉'} ${stratLabel}: ${fmt$(capital)} → <strong>${fmt$(finalVal)}</strong> ` +
+      `<span class="${clr(ret)}">(${fmtPct(ret)})</span>`
+
+    let s
+    if (!closed.length) {
+      s = `Over ${timeline.length} trading days this strategy found no trades that met its rules on ` +
+          `these stocks — a real, honest outcome (it stays in cash rather than forcing bad trades). ` +
+          `Try another preset, different stocks, or a longer window.`
+    } else {
+      s = `Over ${timeline.length} trading days your bot made <strong>${closed.length}</strong> ` +
+          `completed trade${closed.length === 1 ? '' : 's'}`
+      if (wr != null) s += ` with a <strong>${wr}%</strong> win rate`
+      s += '. '
+      if (vs != null) {
+        s += vs >= 0
+          ? `It <strong class="positive">beat</strong> buy-and-hold (SPY) by <strong>${fmtPct(vs)}</strong>. `
+          : `It <strong class="negative">trailed</strong> buy-and-hold by <strong>${fmtPct(Math.abs(vs))}</strong>. `
+      }
+      if (bestT) s += `Best call: <strong>${bestT.ticker}</strong> for ${fmt$(bestT.pnl)}.`
+    }
+    el('sb-verdict-text').innerHTML = s
+    v.hidden = false
   }
 
   // ── Controls ──
@@ -1650,15 +1749,61 @@ function initSandbox() {
     speed = e.target.value
     if (playing) play()    // restart timer at new cadence
   })
-  el('sb-reconfigure').addEventListener('click', () => {
+  function reconfigure() {
     pause()
     localStorage.removeItem(LS_KEY)
+    const v = el('sb-verdict'); if (v) v.hidden = true
     livePanel.hidden = true
     configCard.hidden = false
     const presetsEl = el('sandbox-presets')
     if (presetsEl) presetsEl.hidden = false
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  el('sb-reconfigure').addEventListener('click', reconfigure)
+  el('sb-verdict-new').addEventListener('click', reconfigure)
+  el('sb-verdict-again').addEventListener('click', () => { resetState(); renderAll(); play() })
+
+  // ── Shareable bot link ─────────────────────────────────────────────────
+  el('sb-share').addEventListener('click', async () => {
+    const riskEl = el('sb-risk-btns').querySelector('.risk-btn.active')
+    const params = new URLSearchParams({
+      strategy: el('sb-strategy').value,
+      risk:     riskEl ? riskEl.dataset.risk : 'moderate',
+      capital:  String(Math.round(capital || 100000)),
+      window:   el('sb-window').value,
+      tickers:  tickers.join(','),
+    })
+    const url = `${location.origin}${location.pathname}?${params.toString()}`
+    const btn = el('sb-share')
+    const restore = () => { btn.textContent = '🔗 Share' }
+    try {
+      await navigator.clipboard.writeText(url)
+      btn.textContent = '✓ Link copied!'
+      setTimeout(restore, 1800)
+    } catch (_) {
+      window.prompt('Copy your bot link:', url)
+    }
   })
+
+  function applySharedConfig(sp) {
+    const strat = sp.get('strategy')
+    const sel = el('sb-strategy')
+    const opt = strat && sel.querySelector(`option[value="${strat}"]`)
+    if (!opt) return false                       // unknown strategy → ignore
+    opt.disabled = false
+    sel.value = strat
+    const risk = sp.get('risk') || 'moderate'
+    el('sb-risk-btns').querySelectorAll('.risk-btn')
+      .forEach(b => b.classList.toggle('active', b.dataset.risk === risk))
+    const cap = parseFloat(sp.get('capital'))
+    if (cap >= 1000) el('sb-capital').value = cap
+    const win = sp.get('window')
+    if (['180', '365', '730', '1825'].includes(win)) el('sb-window').value = win
+    const tk = (sp.get('tickers') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+    if (tk.length) { tickers = tk.slice(0, 12); renderChips() }
+    launch()
+    return true
+  }
 
   // ── Rendering ──
   function renderAll() {
@@ -1797,7 +1942,14 @@ function initSandbox() {
     return false
   }
 
-  restore()   // if a previous bot exists, bring it back paused where it left off
+  // A shared link (?strategy=…&tickers=…) launches that exact bot; otherwise
+  // bring back a previous run, paused where it left off.
+  const sharedParams = new URLSearchParams(location.search)
+  if (sharedParams.get('strategy')) {
+    if (!applySharedConfig(sharedParams)) restore()
+  } else {
+    restore()
+  }
 }
 
 // ── Router ──────────────────────────────────────────────────────────────────
