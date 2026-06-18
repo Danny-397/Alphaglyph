@@ -133,9 +133,13 @@ def predict_batch(X: np.ndarray) -> dict | None:
         return None
 
 
-def _prepare_windows(ohlcv: pd.DataFrame, ticker: str, include_sentiment: bool | None = None):
+def _prepare_windows(ohlcv: pd.DataFrame, ticker: str,
+                     include_sentiment: bool | None = None,
+                     include_macro: bool | None = None):
     """OHLCV → normalised model windows using the meta's train-split stats."""
-    frame = mlf.build_feature_frame(ohlcv, ticker, include_sentiment=include_sentiment)
+    frame = mlf.build_feature_frame(ohlcv, ticker,
+                                    include_macro=include_macro,
+                                    include_sentiment=include_sentiment)
     if frame is None:
         return None, []
     X, dates = mlf.windows_from_frame(frame, int(_meta['seq_len']))
@@ -208,10 +212,10 @@ def live_prediction(ticker: str) -> dict | None:
         return {'ticker': ticker, 'available': False}
     price = float(ohlcv['Close'].iloc[-1])
 
-    # Sentiment off here: GDELT is slow/rate-limited from cloud IPs (it
-    # self-disables and zero-fills in production anyway), so the interactive
-    # panel stays fast and bounded. The model handles the zero-fill gracefully.
-    X, _dates = _prepare_windows(ohlcv, ticker, include_sentiment=False)
+    # Macro (FRED, ~90s cold) and sentiment (GDELT, rate-limited) are both off
+    # on the interactive path so it stays fast and reliable. The model was
+    # trained with modality dropout to run on price/technical features alone.
+    X, _dates = _prepare_windows(ohlcv, ticker, include_sentiment=False, include_macro=False)
     if X is None:
         return {'ticker': ticker, 'price': round(price, 2), 'available': False}
     pred = predict_batch(X[-1:])
@@ -254,11 +258,11 @@ def backtest_signals(ohlcv: pd.DataFrame, ticker: str) -> pd.Series | None:
     """
     if not _ensure_loaded():
         return None
-    # Sentiment off: GDELT is slow/rate-limited and would make a multi-ticker
-    # backtest time out. The model was trained with modality dropout to run
-    # without it (zero-filled), and the live signal path does the same — so
-    # backtest and live stay consistent.
-    X, dates = _prepare_windows(ohlcv, ticker, include_sentiment=False)
+    # Macro (FRED, ~90s cold) and sentiment (GDELT, rate-limited) are both off
+    # so a multi-ticker backtest can't time out. The model was trained with
+    # modality dropout to run on price/technical features alone, and the live
+    # signal path does the same — so backtest and live stay consistent.
+    X, dates = _prepare_windows(ohlcv, ticker, include_sentiment=False, include_macro=False)
     if X is None:
         return None
     pred = predict_batch(X)
