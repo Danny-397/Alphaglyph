@@ -1,0 +1,48 @@
+name: Keep bot warm
+
+# WHY THIS EXISTS
+# Render's free tier spins the web service down after ~15 min with no traffic.
+# While it's asleep, NOTHING runs — not the heartbeat thread, not a request-driven
+# tick. The bot is tick-driven (cycles run on incoming requests), so all it needs
+# to stay alive is a steady heartbeat. This scheduled job pings /health every
+# ~10 minutes, which wakes the instance AND runs a trading cycle if one is due.
+#
+# Together with the tick engine this is what actually keeps the bot from
+# "stopping": no browser tab needs to be open, no manual restart, no paid plan.
+#
+# NOTE: GitHub cron is best-effort (it can lag a few minutes and is paused after
+# 60 days of zero repo activity). For rock-solid uptime also point a dedicated
+# free pinger (https://cron-job.org or UptimeRobot) at the same /health URL.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes (GitHub's minimum granularity is 5)
+  workflow_dispatch:          # allow manual "Run workflow" from the Actions tab
+
+# Don't pile up overlapping pings if a run is slow (cold starts take ~50s).
+concurrency:
+  group: keepwarm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health (wake instance + run a due trading cycle)
+        env:
+          # Override by setting a repo variable BACKEND_URL if you rename the
+          # service: Settings → Secrets and variables → Actions → Variables.
+          BACKEND_URL: ${{ vars.BACKEND_URL || 'https://trading-bot-jy87.onrender.com' }}
+        run: |
+          set -e
+          # Retry to cover Render cold-start latency (first hit can take ~50s).
+          for attempt in 1 2 3 4; do
+            body="$(curl -s -m 90 "$BACKEND_URL/health" || true)"
+            if echo "$body" | grep -q '"status":"ok"'; then
+              echo "✓ awake: $body"
+              exit 0
+            fi
+            echo "attempt $attempt: not ready yet, retrying in 15s…"
+            sleep 15
+          done
+          echo "::warning::/health did not return ok after retries (instance may be mid-cold-start)"

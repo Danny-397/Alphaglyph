@@ -1321,3 +1321,38 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   /* Tab strips stay swipeable */
   .tab-list { -webkit-overflow-scrolling: touch; }
 }
+
+/* ── Sandbox / Run-Your-Own-Bot page ─────────────────────────────────────── */
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 4px;
+}
+.sb-progress-track {
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 10px 0 16px;
+}
+.sb-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--blue), var(--green));
+  transition: width .12s linear;
+}
+.sb-feed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  animation: sbFeedIn .25s ease;
+}
+.sb-feed-row:last-child { border-bottom: none; }
+.sb-feed-time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 78px; }
+.sb-feed-tkr  { font-weight: 700; min-width: 48px; }
+.sb-feed-meta { margin-left: auto; font-size: 11px; color: var(--muted); text-align: right; }
+@keyframes sbFeedIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

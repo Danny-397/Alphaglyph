@@ -105,9 +105,11 @@ def _deny_admin():
 database.init_db()
 simulator.init_simulator()
 # Render free tier spins the process down on inactivity and gunicorn can recycle
-# the worker — either kills the in-memory bot thread. Resume it from persisted
-# state so the dashboard doesn't show "stopped" after a restart.
-bot.resume_if_running()
+# the worker — either kills the in-memory bot thread. The bot is now tick-driven
+# (cycles run on incoming requests, source of truth is the DB), so it can't stay
+# stopped. ensure_running_default() keeps the demo bot ON by default and resumes
+# the heartbeat after a restart. Set BOT_AUTOSTART=false to require a manual start.
+bot.ensure_running_default()
 
 VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive',)
 
@@ -116,6 +118,14 @@ VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive',)
 
 @app.route('/api/status')
 def get_status():
+    # Every dashboard poll nudges the engine — if a trading cycle is due, it runs
+    # in the background. This is what keeps the bot alive without a long-running
+    # thread: traffic drives it. Non-blocking, so the status response stays fast.
+    try:
+        bot.maybe_run_cycle()
+    except Exception as exc:
+        logger.warning('status tick failed: %s', exc)
+
     state         = database.get_bot_state()
     strategy      = state['strategy']       if state else 'adaptive'
     risk_tol      = state['risk_tolerance'] if state else 'moderate'
@@ -139,6 +149,8 @@ def get_status():
         'regime':          regime_info,
         'kelly_fraction':  round(kelly * 100, 2) if kelly else None,
         'admin_required':  bool(ADMIN_TOKEN),
+        'next_cycle_in':   bot.seconds_until_next_cycle(),
+        'cycle_seconds':   bot._CYCLE_SECONDS,
     })
 
 
@@ -349,20 +361,22 @@ def health():
     # Exempt: UptimeRobot (or similar) pings this frequently to keep the free
     # Render instance warm — it must never be rate limited.
     #
-    # Self-healing watchdog: if the persisted state says the bot should be
-    # running but its thread has died (e.g. after a restart), restart it. With
-    # a 5-minute keep-warm ping this means the bot can never stay down for long.
-    # Wrapped so a hiccup here never makes the health check fail.
+    # Self-healing watchdog: a keep-warm ping (UptimeRobot etc.) both resumes the
+    # heartbeat thread AND runs a trading cycle if one is due. With a ~5-minute
+    # ping the bot can never stay down. Wrapped so a hiccup never fails the check.
     try:
         bot.resume_if_running()
+        bot.maybe_run_cycle()
     except Exception as exc:
-        logger.warning('health watchdog resume failed: %s', exc)
+        logger.warning('health watchdog failed: %s', exc)
     return jsonify({
-        'status': 'ok',
-        'ts':     datetime.utcnow().isoformat(),
+        'status':  'ok',
+        'ts':      datetime.utcnow().isoformat(),
         'running': bot.is_running(),
+        'engine_thread': bot.engine_thread_alive(),
+        'next_cycle_in': bot.seconds_until_next_cycle(),
         # 'postgres' = persistent (survives redeploys); 'sqlite' = ephemeral.
-        'db':     'postgres' if database._USE_PG else 'sqlite',
+        'db':      'postgres' if database._USE_PG else 'sqlite',
     })
 
 

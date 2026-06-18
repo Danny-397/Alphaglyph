@@ -15,6 +15,7 @@ No external brokerage account or API key is required.
 """
 
 import logging
+import os
 import threading
 from datetime import datetime
 
@@ -32,6 +33,21 @@ _activity_log = []
 _position_highs: dict[str, float] = {}  # ticker → highest price seen since entry
 
 _last_regime: reg.RegimeResult | None = None
+
+# How often a trading cycle should run, in seconds. Persisted as last_cycle_at
+# in bot_state so timing survives process restarts (Render free-tier spin-downs,
+# gunicorn worker recycles). Override with BOT_CYCLE_SECONDS for faster demos.
+_CYCLE_SECONDS = max(30, int(os.getenv('BOT_CYCLE_SECONDS', '300')))
+
+# A non-reentrant lock that guarantees only ONE trading cycle runs at a time,
+# no matter how many requests trigger a tick concurrently (gunicorn runs one
+# worker with several threads). Acquired by maybe_run_cycle() and released by
+# the cycle thread when it finishes.
+_cycle_lock = threading.Lock()
+
+
+def _autostart_enabled() -> bool:
+    return os.getenv('BOT_AUTOSTART', 'true').strip().lower() in ('1', 'true', 'yes', 'on')
 
 
 # ── Activity log ──────────────────────────────────────────────────────────────
@@ -264,72 +280,190 @@ def _trading_cycle(configured_strategy: str):
         logger.exception('Unhandled error in trading cycle')
 
 
-# ── Bot loop ──────────────────────────────────────────────────────────────────
+# ── Tick-driven engine ─────────────────────────────────────────────────────────
+#
+# WHY THIS DESIGN (and not a long-lived background thread):
+# The previous version ran the bot inside a daemon thread and treated that
+# thread's liveness as "is the bot running". On free-tier hosting that is fatal:
+# Render spins the whole process down after ~15 min idle and gunicorn recycles
+# workers — either event silently kills the thread, so the bot "stopped every
+# single time". Worse, on ephemeral SQLite the persisted state was wiped on
+# restart, so the thread never even auto-resumed.
+#
+# The fix: the bot is "running" when bot_state.is_running is set in the database
+# — that's the single source of truth. Trading cycles are DUE on a fixed cadence
+# (last_cycle_at persisted in the DB) and are driven by ANY incoming request
+# (the dashboard polls /api/status every 10 s, and a keep-warm ping hits
+# /health). So the bot makes progress whenever the service is awake, with no
+# dependence on a thread surviving. A lightweight heartbeat thread still runs
+# when the process is continuously alive (local/dev), but nothing depends on it.
 
-def _bot_loop():
-    _log('Bot started')
-    while not _stop_event.is_set():
-        # The whole body is guarded: a transient hiccup (e.g. a brief database
-        # blip) must NEVER kill the loop thread — it should log and try again
-        # next cycle. Previously an unguarded get_bot_state() here could crash
-        # the thread silently while the web process kept running.
+
+def _cycle_due(last_iso: str | None) -> bool:
+    if not last_iso:
+        return True
+    try:
+        last = datetime.fromisoformat(last_iso)
+    except (ValueError, TypeError):
+        return True
+    return (datetime.utcnow() - last).total_seconds() >= _CYCLE_SECONDS
+
+
+def seconds_until_next_cycle() -> int:
+    state = database.get_bot_state()
+    if not (state and state.get('is_running')):
+        return 0
+    last = state.get('last_cycle_at')
+    if not last:
+        return 0
+    try:
+        elapsed = (datetime.utcnow() - datetime.fromisoformat(last)).total_seconds()
+    except (ValueError, TypeError):
+        return 0
+    return max(0, int(_CYCLE_SECONDS - elapsed))
+
+
+def _run_cycle_locked(strategy: str):
+    """Run one cycle, then release the lock. Always runs in its own thread so the
+    request that triggered the tick returns immediately (a cycle can take many
+    seconds fetching market data)."""
+    try:
+        _trading_cycle(strategy)
+    except Exception as exc:
+        logger.exception('Trading cycle crashed (will retry next cycle): %s', exc)
+    finally:
+        _cycle_lock.release()
+
+
+def maybe_run_cycle() -> bool:
+    """
+    Run a trading cycle if one is due. Safe and cheap to call from any request
+    handler — this is what keeps the bot alive on free-tier hosting.
+
+    Returns True if a cycle was kicked off. Non-blocking: the cycle executes in
+    a background thread, and the persisted last_cycle_at slot is claimed BEFORE
+    starting so concurrent requests (or a redundant heartbeat tick) can never
+    double-trade.
+    """
+    state = database.get_bot_state()
+    if not (state and state.get('is_running')):
+        return False
+    if not _cycle_due(state.get('last_cycle_at')):
+        return False
+    # Only one cycle at a time. If we can't grab the lock, a cycle is already
+    # running — skip silently.
+    if not _cycle_lock.acquire(blocking=False):
+        return False
+    try:
+        # Re-read under the lock and claim the slot before doing any work.
+        state = database.get_bot_state()
+        if not (state and state.get('is_running')) or not _cycle_due(state.get('last_cycle_at')):
+            _cycle_lock.release()
+            return False
+        database.update_bot_state(last_cycle_at=datetime.utcnow().isoformat())
+        strategy = state.get('strategy', 'adaptive')
+        threading.Thread(target=_run_cycle_locked, args=(strategy,),
+                         daemon=True, name='alphaglyph-cycle').start()
+        return True
+    except Exception as exc:
+        # Make sure we never leak the lock on an unexpected failure.
+        logger.exception('maybe_run_cycle failed: %s', exc)
         try:
-            state    = database.get_bot_state()
-            strategy = state['strategy'] if state else 'adaptive'
-            _trading_cycle(strategy)
+            _cycle_lock.release()
+        except RuntimeError:
+            pass
+        return False
+
+
+def _heartbeat_loop():
+    """Best-effort local driver: when the process stays alive (local/dev, or a
+    paid always-on host), this nudges the engine so cycles still run without any
+    inbound traffic. On free tiers it simply dies with the process — harmless,
+    because request-driven ticks take over."""
+    _log('Bot engine started')
+    while not _stop_event.is_set():
+        try:
+            maybe_run_cycle()
         except Exception as exc:
-            logger.exception('Bot loop error (continuing next cycle): %s', exc)
-        _stop_event.wait(300)
-    _log('Bot stopped')
+            logger.exception('Heartbeat error (continuing): %s', exc)
+        _stop_event.wait(min(60, _CYCLE_SECONDS))
+
+
+def _ensure_heartbeat():
+    global _bot_thread
+    if _bot_thread and _bot_thread.is_alive():
+        return
+    _stop_event.clear()
+    _bot_thread = threading.Thread(target=_heartbeat_loop, daemon=True, name='alphaglyph')
+    _bot_thread.start()
 
 
 # ── Public controls ───────────────────────────────────────────────────────────
 
 def start_bot() -> tuple[bool, str]:
-    global _bot_thread
-    if _bot_thread and _bot_thread.is_alive():
-        return False, 'Bot is already running'
-    _stop_event.clear()
-    _bot_thread = threading.Thread(target=_bot_loop, daemon=True, name='alphaglyph')
-    _bot_thread.start()
     account = simulator.get_account()
     database.update_bot_state(
         is_running=True,
         started_at=datetime.utcnow().isoformat(),
         initial_value=account.portfolio_value,
+        last_cycle_at='',                 # empty → first cycle runs immediately
     )
+    _ensure_heartbeat()
+    _log('Bot started')
     return True, 'Bot started'
 
 
 def stop_bot() -> tuple[bool, str]:
     _stop_event.set()
     database.update_bot_state(is_running=False)
+    _log('Bot stopped')
     return True, 'Stop signal sent'
 
 
 def resume_if_running() -> bool:
     """
-    Restart the bot loop on process startup if the persisted state says it was
-    running. Called once at app import time.
-
-    Render's free tier spins the service down after inactivity and restarts the
-    process on the next request; gunicorn can also recycle the worker. Either
-    event kills the in-memory bot thread, so without this the dashboard would
-    show "stopped" after every restart. Unlike start_bot(), this preserves the
-    existing started_at and initial_value so the return baseline isn't reset.
+    Make sure the heartbeat thread exists if the persisted state says the bot is
+    running. Called at app import and from the /health watchdog. The bot trades
+    via request-driven ticks regardless — this just restarts the local heartbeat
+    after a restart so a continuously-awake process keeps cycling on its own.
     """
-    global _bot_thread
-    if _bot_thread and _bot_thread.is_alive():
-        return False
     state = database.get_bot_state()
     if not (state and state.get('is_running')):
         return False
-    _stop_event.clear()
-    _bot_thread = threading.Thread(target=_bot_loop, daemon=True, name='alphaglyph')
-    _bot_thread.start()
-    _log('Bot auto-resumed after process restart')
+    if _bot_thread and _bot_thread.is_alive():
+        return False
+    _ensure_heartbeat()
+    _log('Bot engine resumed after process restart')
     return True
 
 
+def ensure_running_default() -> bool:
+    """
+    Keep the public demo bot ON by default so it is never sitting idle.
+
+    Only auto-starts a *fresh* bot (never started, or a wiped ephemeral DB where
+    started_at was reset) — an explicit owner stop on a persistent (Postgres) DB
+    is honoured because started_at remains set. Disable with BOT_AUTOSTART=false.
+    """
+    if not _autostart_enabled():
+        return False
+    state = database.get_bot_state()
+    if state and not state.get('is_running') and not state.get('started_at'):
+        start_bot()
+        _log('Bot auto-started (BOT_AUTOSTART) — demo bot is on by default')
+        return True
+    resume_if_running()
+    return False
+
+
 def is_running() -> bool:
+    """The bot is running when the persisted state says so — independent of any
+    thread's liveness. Request-driven ticks keep it trading even when the
+    heartbeat thread has been killed by a spin-down or worker recycle."""
+    state = database.get_bot_state()
+    return bool(state and state.get('is_running'))
+
+
+def engine_thread_alive() -> bool:
+    """Diagnostic: whether the in-process heartbeat thread is currently alive."""
     return _bot_thread is not None and _bot_thread.is_alive()

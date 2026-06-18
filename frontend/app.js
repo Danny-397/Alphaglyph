@@ -268,10 +268,12 @@ function initDashboard() {
         regimeTxt = ` It reads the market as <strong>${r}</strong>` +
                     (rs ? `, so it's using the <strong>${rs}</strong> strategy.` : '.')
       }
+      const nextTxt = (s.next_cycle_in != null && s.next_cycle_in > 0)
+        ? ` Next market scan in <strong>${s.next_cycle_in}s</strong>.` : ' Scanning the market now…'
       now.innerHTML = `🟢 <strong>Live and trading.</strong> Every 5 minutes it scans ${stocks}, ` +
         `checks its risk limits, and acts on its signals — ${posTxt}, ` +
         `<strong>${s.daily_trades || 0}</strong> trade${(s.daily_trades || 0) === 1 ? '' : 's'} today.` +
-        regimeTxt
+        regimeTxt + nextTxt
     } else {
       now.innerHTML = `The market is <strong>closed</strong>, so the bot is monitoring and will ` +
         `resume scanning ${stocks} at the next open. Strategy ready: <strong>${stratNm}</strong>; ${posTxt}.`
@@ -1103,8 +1105,394 @@ function initPortfolio() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  SANDBOX — "Run Your Own Bot"
+//  A personal paper-trading bot that lives entirely in the visitor's browser.
+//  It reuses the REAL server strategy engine (/api/backtest) so the signals,
+//  risk management, regime adaptation, Kelly sizing and ML transformer are
+//  identical to the live bot — then plays the result back day-by-day as a live
+//  bot the user owns. No server-side per-user state; it can never "stop".
+// ════════════════════════════════════════════════════════════════════════════
+function initSandbox() {
+  const LS_KEY = 'ag_sandbox_v2'
+
+  const SPEEDS = {
+    slow:    { days: 1,    ms: 220 },
+    normal:  { days: 1,    ms: 70  },
+    fast:    { days: 5,    ms: 40  },
+    instant: { days: 1e9,  ms: 0   },
+  }
+
+  // ── Run state ──
+  let timeline = []          // [{date, value}] — authoritative portfolio value
+  let trades   = []          // chronologically sorted BUY/SELL events
+  let spyByDate = {}         // date -> SPY buy&hold value (same starting capital)
+  let cursor = 0             // index into timeline (trading days elapsed)
+  let tradePtr = 0           // next trade to reveal
+  let cash = 0, capital = 0
+  let positions = {}         // ticker -> {shares, entry, date, strategy}
+  let closed = []            // realised pnl per closed trade
+  let best = null, worst = null
+  let lastRegime = '—', lastSpy = 0
+  let stratLabel = '—'
+  let speed = 'normal'
+  let playing = false, timer = null, chart = null
+
+  // ── Config form ──
+  let tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
+  const configCard  = el('sandbox-config')
+  const livePanel   = el('sandbox-live')
+  const tickerInput = el('sb-ticker-input')
+  const tickerAdd   = el('sb-ticker-add')
+  const tickerErr   = el('sb-ticker-error')
+
+  enableMlOption(el('sb-strategy'))
+
+  function renderChips() {
+    const box = el('sb-tickers')
+    if (!tickers.length) {
+      box.innerHTML = '<span style="font-size:12px;color:var(--muted);">No stocks added yet.</span>'
+      return
+    }
+    box.innerHTML = tickers.map(t =>
+      `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`
+    ).join('')
+    box.querySelectorAll('.chip-x').forEach(b =>
+      b.addEventListener('click', () => { tickers = tickers.filter(x => x !== b.dataset.ticker); renderChips() }))
+  }
+
+  async function addTicker() {
+    const sym = (tickerInput.value || '').trim().toUpperCase()
+    tickerErr.hidden = true
+    if (!sym) return
+    if (tickers.includes(sym)) { tickerInput.value = ''; return }
+    tickerAdd.disabled = true; tickerAdd.textContent = '…'
+    const res = await api('/api/validate_ticker?symbol=' + encodeURIComponent(sym))
+    tickerAdd.disabled = false; tickerAdd.textContent = 'Add'
+    if (res && res.status === 'valid') {
+      tickers.push(res.symbol); renderChips(); tickerInput.value = ''; tickerInput.focus()
+    } else if (res && res.status === 'rate_limited') {
+      tickerErr.textContent = 'Couldn’t verify "' + sym + '" right now — try again in a moment.'; tickerErr.hidden = false
+    } else {
+      tickerErr.textContent = '"' + sym + '" doesn’t exist. Enter a valid ticker symbol.'; tickerErr.hidden = false; tickerInput.select()
+    }
+  }
+
+  tickerAdd.addEventListener('click', addTicker)
+  tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTicker() } })
+  renderChips()
+
+  el('sb-risk-btns').querySelectorAll('.risk-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el('sb-risk-btns').querySelectorAll('.risk-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+    })
+  })
+
+  function showErr(msg) { const e = el('sb-error'); e.textContent = msg; e.hidden = false }
+
+  // ── Launch: run the real engine, then start playback ──
+  el('sb-launch').addEventListener('click', launch)
+
+  async function launch() {
+    if (!tickers.length) { showErr('Add at least one stock to trade.'); return }
+    capital = Math.max(1000, parseFloat(el('sb-capital').value) || 100000)
+    const windowDays = parseInt(el('sb-window').value, 10) || 365
+    const riskEl = el('sb-risk-btns').querySelector('.risk-btn.active')
+    const strategy = el('sb-strategy').value
+    speed = el('sb-speed').value
+    stratLabel = STRATEGY_LABELS[strategy] || strategy
+
+    const payload = {
+      strategy,
+      tickers: [...tickers],
+      start_date: daysAgo(windowDays),
+      end_date: today(),
+      initial_capital: capital,
+      risk_tolerance: riskEl ? riskEl.dataset.risk : 'moderate',
+      commission_pct: 0.001,
+      slippage_pct: 0.0005,
+    }
+
+    el('sb-error').hidden = true
+    el('sb-loading').hidden = false
+    el('sb-launch').disabled = true
+    const data = await api('/api/backtest', { method: 'POST', body: JSON.stringify(payload) })
+    el('sb-loading').hidden = true
+    el('sb-launch').disabled = false
+
+    if (!data || data.error) { showErr(data?.error || 'Could not start your bot — please try again.'); return }
+    if (!data.equity_curve || !data.equity_curve.length) {
+      showErr('Not enough price data for those stocks and window. Try different tickers or a longer history.')
+      return
+    }
+    loadRun({
+      timeline:   data.equity_curve,
+      trades:     data.trades || [],
+      spy:        data.spy_curve || [],
+      capital,
+      speed,
+      stratLabel,
+      cursor: 0,
+    })
+    play()
+    save()
+  }
+
+  // ── (Re)hydrate a run into memory and show the live panel ──
+  function loadRun(run) {
+    timeline   = run.timeline
+    capital    = run.capital
+    speed      = run.speed || 'normal'
+    stratLabel = run.stratLabel || '—'
+    trades = run.trades.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    spyByDate = {}
+    run.spy.forEach(p => { spyByDate[p.date] = p.value })
+
+    el('sb-strategy-label').textContent = stratLabel
+    el('sb-speed').value = speed
+    el('sb-speed-live').value = speed
+
+    resetState()
+    // fast-forward (no animation) to the saved cursor
+    const target = Math.min(run.cursor || 0, timeline.length - 1)
+    while (cursor < target) { cursor++; applyTradesUpTo(timeline[cursor].date) }
+
+    configCard.hidden = true
+    livePanel.hidden = false
+    buildChart()
+    renderAll()
+    pause()
+  }
+
+  function resetState() {
+    cursor = 0; tradePtr = 0; cash = capital
+    positions = {}; closed = []; best = null; worst = null
+    lastRegime = '—'; lastSpy = capital
+    clearFeed()
+    applyTradesUpTo(timeline[0].date)   // reveal day-zero trades
+  }
+
+  // ── Trade application (reconstructs cash & open positions exactly) ──
+  function applyTradesUpTo(dateStr) {
+    while (tradePtr < trades.length && trades[tradePtr].date <= dateStr) {
+      applyTrade(trades[tradePtr]); tradePtr++
+    }
+  }
+
+  function applyTrade(t) {
+    const cost = t.cost || 0
+    if (t.action === 'BUY') {
+      cash -= t.price * t.shares + cost
+      positions[t.ticker] = { shares: t.shares, entry: t.price, date: t.date, strategy: t.strategy }
+    } else {
+      cash += t.price * t.shares - cost
+      delete positions[t.ticker]
+      if (t.pnl != null) {
+        closed.push(t.pnl)
+        if (best  == null || t.pnl > best)  best  = t.pnl
+        if (worst == null || t.pnl < worst) worst = t.pnl
+      }
+    }
+    if (t.regime) lastRegime = t.regime
+    pushFeed(t)
+  }
+
+  // ── Playback loop ──
+  function step() {
+    const conf = SPEEDS[speed]
+    const advance = speed === 'instant' ? timeline.length : conf.days
+    for (let k = 0; k < advance && cursor < timeline.length - 1; k++) {
+      cursor++
+      applyTradesUpTo(timeline[cursor].date)
+    }
+    renderAll()
+    save()
+    if (cursor >= timeline.length - 1) finish()
+  }
+
+  function play() {
+    if (cursor >= timeline.length - 1) resetState()   // at the end → replay
+    playing = true
+    el('sb-playpause').textContent = '⏸ Pause'
+    el('sb-dot').className = 'dot dot-green'
+    el('sb-state-text').textContent = 'YOUR BOT IS LIVE'
+    clearInterval(timer)
+    if (speed === 'instant') { step() }
+    else { timer = setInterval(step, SPEEDS[speed].ms) }
+    renderAll()
+  }
+
+  function pause() {
+    playing = false
+    clearInterval(timer); timer = null
+    el('sb-playpause').textContent = '⏵ Resume'
+    el('sb-dot').className = 'dot dot-yellow'
+    el('sb-state-text').textContent = 'PAUSED'
+  }
+
+  function finish() {
+    playing = false
+    clearInterval(timer); timer = null
+    el('sb-dot').className = 'dot dot-green'
+    el('sb-state-text').textContent = 'CAUGHT UP TO TODAY'
+    el('sb-playpause').textContent = '↻ Replay'
+  }
+
+  // ── Controls ──
+  el('sb-playpause').addEventListener('click', () => { playing ? pause() : play() })
+  el('sb-restart').addEventListener('click', () => { resetState(); renderAll(); play() })
+  el('sb-speed-live').addEventListener('change', e => {
+    speed = e.target.value
+    if (playing) play()    // restart timer at new cadence
+  })
+  el('sb-reconfigure').addEventListener('click', () => {
+    pause()
+    localStorage.removeItem(LS_KEY)
+    livePanel.hidden = true
+    configCard.hidden = false
+  })
+
+  // ── Rendering ──
+  function renderAll() {
+    const day  = timeline[cursor]
+    const val  = day.value
+    const ret  = (val - capital) / capital * 100
+    lastSpy = spyByDate[day.date] != null ? spyByDate[day.date] : lastSpy
+    const invested = Math.max(0, val - cash)
+
+    el('sb-simdate').textContent = day.date + '  ·  Day ' + (cursor + 1) + ' / ' + timeline.length
+    el('sb-value').textContent  = fmt$(val)
+    const rEl = el('sb-return'); rEl.textContent = fmtPct(ret); rEl.className = 'hero-stat-value ' + clr(ret)
+    el('sb-cash').textContent   = fmt$(cash)
+    el('sb-positions-count').textContent = Object.keys(positions).length
+    el('sb-invested').textContent = fmt$(invested)
+
+    const spyRet = lastSpy ? (lastSpy - capital) / capital * 100 : 0
+    const vs = ret - spyRet
+    const vsEl = el('sb-vsspy'); vsEl.textContent = fmtPct(vs); vsEl.className = 'perf-value ' + clr(vs)
+
+    el('sb-trades').textContent  = closed.length
+    const wins = closed.filter(p => p > 0).length
+    el('sb-winrate').textContent = closed.length ? Math.round(wins / closed.length * 100) + '%' : '—'
+    const bEl = el('sb-best');  bEl.textContent  = best  != null ? fmt$(best)  : '—'; bEl.className  = 'perf-value ' + clr(best)
+    const wEl = el('sb-worst'); wEl.textContent  = worst != null ? fmt$(worst) : '—'; wEl.className  = 'perf-value ' + clr(worst)
+
+    const rb = el('sb-regime-badge')
+    rb.textContent = lastRegime
+    rb.className = 'regime-badge ' + (lastRegime !== '—' ? lastRegime : '')
+
+    const pct = timeline.length > 1 ? cursor / (timeline.length - 1) * 100 : 100
+    el('sb-progress').style.width = pct + '%'
+
+    renderPositions()
+    updateChart()
+  }
+
+  function renderPositions() {
+    const tbody = el('sb-positions-tbody')
+    const rows = Object.entries(positions)
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open positions</td></tr>'
+      return
+    }
+    tbody.innerHTML = rows.map(([tkr, p]) => `
+      <tr>
+        <td><strong>${tkr}</strong></td>
+        <td>${fmtN(p.shares, 0)}</td>
+        <td>${fmt$(p.entry)}</td>
+        <td style="color:var(--muted);font-size:11px;">${p.date}</td>
+        <td style="color:var(--blue);font-size:11px;">${STRATEGY_LABELS[p.strategy] || p.strategy || '—'}</td>
+      </tr>`).join('')
+  }
+
+  // ── Live trade feed ──
+  function clearFeed() {
+    el('sb-feed').innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">Your bot’s trades will appear here as it runs…</div>'
+  }
+
+  function pushFeed(t) {
+    const box = el('sb-feed')
+    if (!box.querySelector('.sb-feed-row')) box.innerHTML = ''   // drop the placeholder
+    const isBuy = t.action === 'BUY'
+    const pnlTxt = (t.action === 'SELL' && t.pnl != null)
+      ? `<span class="${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
+    const row = document.createElement('div')
+    row.className = 'sb-feed-row'
+    row.innerHTML =
+      `<span class="sb-feed-time">${t.date}</span>` +
+      `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
+      `<span class="sb-feed-tkr">${t.ticker}</span>` +
+      `<span>${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>` +
+      `<span class="sb-feed-meta">${pnlTxt}${pnlTxt ? ' · ' : ''}${(t.reason || '').replace(/_/g, ' ')}${t.regime ? ' · ' + t.regime : ''}</span>`
+    box.insertBefore(row, box.firstChild)
+    while (box.children.length > 120) box.removeChild(box.lastChild)
+  }
+
+  // ── Chart ──
+  function buildChart() {
+    chart = destroyChart(chart)
+    chart = new Chart(el('sb-chart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Your Bot', data: [], borderColor: '#3fb950', borderWidth: 2,
+            backgroundColor: 'rgba(63,185,80,0.07)', fill: true, tension: 0.25, pointRadius: 0 },
+          { label: 'Buy & Hold SPY', data: [], borderColor: '#e3b341', borderWidth: 1.5,
+            borderDash: [4, 4], fill: false, tension: 0.25, pointRadius: 0, spanGaps: true },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
+          tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt$(c.parsed.y) } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } },
+          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+        },
+      },
+    })
+  }
+
+  function updateChart() {
+    if (!chart) return
+    const slice = timeline.slice(0, cursor + 1)
+    chart.data.labels = slice.map(p => p.date)
+    chart.data.datasets[0].data = slice.map(p => p.value)
+    chart.data.datasets[1].data = slice.map(p => (spyByDate[p.date] != null ? spyByDate[p.date] : null))
+    chart.update('none')
+  }
+
+  // ── Persistence (survives reloads — the bot is "always there") ──
+  function save() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        timeline, trades, spy: Object.entries(spyByDate).map(([date, value]) => ({ date, value })),
+        capital, speed, stratLabel, cursor,
+      }))
+    } catch (_) { /* storage full / disabled — non-fatal */ }
+  }
+
+  function restore() {
+    let saved
+    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch (_) { saved = null }
+    if (saved && Array.isArray(saved.timeline) && saved.timeline.length) {
+      loadRun(saved)
+      return true
+    }
+    return false
+  }
+
+  restore()   // if a previous bot exists, bring it back paused where it left off
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 const PAGE = document.body.dataset.page
 if (PAGE === 'dashboard') initDashboard()
 if (PAGE === 'backtest')  initBacktest()
 if (PAGE === 'portfolio') initPortfolio()
+if (PAGE === 'sandbox')   initSandbox()

@@ -121,7 +121,8 @@ def init_db():
             strategy       TEXT    NOT NULL DEFAULT 'adaptive',
             started_at     TEXT,
             initial_value  {real}  DEFAULT 100000,
-            risk_tolerance TEXT    NOT NULL DEFAULT 'moderate'
+            risk_tolerance TEXT    NOT NULL DEFAULT 'moderate',
+            last_cycle_at  TEXT
         );
     ''')
 
@@ -146,6 +147,7 @@ def _migrate(db):
     migrations = [
         f'ALTER TABLE trades    ADD COLUMN {ine}regime TEXT',
         f"ALTER TABLE bot_state ADD COLUMN {ine}risk_tolerance TEXT NOT NULL DEFAULT 'moderate'",
+        f'ALTER TABLE bot_state ADD COLUMN {ine}last_cycle_at TEXT',
     ]
     for sql in migrations:
         try:
@@ -219,7 +221,7 @@ def get_bot_state():
 
 
 def update_bot_state(is_running=None, strategy=None, started_at=None,
-                     initial_value=None, risk_tolerance=None):
+                     initial_value=None, risk_tolerance=None, last_cycle_at=None):
     conn = get_connection()
     if is_running is not None:
         conn.execute('UPDATE bot_state SET is_running = ? WHERE id = 1', (1 if is_running else 0,))
@@ -231,6 +233,10 @@ def update_bot_state(is_running=None, strategy=None, started_at=None,
         conn.execute('UPDATE bot_state SET initial_value = ? WHERE id = 1', (initial_value,))
     if risk_tolerance is not None:
         conn.execute('UPDATE bot_state SET risk_tolerance = ? WHERE id = 1', (risk_tolerance,))
+    # last_cycle_at uses '' (not None) as the "run a cycle now" sentinel, so an
+    # empty string must still be written — hence the explicit `is not None` check.
+    if last_cycle_at is not None:
+        conn.execute('UPDATE bot_state SET last_cycle_at = ? WHERE id = 1', (last_cycle_at,))
     conn.commit()
     conn.close()
 

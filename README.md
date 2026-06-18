@@ -316,7 +316,8 @@ AlphaGlyph tries data sources in order: **Tiingo** (if `TIINGO_API_KEY` is set) 
 ### Deployment notes
 
 - **`workers = 1` is mandatory.** `gunicorn.conf.py` enforces this. Multiple workers = multiple bot threads = duplicate orders against the same simulated account.
-- **Render free tier spins down** after 15 min of inactivity. Use UptimeRobot (free) to ping `/health` every 10 minutes. The bot loop must be restarted from the dashboard after a cold start.
+- **Render free tier spins down** after 15 min of inactivity. The bot is **tick-driven** — trading cycles run on incoming requests (dashboard polls + `/health` pings), with the database as the single source of truth for whether it's running. So it self-recovers after any spin-down or worker recycle; **no manual restart needed**. A bundled GitHub Actions cron (`.github/workflows/keepwarm.yml`) pings `/health` every ~10 min to keep the instance awake; for rock-solid uptime also point a free pinger ([cron-job.org](https://cron-job.org) or UptimeRobot) at the same URL. `BOT_AUTOSTART=true` (default) keeps the demo bot on by default.
+- **State persistence**: set `DATABASE_URL` to a free Postgres (Neon/Supabase) so the track record — and an explicit owner *stop* — survive redeploys. On ephemeral SQLite the state resets on each restart and the always-on default takes over.
 - **Backtest timeouts**: the Render default timeout is 30s; `gunicorn.conf.py` sets `timeout = 120` to accommodate long backtests with many tickers.
 
 ---
