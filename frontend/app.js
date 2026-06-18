@@ -123,7 +123,14 @@ function setConn(reachable) {
 }
 
 // ── Utilities ───────────────────────────────────────────────────────────────
-async function api(path, opts = {}) {
+const _sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// Resilient fetch. Free-tier cold starts, brief rate limits, and the market-data
+// providers' occasional hiccups are all transient — so instead of surfacing an
+// error we back off and retry silently, showing only the friendly "waking up"
+// banner. Returns null only after several attempts genuinely fail.
+async function api(path, opts = {}, _attempt = 0) {
+  const MAX = 5
   try {
     const r = await fetch(API_BASE + path, {
       ...opts,
@@ -134,13 +141,20 @@ async function api(path, opts = {}) {
       },
     })
     setConn(true)                        // we reached the server
-    if (!r.ok) throw new Error('HTTP ' + r.status)
-    return r.json()
+    if (r.ok) return r.json()
+    // Transient server states (cold start / rate limit) → back off and retry.
+    if ((r.status === 429 || r.status >= 500) && _attempt < MAX) {
+      await _sleep(Math.min(5000, 500 * 2 ** _attempt))
+      return api(path, opts, _attempt + 1)
+    }
+    return null                          // a real 4xx — caller handles gracefully
   } catch (err) {
-    // A thrown TypeError means fetch itself failed (server asleep / unreachable),
-    // as opposed to an HTTP error from a server we did reach.
+    // fetch threw → server asleep/unreachable. Show the waking banner, retry.
     if (err instanceof TypeError) setConn(false)
-    console.warn('API error:', path, err.message)
+    if (_attempt < MAX) {
+      await _sleep(Math.min(5000, 500 * 2 ** _attempt))
+      return api(path, opts, _attempt + 1)
+    }
     return null
   }
 }
