@@ -293,6 +293,31 @@
       </div>
     </div>
 
+    <!-- Stock Explorer — see what a strategy sees on any stock -->
+    <div class="card" id="stock-explorer" style="margin-top:16px;">
+      <div class="se-head">
+        <span class="se-title">Stock Explorer</span>
+        <select id="se-ticker" aria-label="Stock"></select>
+        <select id="se-strategy" aria-label="Strategy">
+          <option value="ma_crossover">MA Crossover</option>
+          <option value="rsi">RSI</option>
+          <option value="macd">MACD</option>
+          <option value="ml" disabled>ML Transformer</option>
+        </select>
+        <span class="se-legend" id="se-legend"></span>
+      </div>
+      <p class="se-sub">
+        See exactly what a strategy sees — the price, its own indicators, and every point it would
+        <span style="color:var(--green);font-weight:700;">▲ buy</span> or
+        <span style="color:var(--red);font-weight:700;">▼ sell</span> over the past year.
+      </p>
+      <div class="chart-wrap"><canvas id="se-chart"></canvas></div>
+      <div class="chart-wrap" id="se-sub-wrap" hidden style="height:130px;margin-top:8px;">
+        <canvas id="se-subchart"></canvas>
+      </div>
+      <div id="se-empty" hidden style="text-align:center;color:var(--muted);padding:24px;font-size:13px;"></div>
+    </div>
+
     <!-- Full-width bottom: tabs for Trades + Activity -->
     <div class="card" style="margin-top:16px;">
       <div class="tab-list">

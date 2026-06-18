@@ -105,6 +105,54 @@ def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '') -> pd.DataFr
     return df
 
 
+# ── Chart series (price + indicators + signal markers) ──────────────────────────
+
+_CHART_INDICATORS = {
+    'ma_crossover': ['sma20', 'sma50'],
+    'rsi':          ['rsi14'],
+    'macd':         ['macd_line', 'macd_signal', 'macd_hist'],
+    'ml':           [],
+}
+
+
+def chart_series(strategy: str, ticker: str, period: str = '1y') -> dict | None:
+    """
+    Build the data the Stock Explorer draws: the close price, the strategy's
+    own indicators, and the exact dates it would have signalled BUY/SELL — so a
+    user can see precisely what the strategy "sees" on any stock. Reuses the same
+    vectorised signal logic as the backtest, so the markers match real behaviour.
+    """
+    raw = feat.fetch_ohlcv(ticker, period=period)
+    if raw is None or len(raw) < 30:
+        return None
+
+    df   = _add_signals(raw, strategy, ticker)
+    cols = _CHART_INDICATORS.get(strategy, [])
+
+    series = []
+    for idx, row in df.iterrows():
+        rec = {'date': idx.strftime('%Y-%m-%d'), 'close': round(float(row['Close']), 2)}
+        for c in cols:
+            if c in df.columns and pd.notna(row[c]):
+                rec[c] = round(float(row[c]), 4)
+        series.append(rec)
+
+    signals = [
+        {'date':   idx.strftime('%Y-%m-%d'),
+         'action': 'BUY' if int(row['signal']) == 1 else 'SELL',
+         'price':  round(float(row['Close']), 2)}
+        for idx, row in df.iterrows() if int(row['signal']) != 0
+    ]
+
+    return {
+        'ticker':     ticker,
+        'strategy':   strategy,
+        'indicators': cols,
+        'series':     series,
+        'signals':    signals,
+    }
+
+
 # ── Regime breakdown ───────────────────────────────────────────────────────────
 
 def _regime_breakdown(sell_trades: list[dict]) -> dict:

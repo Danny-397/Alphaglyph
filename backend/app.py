@@ -264,6 +264,30 @@ def get_watchlist():
     return jsonify(strategies.WATCHLIST)
 
 
+@app.route('/api/chart')
+@limiter.limit('60 per minute')
+def chart():
+    """
+    Price + the strategy's indicators + the exact BUY/SELL signal dates for one
+    ticker over the past year — powers the Stock Explorer so users can see what
+    a strategy "sees". Markers come from the same logic the backtest uses.
+    """
+    ticker   = request.args.get('ticker', '').strip().upper()
+    strategy = request.args.get('strategy', 'ma_crossover')
+    if not ticker:
+        return jsonify({'error': 'ticker required'}), 400
+    if strategy not in VALID_STRATEGIES:
+        return jsonify({'error': 'Invalid strategy'}), 400
+    try:
+        data = backtester.chart_series(strategy, ticker)
+    except Exception as exc:
+        logger.warning('chart failed for %s/%s: %s', ticker, strategy, exc)
+        return jsonify({'error': 'Could not build chart'}), 500
+    if not data:
+        return jsonify({'error': f'No data for {ticker}'}), 404
+    return jsonify(data)
+
+
 @app.route('/api/ml/info')
 def ml_info():
     """ML transformer status: whether a trained model is deployed, its

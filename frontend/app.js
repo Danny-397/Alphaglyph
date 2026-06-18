@@ -230,11 +230,21 @@ function initTabs(root) {
 // ════════════════════════════════════════════════════════════════════════════
 function initDashboard() {
   let eqChart        = null
+  let seChart        = null    // Stock Explorer price chart
+  let seSub          = null    // Stock Explorer indicator sub-chart
   let botRunning     = false
   let controlsLocked = false   // true on a public demo when the viewer isn't the owner
   let watchCount     = 0       // how many tickers the bot scans (for the narration)
 
-  api('/api/watchlist').then(w => { if (Array.isArray(w)) watchCount = w.length })
+  api('/api/watchlist').then(w => {
+    if (!Array.isArray(w) || !w.length) return
+    watchCount = w.length
+    const sel = el('se-ticker')
+    if (sel) {
+      sel.innerHTML = w.map(t => `<option value="${t}">${t}</option>`).join('')
+      loadExplorer()
+    }
+  })
 
   initTabs(document.body)
 
@@ -572,7 +582,7 @@ function initDashboard() {
       const upClr = p.p_up >= 0.55 ? 'positive' : p.p_up <= 0.45 ? 'negative' : ''
       const sigCls = p.signal === 'BUY' ? 'badge-buy' : p.signal === 'SELL' ? 'badge-sell' : ''
       const bandClr = q.q50 >= 0 ? 'pos' : 'neg'
-      return `<tr>
+      return `<tr data-ticker="${p.ticker}" class="ml-row" title="Open ${p.ticker} in the Stock Explorer">
         <td><strong>${p.ticker}</strong><div class="ml-px">${fmt$(p.price)}</div></td>
         <td>
           <div class="ml-prob"><div class="ml-prob-fill ${upClr}" style="width:${pUp}%"></div></div>
@@ -591,12 +601,120 @@ function initDashboard() {
         <td><span class="badge ${sigCls}">${p.signal}</span></td>
       </tr>`
     }).join('')
+
+    // Click a forecast row to inspect that stock in the Stock Explorer below.
+    tbody.querySelectorAll('tr[data-ticker]').forEach(tr => tr.addEventListener('click', () => {
+      const sel = el('se-ticker')
+      if (sel && [...sel.options].some(o => o.value === tr.dataset.ticker)) {
+        sel.value = tr.dataset.ticker
+        loadExplorer()
+        el('stock-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }))
   }
 
   const mlRefresh = el('ml-refresh')
   if (mlRefresh) mlRefresh.addEventListener('click', loadMlInsights)
   // Kick off the ML panel, then offer the first-visit tour once layout settles.
   loadMlInsights().then(() => setTimeout(maybeStartTour, 500))
+
+  // ── Stock Explorer: see what a strategy sees on any stock ──────────────
+  enableMlOption(el('se-strategy'))
+  const seTicker = el('se-ticker'), seStrategy = el('se-strategy')
+  if (seTicker)   seTicker.addEventListener('change', loadExplorer)
+  if (seStrategy) seStrategy.addEventListener('change', loadExplorer)
+
+  async function loadExplorer() {
+    const ticker = el('se-ticker')?.value
+    const strat  = el('se-strategy')?.value || 'ma_crossover'
+    if (!ticker) return
+    const empty = el('se-empty')
+    const data = await api(`/api/chart?ticker=${encodeURIComponent(ticker)}&strategy=${strat}`)
+    if (!data || data.error || !(data.series || []).length) {
+      seChart = destroyChart(seChart); seSub = destroyChart(seSub)
+      el('se-sub-wrap').hidden = true
+      if (empty) { empty.textContent = `No chart data for ${ticker}.`; empty.hidden = false }
+      return
+    }
+    if (empty) empty.hidden = true
+    renderExplorer(data)
+  }
+
+  function renderExplorer(d) {
+    const labels = d.series.map(s => s.date)
+    const buyMap = {}, sellMap = {}
+    d.signals.forEach(s => { (s.action === 'BUY' ? buyMap : sellMap)[s.date] = s.price })
+
+    const datasets = [{
+      label: 'Price', data: d.series.map(s => s.close),
+      borderColor: '#e9efeb', borderWidth: 1.6, fill: false, tension: 0.15, pointRadius: 0, order: 3,
+    }]
+    if (d.strategy === 'ma_crossover') {
+      datasets.push({ label: 'SMA 20', data: d.series.map(s => s.sma20 ?? null), borderColor: '#3fb950', borderWidth: 1.3, fill: false, pointRadius: 0, spanGaps: true, order: 2 })
+      datasets.push({ label: 'SMA 50', data: d.series.map(s => s.sma50 ?? null), borderColor: '#e3b341', borderWidth: 1.3, fill: false, pointRadius: 0, spanGaps: true, order: 2 })
+    }
+    datasets.push({ label: '▲ Buy',  data: labels.map(x => buyMap[x]  ?? null), showLine: false, pointStyle: 'triangle', pointRadius: 8, pointBackgroundColor: '#3fb950', pointBorderColor: '#0b0e0c', pointBorderWidth: 1, order: 1 })
+    datasets.push({ label: '▼ Sell', data: labels.map(x => sellMap[x] ?? null), showLine: false, pointStyle: 'triangle', rotation: 180, pointRadius: 8, pointBackgroundColor: '#f85149', pointBorderColor: '#0b0e0c', pointBorderWidth: 1, order: 1 })
+
+    seChart = destroyChart(seChart)
+    seChart = new Chart(el('se-chart').getContext('2d'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
+          tooltip: { callbacks: { label: c => c.parsed.y == null ? null : ' ' + c.dataset.label + ': ' + fmt$(c.parsed.y) } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } },
+          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + v } },
+        },
+      },
+    })
+
+    // Indicator sub-chart for oscillators that don't share the price scale.
+    const subWrap = el('se-sub-wrap')
+    seSub = destroyChart(seSub)
+    if (d.strategy === 'rsi') {
+      subWrap.hidden = false
+      seSub = new Chart(el('se-subchart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets: [
+          { label: 'RSI(14)', data: d.series.map(s => s.rsi14 ?? null), borderColor: '#d2a8ff', borderWidth: 1.5, pointRadius: 0, spanGaps: true },
+          { label: '70', data: labels.map(() => 70), borderColor: 'rgba(248,81,73,0.5)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0 },
+          { label: '30', data: labels.map(() => 30), borderColor: 'rgba(63,185,80,0.5)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0 },
+        ] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: { x: { display: false }, y: { min: 0, max: 100, ticks: { stepSize: 50 }, grid: { color: 'rgba(36,48,42,0.4)' } } },
+        },
+      })
+    } else if (d.strategy === 'macd') {
+      subWrap.hidden = false
+      seSub = new Chart(el('se-subchart').getContext('2d'), {
+        data: { labels, datasets: [
+          { type: 'bar', label: 'Histogram', data: d.series.map(s => s.macd_hist ?? null), backgroundColor: d.series.map(s => (s.macd_hist >= 0 ? 'rgba(63,185,80,0.5)' : 'rgba(248,81,73,0.5)')) },
+          { type: 'line', label: 'MACD', data: d.series.map(s => s.macd_line ?? null), borderColor: '#58a6ff', borderWidth: 1.4, pointRadius: 0, spanGaps: true },
+          { type: 'line', label: 'Signal', data: d.series.map(s => s.macd_signal ?? null), borderColor: '#e3b341', borderWidth: 1.4, pointRadius: 0, spanGaps: true },
+        ] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: { x: { display: false }, y: { grid: { color: 'rgba(36,48,42,0.4)' } } },
+        },
+      })
+    } else {
+      subWrap.hidden = true
+    }
+
+    const nb = d.signals.filter(s => s.action === 'BUY').length
+    const ns = d.signals.filter(s => s.action === 'SELL').length
+    el('se-legend').innerHTML =
+      `<span style="color:var(--green);">▲ ${nb}</span> · <span style="color:var(--red);">▼ ${ns}</span> signals · 1y`
+  }
 
   // ── First-visit guided tour (coachmarks) ───────────────────────────────
   function maybeStartTour() {
