@@ -544,7 +544,19 @@ function initBacktest() {
     note.hidden = false
   }
 
-  el('bt-strategy').addEventListener('change', applyMlOOS)
+  function applyBtStrategyHints() {
+    applyMlOOS()   // handles ML out-of-sample note/dates (and hides note otherwise)
+    if (el('bt-strategy').value === 'dip_buyer') {
+      el('bt-start').value = daysAgo(730)   // 2y so it has dips to buy
+      const note = el('bt-ml-note')
+      if (note) {
+        note.innerHTML = '🪙 <strong>Dip Buyer</strong> only buys near 52-week lows — date range set to ' +
+          '<strong>2 years</strong> so it has dips to act on.'
+        note.hidden = false
+      }
+    }
+  }
+  el('bt-strategy').addEventListener('change', applyBtStrategyHints)
 
   // ── Ticker management (free-text input, validated against the backend) ──
   let btTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
@@ -1340,6 +1352,22 @@ function initSandbox() {
 
   enableMlOption(el('sb-strategy'))
 
+  // Dip Buyer is patient (only buys near 52-week lows), so steer it to a window
+  // long enough to actually contain dips.
+  function applyStrategyHints() {
+    const note  = el('sb-strategy-note')
+    const isDip = el('sb-strategy').value === 'dip_buyer'
+    if (isDip) el('sb-window').value = '730'
+    if (note) {
+      note.hidden = !isDip
+      if (isDip) note.innerHTML =
+        '🪙 <strong>Dip Buyer</strong> is a patient value strategy — it only buys stocks near their ' +
+        '52-week low and keeps cash in reserve for the next one. Window set to <strong>2 years</strong> so it has dips to act on.'
+    }
+  }
+  el('sb-strategy').addEventListener('change', applyStrategyHints)
+  applyStrategyHints()
+
   // First-run 3-step primer (dismissible, remembered)
   const primer = el('sb-primer')
   if (primer && !localStorage.getItem('sb_primer_dismissed')) {
@@ -1972,6 +2000,20 @@ function initAccount() {
   const tickerErr   = el('acct-ticker-error')
 
   enableMlOption(el('acct-strategy'))
+
+  function applyAcctHints() {
+    const note  = el('acct-strategy-note')
+    const isDip = el('acct-strategy').value === 'dip_buyer'
+    if (isDip) el('acct-since').value = '730'
+    if (note) {
+      note.hidden = !isDip
+      if (isDip) note.innerHTML =
+        '🪙 <strong>Dip Buyer</strong> is patient — it only buys near 52-week lows. Tracking set to ' +
+        '<strong>2 years</strong> so it has dips to act on.'
+    }
+  }
+  el('acct-strategy').addEventListener('change', applyAcctHints)
+  applyAcctHints()
 
   function load() { try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch (_) { return null } }
   function store(a) { try { localStorage.setItem(LS_KEY, JSON.stringify(a)) } catch (_) {} }
