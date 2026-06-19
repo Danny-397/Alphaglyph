@@ -1847,9 +1847,110 @@ function initSandbox() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  LIVE SIGNAL SCANNER
+//  What every strategy + the ML transformer says about your stocks right now.
+// ════════════════════════════════════════════════════════════════════════════
+function initSignals() {
+  const LS_KEY = 'ag_scan_watchlist'
+  let tickers = []
+  try { tickers = JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch (_) {}
+  if (!Array.isArray(tickers) || !tickers.length)
+    tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
+
+  const tickerInput = el('sig-ticker-input')
+  const tickerAdd   = el('sig-ticker-add')
+  const tickerErr   = el('sig-ticker-error')
+
+  const sigBadge = s =>
+    s === 'BUY'  ? '<span class="badge badge-buy">BUY</span>'  :
+    s === 'SELL' ? '<span class="badge badge-sell">SELL</span>' :
+    s === 'HOLD' ? '<span class="badge sig-hold">HOLD</span>'   :
+                   '<span style="color:var(--muted);">—</span>'
+
+  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(tickers)) } catch (_) {} }
+
+  function renderChips() {
+    const box = el('sig-tickers')
+    box.innerHTML = tickers.length
+      ? tickers.map(t => `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`).join('')
+      : '<span style="font-size:12px;color:var(--muted);">No tickers — add some above.</span>'
+    box.querySelectorAll('.chip-x').forEach(b => b.addEventListener('click', () => {
+      tickers = tickers.filter(x => x !== b.dataset.ticker); save(); renderChips(); scan()
+    }))
+  }
+
+  async function addTicker() {
+    const sym = (tickerInput.value || '').trim().toUpperCase()
+    tickerErr.hidden = true
+    if (!sym) return
+    if (tickers.includes(sym)) { tickerInput.value = ''; return }
+    tickerAdd.disabled = true; tickerAdd.textContent = '…'
+    const res = await api('/api/validate_ticker?symbol=' + encodeURIComponent(sym))
+    tickerAdd.disabled = false; tickerAdd.textContent = 'Add'
+    if (res && res.status === 'valid') {
+      tickers.push(res.symbol); save(); renderChips(); tickerInput.value = ''; tickerInput.focus(); scan()
+    } else if (res && res.status === 'rate_limited') {
+      tickerErr.textContent = 'Couldn’t verify "' + sym + '" right now — try again shortly.'; tickerErr.hidden = false
+    } else {
+      tickerErr.textContent = '"' + sym + '" doesn’t exist. Enter a valid ticker symbol.'; tickerErr.hidden = false; tickerInput.select()
+    }
+  }
+
+  tickerAdd.addEventListener('click', addTicker)
+  tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTicker() } })
+  el('sig-scan').addEventListener('click', scan)
+
+  async function loadRegime() {
+    const r = await api('/api/regime')
+    const badge = el('sig-regime-badge')
+    if (!r || r.error) { el('sig-regime-desc').textContent = 'Market regime unavailable right now.'; return }
+    badge.textContent = (r.label || r.regime || 'UNKNOWN').toUpperCase()
+    badge.className = 'regime-badge ' + (r.regime || '')
+    el('sig-regime-desc').innerHTML = (r.description || '') +
+      (r.strategy ? ` · favors <strong>${STRATEGY_LABELS[r.strategy] || r.strategy}</strong>` : '')
+  }
+
+  async function scan() {
+    const tbody = el('sig-tbody')
+    if (!tickers.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Add a ticker to scan.</td></tr>'; return }
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Scanning <span class="dots"><span></span><span></span><span></span></span></td></tr>`
+    const data = await api('/api/scan?tickers=' + encodeURIComponent(tickers.join(',')))
+    if (!data || !data.scanned) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Couldn’t scan right now — try Rescan.</td></tr>'; return }
+
+    tbody.innerHTML = data.scanned.map(row => {
+      const s = row.signals || {}
+      const mlCell = !data.ml_loaded ? '<span style="color:var(--muted);">—</span>'
+        : `${sigBadge(s.ml)}${row.p_up != null ? ` <span style="font-size:11px;color:${row.p_up >= 0.5 ? 'var(--green)' : 'var(--red)'};">${Math.round(row.p_up * 100)}%${row.p_up >= 0.5 ? '↑' : '↓'}</span>` : ''}`
+      const net = row.buys - row.sells
+      const consensus = net > 0
+        ? `<span class="positive" style="font-weight:700;">▲ ${row.buys} buy</span>`
+        : net < 0 ? `<span class="negative" style="font-weight:700;">▼ ${row.sells} sell</span>`
+        : '<span style="color:var(--muted);">— mixed</span>'
+      return `<tr>
+        <td><strong>${row.ticker}</strong></td>
+        <td>${fmt$(row.price)}</td>
+        <td>${sigBadge(s.ma_crossover)}</td>
+        <td>${sigBadge(s.rsi)}</td>
+        <td>${sigBadge(s.macd)}</td>
+        <td>${mlCell}</td>
+        <td>${consensus}</td>
+      </tr>`
+    }).join('')
+
+    const now = new Date()
+    el('sig-updated').textContent = 'Updated ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  renderChips()
+  loadRegime()
+  scan()
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 const PAGE = document.body.dataset.page
 if (PAGE === 'dashboard') { initSandbox(); initDashboard() }  // demo bot + market panels
 if (PAGE === 'backtest')  initBacktest()
 if (PAGE === 'portfolio') initPortfolio()
 if (PAGE === 'sandbox')   initSandbox()
+if (PAGE === 'signals')   initSignals()
