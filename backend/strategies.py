@@ -23,7 +23,11 @@ logger = logging.getLogger(__name__)
 
 WATCHLIST = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
 
-VALID_STRATEGIES = ('ma_crossover', 'rsi', 'macd', 'ml')
+VALID_STRATEGIES = ('ma_crossover', 'rsi', 'macd', 'ml', 'dip_buyer')
+
+# Dip Buyer thresholds — match backtest.py (position within the 52-week range).
+_DIP_BUY_THRESH  = 0.30
+_DIP_SELL_THRESH = 0.80
 
 
 # ── Strategy 1 — Moving Average Crossover ─────────────────────────────────────
@@ -103,6 +107,27 @@ def ml_signal(ticker: str) -> tuple[str | None, float | None]:
     return 'HOLD', price
 
 
+# ── Strategy 5 — Dip Buyer (52-week value) ────────────────────────────────────
+# Buys when a stock is near its 52-week low and sells once it recovers toward the
+# high. The backtest engine adds patient, reserve-keeping tranche sizing on top;
+# this just reports the current stance for the live scanner.
+
+def dip_buyer_signal(ticker: str) -> tuple[str | None, float | None]:
+    df = feat.get_feature_df(ticker, period='1y')
+    if df is None or len(df) < 40:
+        return None, None
+    price = float(df['Close'].iloc[-1])
+    low   = float(df['Close'].rolling(252, min_periods=40).min().iloc[-1])
+    high  = float(df['Close'].rolling(252, min_periods=40).max().iloc[-1])
+    if high > low:
+        pct = (price - low) / (high - low)
+        if pct < _DIP_BUY_THRESH:
+            return 'BUY', price
+        if pct > _DIP_SELL_THRESH:
+            return 'SELL', price
+    return 'HOLD', price
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 def get_signal(strategy: str, ticker: str) -> tuple[str | None, float | None]:
@@ -111,6 +136,7 @@ def get_signal(strategy: str, ticker: str) -> tuple[str | None, float | None]:
         'rsi':          rsi_signal,
         'macd':         macd_signal,
         'ml':           ml_signal,
+        'dip_buyer':    dip_buyer_signal,
     }
     fn = dispatch.get(strategy)
     if fn is None:

@@ -296,12 +296,13 @@ def compare_strategies():
     if risk_tolerance not in ('conservative', 'moderate', 'aggressive'):
         return jsonify({'error': 'Invalid risk tolerance'}), 400
 
-    candidates = ['adaptive', 'ma_crossover', 'rsi', 'macd']
+    candidates = ['adaptive', 'ma_crossover', 'rsi', 'macd', 'dip_buyer']
     if ml_runtime.get_info().get('loaded'):
         candidates.append('ml')
 
     LABELS = {'adaptive': 'Adaptive (Regime)', 'ma_crossover': 'MA Crossover',
-              'rsi': 'RSI Mean Reversion', 'macd': 'MACD Momentum', 'ml': 'ML Transformer'}
+              'rsi': 'RSI Mean Reversion', 'macd': 'MACD Momentum', 'ml': 'ML Transformer',
+              'dip_buyer': 'Dip Buyer (52-Week Value)'}
 
     results = []
     benchmark_return = None

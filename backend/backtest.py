@@ -45,6 +45,17 @@ logger = logging.getLogger(__name__)
 RANGE_MAX = 2.5
 RANGE_MIN = 0.3
 
+# ── "Dip Buyer" strategy parameters ───────────────────────────────────────────
+# A patient value strategy: buy in tranches as a stock falls toward its 52-week
+# low, average down on further drops, and sell when it recovers toward the high —
+# always keeping cash in reserve so it can buy the next company that sells off.
+DIP_BUY_THRESH  = 0.30   # buy while in the bottom 30% of the 52-week range
+DIP_SELL_THRESH = 0.80   # sell once it recovers into the top 20%
+DIP_TRANCHE_PCT = 0.10   # each tranche ≈ 10% of the portfolio (before the dip multiplier)
+DIP_ADD_DROP    = 0.08   # average down after a further 8% drop below avg cost
+DIP_MAX_POS_PCT = 0.30   # never let one name exceed 30% of the portfolio
+DIP_RESERVE     = 0.10   # always keep ≥10% cash as dry powder for new dips
+
 
 # ── Kelly helper (rolling, no look-ahead) ─────────────────────────────────────
 
@@ -84,6 +95,14 @@ def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '') -> pd.DataFr
         # Momentum STANCE: long while MACD is above its signal line.
         buy  = df['macd_line'] > df['macd_signal']
         sell = df['macd_line'] < df['macd_signal']
+    elif strategy == 'dip_buyer':
+        # Value: buy near the 52-week low, sell when recovered toward the high.
+        low52  = df['Close'].rolling(252, min_periods=40).min()
+        high52 = df['Close'].rolling(252, min_periods=40).max()
+        pct    = ((df['Close'] - low52) / (high52 - low52)).clip(0, 1)
+        df['low52'], df['high52'] = low52, high52
+        buy  = pct < DIP_BUY_THRESH
+        sell = pct > DIP_SELL_THRESH
     elif strategy == 'ml':
         # Transformer signals: one batched ONNX call over every window in the
         # range.  Each day's window ends on that day — no look-ahead.  Without
@@ -288,6 +307,18 @@ def run_backtest(
     kelly_wins:   list[float] = []
     kelly_losses: list[float] = []
 
+    def _dip_tranche(pv, px, csh, row_):
+        """Shares for one Dip-Buyer tranche: ~DIP_TRANCHE_PCT of the portfolio,
+        scaled up the deeper the price sits in its 52-week range, and bounded so
+        the cash reserve is preserved (dry powder for the next dip)."""
+        base = pv * DIP_TRANCHE_PCT
+        lo, hi = row_.get('low52'), row_.get('high52')
+        if pd.notna(lo) and pd.notna(hi) and hi > lo:
+            pc = min(max((px - float(lo)) / (float(hi) - float(lo)), 0.0), 1.0)
+            base *= RANGE_MAX - (RANGE_MAX - RANGE_MIN) * pc
+        spend = min(base, csh - pv * DIP_RESERVE)
+        return max(int(spend / px), 0) if px > 0 and spend > 0 else 0
+
     for date in all_dates:
         recording = (split_date is None) or (date.strftime('%Y-%m-%d') >= split_date)
 
@@ -329,106 +360,134 @@ def run_backtest(
             else:
                 signal = 0
 
-            # ── Stop-loss / take-profit ────────────────────────────────────
+            is_dip = (day_strategy == 'dip_buyer')
+
+            # ── Manage an open position ────────────────────────────────────
             if ticker in positions:
-                pos    = positions[ticker]
-                entry  = pos['entry']
-                reason = None
-
+                pos = positions[ticker]
                 pos['high'] = max(pos['high'], price)
-                if price <= pos['high'] * (1 - profile['trail_pct']):
-                    reason = 'stop_loss'
-                elif price >= entry * (1 + profile['take_profit_pct']):
-                    reason = 'take_profit'
-                elif signal == -1:
-                    reason = 'sell_signal'
 
-                if reason:
-                    shares = pos['shares']
-
-                    # Transaction cost on sell side
-                    sell_cost  = price * shares * cost_pct
-                    proceeds   = price * shares - sell_cost
-                    cash      += proceeds
-                    total_costs += sell_cost
-
-                    pnl     = proceeds - pos['cost_basis']
-                    pnl_pct = pnl / pos['cost_basis'] * 100 if pos['cost_basis'] else 0
-
-                    # Update rolling Kelly state
-                    if pnl > 0:
-                        kelly_wins.append(pnl)
-                    else:
-                        kelly_losses.append(abs(pnl))
-
-                    if recording:
-                        trades.append({
-                            'date':     date.strftime('%Y-%m-%d'),
-                            'ticker':   ticker,
-                            'action':   'SELL',
-                            'price':    round(price,   2),
-                            'shares':   shares,
-                            'pnl':      round(pnl,     2),
-                            'pnl_pct':  round(pnl_pct, 2),
-                            'reason':   reason,
-                            'regime':   day_regime,
-                            'strategy': day_strategy,
-                            'cost':     round(sell_cost, 2),
-                        })
-                    del positions[ticker]
-
-            # ── Buy signal ─────────────────────────────────────────────────
-            elif signal == 1 and price > 0 and recording and signal_col is not None:
-                # When Markowitz is active, cap each ticker's allocation at its
-                # optimal weight — replaces the profile's fixed max_position_pct.
-                if markowitz_weights:
-                    mz_cap      = markowitz_weights.get(ticker, 1.0 / max(len(data), 1))
-                    sizing_prof = {**profile, 'max_position_pct': mz_cap}
+                if is_dip:
+                    # Dip Buyer: no trailing stop / take-profit. Sell only once it
+                    # has recovered toward its 52-week high; otherwise average down
+                    # on a further drop, while keeping the cash reserve intact.
+                    if signal == -1:
+                        sh        = pos['shares']
+                        sell_cost = price * sh * cost_pct
+                        proceeds  = price * sh - sell_cost
+                        cash += proceeds
+                        total_costs += sell_cost
+                        pnl     = proceeds - pos['cost_basis']
+                        pnl_pct = pnl / pos['cost_basis'] * 100 if pos['cost_basis'] else 0
+                        (kelly_wins if pnl > 0 else kelly_losses).append(abs(pnl))
+                        if recording:
+                            trades.append({
+                                'date': date.strftime('%Y-%m-%d'), 'ticker': ticker, 'action': 'SELL',
+                                'price': round(price, 2), 'shares': sh, 'pnl': round(pnl, 2),
+                                'pnl_pct': round(pnl_pct, 2), 'reason': 'recovered',
+                                'regime': day_regime, 'strategy': day_strategy, 'cost': round(sell_cost, 2)})
+                        del positions[ticker]
+                    elif recording and price <= pos['entry'] * (1 - DIP_ADD_DROP):
+                        add  = _dip_tranche(port_val, price, cash, row)
+                        room = int(max(DIP_MAX_POS_PCT * port_val - pos['cost_basis'], 0) / price) if price else 0
+                        add  = min(add, room)
+                        spend = price * add * (1 + cost_pct)
+                        if add > 0 and cash - port_val * DIP_RESERVE >= spend:
+                            buy_cost = price * add * cost_pct
+                            cash -= spend
+                            total_costs += buy_cost
+                            tot = pos['shares'] + add
+                            pos['cost_basis'] += spend
+                            pos['entry']  = pos['cost_basis'] / tot   # average cost (incl. fees)
+                            pos['shares'] = tot
+                            trades.append({
+                                'date': date.strftime('%Y-%m-%d'), 'ticker': ticker, 'action': 'BUY',
+                                'price': round(price, 2), 'shares': add, 'pnl': None, 'pnl_pct': None,
+                                'reason': 'scale_in', 'regime': day_regime, 'strategy': day_strategy,
+                                'cost': round(buy_cost, 2)})
                 else:
-                    sizing_prof = profile
-                kelly_f     = _kelly(kelly_wins, kelly_losses)
-                base_shares = risk.calculate_position_size_kelly(
-                    port_val, price, cash, kelly_f, sizing_prof)
+                    entry  = pos['entry']
+                    reason = None
+                    if price <= pos['high'] * (1 - profile['trail_pct']):
+                        reason = 'stop_loss'
+                    elif price >= entry * (1 + profile['take_profit_pct']):
+                        reason = 'take_profit'
+                    elif signal == -1:
+                        reason = 'sell_signal'
 
-                # Dip-weighted sizing: bet bigger the closer the price is to its
-                # 52-week low, smaller near the high.
-                rmult = 1.0
-                if range_sizing and 'low52' in df.columns:
-                    lo, hi = row.get('low52'), row.get('high52')
-                    if pd.notna(lo) and pd.notna(hi) and hi > lo:
-                        pct   = min(max((price - float(lo)) / (float(hi) - float(lo)), 0.0), 1.0)
-                        rmult = RANGE_MAX - (RANGE_MAX - RANGE_MIN) * pct
+                    if reason:
+                        shares     = pos['shares']
+                        sell_cost  = price * shares * cost_pct
+                        proceeds   = price * shares - sell_cost
+                        cash      += proceeds
+                        total_costs += sell_cost
+                        pnl     = proceeds - pos['cost_basis']
+                        pnl_pct = pnl / pos['cost_basis'] * 100 if pos['cost_basis'] else 0
+                        if pnl > 0:
+                            kelly_wins.append(pnl)
+                        else:
+                            kelly_losses.append(abs(pnl))
+                        if recording:
+                            trades.append({
+                                'date': date.strftime('%Y-%m-%d'), 'ticker': ticker, 'action': 'SELL',
+                                'price': round(price, 2), 'shares': shares, 'pnl': round(pnl, 2),
+                                'pnl_pct': round(pnl_pct, 2), 'reason': reason, 'regime': day_regime,
+                                'strategy': day_strategy, 'cost': round(sell_cost, 2)})
+                        del positions[ticker]
 
-                shares = max(int(base_shares * size_mult * rmult), 0)
-
-                if shares > 0:
-                    buy_cost    = price * shares * cost_pct
-                    total_spend = price * shares + buy_cost
-                    usable_cash = cash - port_val * profile['min_cash_reserve']
-
-                    if usable_cash >= total_spend:
-                        cash        -= total_spend
+            # ── Open a new position on a buy signal ────────────────────────
+            elif signal == 1 and price > 0 and recording and signal_col is not None:
+                if is_dip:
+                    shares = _dip_tranche(port_val, price, cash, row)
+                    cap    = int(DIP_MAX_POS_PCT * port_val / price) if price else 0
+                    shares = min(shares, cap)
+                    spend  = price * shares * (1 + cost_pct)
+                    if shares > 0 and cash - port_val * DIP_RESERVE >= spend:
+                        buy_cost = price * shares * cost_pct
+                        cash -= spend
                         total_costs += buy_cost
-
-                        positions[ticker] = {
-                            'shares':     shares,
-                            'entry':      price,
-                            'high':       price,       # trailing stop high watermark
-                            'cost_basis': total_spend,
-                        }
+                        positions[ticker] = {'shares': shares, 'entry': spend / shares,
+                                             'high': price, 'cost_basis': spend}
                         trades.append({
-                            'date':     date.strftime('%Y-%m-%d'),
-                            'ticker':   ticker,
-                            'action':   'BUY',
-                            'price':    round(price, 2),
-                            'shares':   shares,
-                            'pnl':      None,
-                            'pnl_pct':  None,
-                            'reason':   'buy_signal',
-                            'regime':   day_regime,
-                            'strategy': day_strategy,
-                            'cost':     round(buy_cost, 2),
-                        })
+                            'date': date.strftime('%Y-%m-%d'), 'ticker': ticker, 'action': 'BUY',
+                            'price': round(price, 2), 'shares': shares, 'pnl': None, 'pnl_pct': None,
+                            'reason': 'dip_buy', 'regime': day_regime, 'strategy': day_strategy,
+                            'cost': round(buy_cost, 2)})
+                else:
+                    # When Markowitz is active, cap each ticker's allocation at its
+                    # optimal weight — replaces the profile's fixed max_position_pct.
+                    if markowitz_weights:
+                        mz_cap      = markowitz_weights.get(ticker, 1.0 / max(len(data), 1))
+                        sizing_prof = {**profile, 'max_position_pct': mz_cap}
+                    else:
+                        sizing_prof = profile
+                    kelly_f     = _kelly(kelly_wins, kelly_losses)
+                    base_shares = risk.calculate_position_size_kelly(
+                        port_val, price, cash, kelly_f, sizing_prof)
+
+                    # Optional dip-weighted sizing: bigger near the 52-week low.
+                    rmult = 1.0
+                    if range_sizing and 'low52' in df.columns:
+                        lo, hi = row.get('low52'), row.get('high52')
+                        if pd.notna(lo) and pd.notna(hi) and hi > lo:
+                            pct   = min(max((price - float(lo)) / (float(hi) - float(lo)), 0.0), 1.0)
+                            rmult = RANGE_MAX - (RANGE_MAX - RANGE_MIN) * pct
+
+                    shares = max(int(base_shares * size_mult * rmult), 0)
+                    if shares > 0:
+                        buy_cost    = price * shares * cost_pct
+                        total_spend = price * shares + buy_cost
+                        usable_cash = cash - port_val * profile['min_cash_reserve']
+                        if usable_cash >= total_spend:
+                            cash        -= total_spend
+                            total_costs += buy_cost
+                            positions[ticker] = {'shares': shares, 'entry': price, 'high': price,
+                                                 'cost_basis': total_spend}
+                            trades.append({
+                                'date': date.strftime('%Y-%m-%d'), 'ticker': ticker, 'action': 'BUY',
+                                'price': round(price, 2), 'shares': shares, 'pnl': None, 'pnl_pct': None,
+                                'reason': 'buy_signal', 'regime': day_regime, 'strategy': day_strategy,
+                                'cost': round(buy_cost, 2)})
 
     # ── Performance metrics ────────────────────────────────────────────────
     final_value   = port_hist[-1]['value'] if port_hist else initial_capital

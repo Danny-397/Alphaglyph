@@ -38,6 +38,7 @@ const STRATEGY_LABELS = {
   rsi:          'RSI Mean Reversion',
   macd:         'MACD Momentum',
   ml:           'ML Transformer',
+  dip_buyer:    'Dip Buyer (52-Week Value)',
 }
 
 // Enable the ML strategy option in a <select> once the backend reports a
@@ -78,16 +79,20 @@ const BUY_REASON = {
   rsi:          'RSI dropped into oversold territory — a mean-reversion bounce setup',
   macd:         'MACD crossed above its signal line on rising volume',
   ml:           'the ML transformer put the odds on the upside',
+  dip_buyer:    'the stock was trading near its 52-week low — a value entry',
 }
 const SELL_REASON = {
   stop_loss:    'price fell back to the trailing stop — locking in the move and capping downside',
   take_profit:  'price hit the take-profit target',
   sell_signal:  'the strategy flipped to a sell signal',
   signal:       'the strategy flipped to a sell signal',
+  recovered:    'it recovered toward its 52-week high — locking in the gain',
 }
 function tradeWhy(t) {
   const where = REGIME_PHRASE[t.regime] || 'the current market'
   if (t.action === 'BUY') {
+    if (t.reason === 'scale_in')
+      return `Averaged down — bought more as it fell further toward its 52-week low.`
     const base = BUY_REASON[t.strategy] || 'the strategy flagged a buy signal'
     return `Bought because ${base}, in ${where}.`
   }
