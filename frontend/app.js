@@ -1947,6 +1947,217 @@ function initSignals() {
   scan()
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  PAPER ACCOUNT — a persistent portfolio tracked FORWARD over real time.
+//  The config (capital, strategy, risk, stocks, start date) lives in
+//  localStorage. Each sync re-runs the backtest from the fixed start date to
+//  today — so as real days pass, the record genuinely extends.
+// ════════════════════════════════════════════════════════════════════════════
+function initAccount() {
+  const LS_KEY = 'ag_account_v1'
+  let acctChart = null
+  let tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
+
+  const setup = el('acct-setup')
+  const view  = el('acct-view')
+  const tickerInput = el('acct-ticker-input')
+  const tickerAdd   = el('acct-ticker-add')
+  const tickerErr   = el('acct-ticker-error')
+
+  enableMlOption(el('acct-strategy'))
+
+  function load() { try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch (_) { return null } }
+  function store(a) { try { localStorage.setItem(LS_KEY, JSON.stringify(a)) } catch (_) {} }
+
+  // ── Setup form ──
+  function renderChips() {
+    const box = el('acct-tickers')
+    box.innerHTML = tickers.length
+      ? tickers.map(t => `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`).join('')
+      : '<span style="font-size:12px;color:var(--muted);">No stocks added.</span>'
+    box.querySelectorAll('.chip-x').forEach(b => b.addEventListener('click', () => {
+      tickers = tickers.filter(x => x !== b.dataset.ticker); renderChips()
+    }))
+  }
+  async function addTicker() {
+    const sym = (tickerInput.value || '').trim().toUpperCase()
+    tickerErr.hidden = true
+    if (!sym || tickers.includes(sym)) { tickerInput.value = ''; return }
+    tickerAdd.disabled = true; tickerAdd.textContent = '…'
+    const res = await api('/api/validate_ticker?symbol=' + encodeURIComponent(sym))
+    tickerAdd.disabled = false; tickerAdd.textContent = 'Add'
+    if (res && res.status === 'valid') { tickers.push(res.symbol); renderChips(); tickerInput.value = ''; tickerInput.focus() }
+    else { tickerErr.textContent = res && res.status === 'rate_limited' ? 'Couldn’t verify right now — try again.' : `"${sym}" doesn’t exist.`; tickerErr.hidden = false }
+  }
+  tickerAdd.addEventListener('click', addTicker)
+  tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTicker() } })
+  el('acct-risk-btns').querySelectorAll('.risk-btn').forEach(btn => btn.addEventListener('click', () => {
+    el('acct-risk-btns').querySelectorAll('.risk-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active')
+  }))
+
+  el('acct-open').addEventListener('click', async () => {
+    if (!tickers.length) { el('acct-error').textContent = 'Add at least one stock.'; el('acct-error').hidden = false; return }
+    const since = parseInt(el('acct-since').value, 10) || 0
+    const riskEl = el('acct-risk-btns').querySelector('.risk-btn.active')
+    const acct = {
+      capital:    Math.max(1000, parseFloat(el('acct-capital').value) || 100000),
+      strategy:   el('acct-strategy').value,
+      risk:       riskEl ? riskEl.dataset.risk : 'moderate',
+      tickers:    [...tickers],
+      start_date: since ? daysAgo(since) : today(),
+      opened_at:  today(),
+    }
+    el('acct-error').hidden = true
+    el('acct-loading').hidden = false
+    el('acct-open').disabled = true
+    const ok = await sync(acct)
+    el('acct-loading').hidden = true
+    el('acct-open').disabled = false
+    if (ok) { store(acct); showView() }
+    else { el('acct-error').textContent = 'Could not open the account — the server may be waking up. Try again.'; el('acct-error').hidden = false }
+  })
+
+  el('acct-sync').addEventListener('click', async () => {
+    const acct = load(); if (!acct) return
+    el('acct-sync-loading').hidden = false
+    await sync(acct)
+    el('acct-sync-loading').hidden = true
+  })
+  el('acct-reset').addEventListener('click', () => {
+    if (!confirm('Reset your paper account? This clears its history.')) return
+    localStorage.removeItem(LS_KEY)
+    acctChart = destroyChart(acctChart)
+    showSetup()
+  })
+
+  function showSetup() { view.hidden = true; setup.hidden = false; renderChips() }
+  function showView()  { setup.hidden = true; view.hidden = false }
+
+  // ── Sync: re-run the backtest from the account's start date to today ──
+  async function sync(acct) {
+    const data = await api('/api/backtest', {
+      method: 'POST',
+      body: JSON.stringify({
+        strategy: acct.strategy, tickers: acct.tickers,
+        start_date: acct.start_date, end_date: today(),
+        initial_capital: acct.capital, risk_tolerance: acct.risk,
+      }),
+    })
+    if (data && !data.error && (data.equity_curve || []).length) {
+      await render(acct, data)
+      return true
+    }
+    // A just-opened account (start too recent for a 30-bar backtest) is simply
+    // all cash — show that rather than failing. It fills in as trading days pass.
+    const ageDays = Math.floor((Date.now() - new Date(acct.start_date).getTime()) / 86400000)
+    if (ageDays <= 45) { renderEmpty(acct); return true }
+    return false
+  }
+
+  function renderEmpty(acct) {
+    el('acct-since-label').textContent = 'Tracking since ' + acct.start_date
+    el('acct-strat-label').textContent = STRATEGY_LABELS[acct.strategy] || acct.strategy
+    el('acct-synced').textContent = 'Just opened'
+    el('acct-value').textContent = fmt$(acct.capital)
+    el('acct-return').textContent = '—'; el('acct-return').className = 'hero-stat-value'
+    el('acct-vsspy').textContent = '—';  el('acct-vsspy').className = 'hero-stat-value'
+    el('acct-cash').textContent = fmt$(acct.capital)
+    el('acct-trades').textContent = '0'; el('acct-winrate').textContent = '—'
+    el('acct-npos').textContent = '0';   el('acct-dd').textContent = '—'
+    acctChart = destroyChart(acctChart)
+    el('acct-holdings').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">All in cash — just opened</td></tr>'
+    el('acct-feed').innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">Your account is open. It needs ~30 trading days of history before the strategy starts trading — check back as it fills in.</div>'
+  }
+
+  async function render(acct, data) {
+    const trades = (data.trades || []).slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    const curve  = data.equity_curve
+    const finalV = curve[curve.length - 1].value
+    const ret    = (finalV - acct.capital) / acct.capital * 100
+    const bench  = data.metrics ? data.metrics.benchmark_return : null
+    const vs     = bench != null ? ret - bench : null
+
+    // Reconstruct cash + open positions from the trade ledger.
+    let cash = acct.capital
+    const pos = {}
+    trades.forEach(t => {
+      const cost = t.cost || 0
+      if (t.action === 'BUY') { cash -= t.price * t.shares + cost; pos[t.ticker] = { shares: t.shares, entry: t.price, date: t.date } }
+      else { cash += t.price * t.shares - cost; delete pos[t.ticker] }
+    })
+
+    el('acct-since-label').textContent = 'Tracking since ' + acct.start_date
+    el('acct-strat-label').textContent = STRATEGY_LABELS[acct.strategy] || acct.strategy
+    el('acct-synced').textContent = 'Synced ' + new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    el('acct-value').textContent = fmt$(finalV)
+    const rEl = el('acct-return'); rEl.textContent = fmtPct(ret); rEl.className = 'hero-stat-value ' + clr(ret)
+    const vEl = el('acct-vsspy'); vEl.textContent = vs == null ? '—' : fmtPct(vs); vEl.className = 'hero-stat-value ' + clr(vs)
+    el('acct-cash').textContent = fmt$(cash)
+
+    const m = data.metrics || {}
+    el('acct-trades').textContent  = m.total_trades ?? '—'
+    el('acct-winrate').textContent = m.win_rate != null ? m.win_rate + '%' : '—'
+    el('acct-npos').textContent    = Object.keys(pos).length
+    el('acct-dd').textContent      = m.max_drawdown != null ? '-' + fmtN(m.max_drawdown) + '%' : '—'
+
+    // Equity vs SPY chart
+    const labels = curve.map(p => p.date)
+    const spyMap = {}; (data.spy_curve || []).forEach(p => { spyMap[p.date] = p.value })
+    acctChart = destroyChart(acctChart)
+    acctChart = new Chart(el('acct-chart').getContext('2d'), {
+      type: 'line',
+      data: { labels, datasets: [
+        { label: 'Your account', data: curve.map(p => p.value), borderColor: '#3fb950', borderWidth: 2, backgroundColor: 'rgba(63,185,80,0.07)', fill: true, tension: 0.25, pointRadius: 0 },
+        { label: 'Buy & Hold SPY', data: labels.map(d => spyMap[d] ?? null), borderColor: '#e3b341', borderWidth: 1.5, borderDash: [4, 4], fill: false, tension: 0.25, pointRadius: 0, spanGaps: true },
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt$(c.parsed.y) } } },
+        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } }, y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } } },
+      },
+    })
+
+    // Trade feed (newest first)
+    const feed = el('acct-feed')
+    if (!trades.length) feed.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">No trades yet — the strategy is waiting for a setup.</div>'
+    else feed.innerHTML = trades.slice().reverse().slice(0, 100).map(t => {
+      const isBuy = t.action === 'BUY'
+      const pnl = (t.action === 'SELL' && t.pnl != null) ? `<span class="sb-feed-pnl ${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
+      return `<div class="sb-feed-item"><div class="sb-feed-row"><span class="sb-feed-time">${t.date}</span>` +
+        `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
+        `<span class="sb-feed-tkr">${t.ticker}</span><span class="sb-feed-trade">${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>${pnl}</div>` +
+        `<div class="sb-feed-why">${tradeWhy(t)}</div></div>`
+    }).join('')
+
+    // Holdings with live prices + P&L (one scan call for the held tickers)
+    const held = Object.keys(pos)
+    const tbody = el('acct-holdings')
+    if (!held.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">All in cash right now</td></tr>'; return }
+    tbody.innerHTML = held.map(t => `<tr><td><strong>${t}</strong></td><td>${fmtN(pos[t].shares, 0)}</td><td>${fmt$(pos[t].entry)}</td><td>—</td><td>—</td></tr>`).join('')
+    const scan = await api('/api/scan?tickers=' + encodeURIComponent(held.join(',')))
+    if (scan && scan.scanned) {
+      const px = {}; scan.scanned.forEach(r => { px[r.ticker] = r.price })
+      tbody.innerHTML = held.map(t => {
+        const p = pos[t], cur = px[t]
+        const pnl = cur != null ? (cur - p.entry) * p.shares : null
+        const pct = cur != null && p.entry ? (cur - p.entry) / p.entry * 100 : null
+        return `<tr><td><strong>${t}</strong></td><td>${fmtN(p.shares, 0)}</td><td>${fmt$(p.entry)}</td><td>${fmt$(cur)}</td><td class="${clr(pnl)}">${pnl != null ? fmt$(pnl) + ' (' + fmtPct(pct) + ')' : '—'}</td></tr>`
+      }).join('')
+    }
+  }
+
+  // ── Boot ──
+  const existing = load()
+  if (existing) {
+    tickers = existing.tickers || tickers
+    showView()
+    el('acct-sync-loading').hidden = false
+    sync(existing).then(() => { el('acct-sync-loading').hidden = true })
+  } else {
+    showSetup()
+  }
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 const PAGE = document.body.dataset.page
 if (PAGE === 'dashboard') { initSandbox(); initDashboard() }  // demo bot + market panels
@@ -1954,3 +2165,4 @@ if (PAGE === 'backtest')  initBacktest()
 if (PAGE === 'portfolio') initPortfolio()
 if (PAGE === 'sandbox')   initSandbox()
 if (PAGE === 'signals')   initSignals()
+if (PAGE === 'account')   initAccount()
