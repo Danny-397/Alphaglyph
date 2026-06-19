@@ -39,6 +39,7 @@ const STRATEGY_LABELS = {
   macd:         'MACD Momentum',
   ml:           'ML Transformer',
   dip_buyer:    'Dip Buyer (52-Week Value)',
+  custom:       'Custom Strategy',
 }
 
 // Enable the ML strategy option in a <select> once the backend reports a
@@ -80,6 +81,7 @@ const BUY_REASON = {
   macd:         'MACD crossed above its signal line on rising volume',
   ml:           'the ML transformer put the odds on the upside',
   dip_buyer:    'the stock was trading near its 52-week low — a value entry',
+  custom:       'your custom buy conditions were met',
 }
 const SELL_REASON = {
   stop_loss:    'price fell back to the trailing stop — locking in the move and capping downside',
@@ -242,6 +244,75 @@ function initTabs(root) {
       })
     })
   })
+}
+
+// ── Custom strategy rule builder (reusable) ──────────────────────────────────
+// Renders editable BUY/SELL condition rows into a container and exposes
+// getRules() → { buy: {logic, conditions}, sell: {logic, conditions} }.
+const RB_INDICATORS = [
+  ['close', 'Price'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50'], ['rsi14', 'RSI (14)'],
+  ['macd_line', 'MACD line'], ['macd_signal', 'MACD signal'], ['macd_hist', 'MACD histogram'],
+  ['vol_ma20', 'Avg volume (20d)'], ['volume', 'Volume'],
+  ['return_1d', '1-day return %'], ['return_5d', '5-day return %'],
+  ['range52', '52-week range (0=low,1=high)'],
+]
+const RB_OPS = [['lt', 'is below'], ['gt', 'is above'], ['cross_up', 'crosses above'], ['cross_dn', 'crosses below']]
+
+function makeRuleBuilder(container) {
+  const ind  = RB_INDICATORS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')
+  const ops  = RB_OPS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')
+  const rind = `<option value="__num">a number…</option>` + ind
+
+  container.innerHTML = ['buy', 'sell'].map(side => `
+    <div class="rb-section">
+      <div class="rb-head"><strong>${side.toUpperCase()}</strong> when
+        <select class="rb-logic" data-side="${side}"><option value="all">ALL</option><option value="any">ANY</option></select>
+        of these are true:</div>
+      <div class="rb-rows" data-side="${side}"></div>
+      <button class="btn btn-sm rb-add" data-side="${side}" type="button">+ Add ${side} condition</button>
+    </div>`).join('')
+
+  function addRow(side, preset) {
+    const rows = container.querySelector(`.rb-rows[data-side="${side}"]`)
+    const row = document.createElement('div')
+    row.className = 'rb-row'
+    row.innerHTML =
+      `<select class="rb-left">${ind}</select>` +
+      `<select class="rb-op">${ops}</select>` +
+      `<select class="rb-right">${rind}</select>` +
+      `<input class="rb-num" type="number" step="any" value="30">` +
+      `<button class="rb-del" type="button" title="Remove">×</button>`
+    rows.appendChild(row)
+    const right = row.querySelector('.rb-right'), num = row.querySelector('.rb-num')
+    const sync = () => { num.style.display = right.value === '__num' ? '' : 'none' }
+    right.addEventListener('change', sync)
+    row.querySelector('.rb-del').addEventListener('click', () => row.remove())
+    if (preset) {
+      row.querySelector('.rb-left').value = preset.left
+      row.querySelector('.rb-op').value = preset.op
+      if (typeof preset.right === 'number') { right.value = '__num'; num.value = preset.right }
+      else right.value = preset.right
+    }
+    sync()
+  }
+
+  container.querySelectorAll('.rb-add').forEach(b => b.addEventListener('click', () => addRow(b.dataset.side)))
+  addRow('buy',  { left: 'rsi14', op: 'lt', right: 30 })
+  addRow('sell', { left: 'rsi14', op: 'gt', right: 70 })
+
+  function group(side) {
+    const logic = container.querySelector(`.rb-logic[data-side="${side}"]`).value
+    const conditions = [...container.querySelectorAll(`.rb-rows[data-side="${side}"] .rb-row`)].map(r => {
+      const rv = r.querySelector('.rb-right').value
+      return {
+        left:  r.querySelector('.rb-left').value,
+        op:    r.querySelector('.rb-op').value,
+        right: rv === '__num' ? parseFloat(r.querySelector('.rb-num').value) : rv,
+      }
+    }).filter(c => c.left && c.op && (typeof c.right === 'string' || !isNaN(c.right)))
+    return { logic, conditions }
+  }
+  return { getRules: () => ({ buy: group('buy'), sell: group('sell') }) }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -514,6 +585,7 @@ function initBacktest() {
   let mcChart  = null
   let ff3Chart = null
   let cmpChart = null
+  let btRules  = null   // custom rule builder (lazy)
 
   el('bt-start').value = daysAgo(365)
   el('bt-end').value   = today()
@@ -546,7 +618,8 @@ function initBacktest() {
 
   function applyBtStrategyHints() {
     applyMlOOS()   // handles ML out-of-sample note/dates (and hides note otherwise)
-    if (el('bt-strategy').value === 'dip_buyer') {
+    const strat = el('bt-strategy').value
+    if (strat === 'dip_buyer') {
       el('bt-start').value = daysAgo(730)   // 2y so it has dips to buy
       const note = el('bt-ml-note')
       if (note) {
@@ -554,6 +627,12 @@ function initBacktest() {
           '<strong>2 years</strong> so it has dips to act on.'
         note.hidden = false
       }
+    }
+    const rb = el('bt-rule-builder')
+    if (rb) {
+      const isCustom = strat === 'custom'
+      rb.hidden = !isCustom
+      if (isCustom && !btRules) btRules = makeRuleBuilder(rb)
     }
   }
   el('bt-strategy').addEventListener('change', applyBtStrategyHints)
@@ -772,6 +851,7 @@ function initBacktest() {
       slippage_pct:    slipPct / 100,
       use_markowitz:   el('bt-markowitz').checked,
       range_sizing:    el('bt-range-sizing').checked,
+      ...(el('bt-strategy').value === 'custom' && btRules ? { custom_rules: btRules.getRules() } : {}),
     }
 
     el('empty-state').hidden      = true
@@ -1354,15 +1434,23 @@ function initSandbox() {
 
   // Dip Buyer is patient (only buys near 52-week lows), so steer it to a window
   // long enough to actually contain dips.
+  let sbRules = null   // custom rule builder (lazy)
   function applyStrategyHints() {
+    const strat = el('sb-strategy').value
     const note  = el('sb-strategy-note')
-    const isDip = el('sb-strategy').value === 'dip_buyer'
+    const isDip = strat === 'dip_buyer'
     if (isDip) el('sb-window').value = '730'
     if (note) {
       note.hidden = !isDip
       if (isDip) note.innerHTML =
         '🪙 <strong>Dip Buyer</strong> is a patient value strategy — it only buys stocks near their ' +
         '52-week low and keeps cash in reserve for the next one. Window set to <strong>2 years</strong> so it has dips to act on.'
+    }
+    const rb = el('sb-rule-builder')
+    if (rb) {
+      const isCustom = strat === 'custom'
+      rb.hidden = !isCustom
+      if (isCustom && !sbRules) sbRules = makeRuleBuilder(rb)
     }
   }
   el('sb-strategy').addEventListener('change', applyStrategyHints)
@@ -1491,6 +1579,7 @@ function initSandbox() {
       commission_pct: 0.001,
       slippage_pct: 0.0005,
       range_sizing: !!el('sb-range-sizing')?.checked,
+      ...(strategy === 'custom' && sbRules ? { custom_rules: sbRules.getRules() } : {}),
     }
 
     el('sb-error').hidden = true
@@ -1871,7 +1960,19 @@ function initSandbox() {
   // Full My Bot page: a shared link (?strategy=…) launches that exact bot,
   // otherwise restore a previous run paused where it left off.
   if (IS_DASHBOARD) {
-    applyPreset(PRESETS[1])   // "All-Weather Adaptive" — a sensible default demo
+    // Demo the Dip Buyer value strategy: buy more as a stock falls (in the red),
+    // trim as it rises (in the green), over a 2-year window so it has dips to act on.
+    const sel = el('sb-strategy')
+    const opt = sel.querySelector('option[value="dip_buyer"]')
+    if (opt) opt.disabled = false
+    sel.value = 'dip_buyer'
+    el('sb-risk-btns').querySelectorAll('.risk-btn')
+      .forEach(b => b.classList.toggle('active', b.dataset.risk === 'moderate'))
+    el('sb-capital').value = 100000
+    tickers = ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'TSLA', 'JPM', 'META']
+    renderChips()
+    applyStrategyHints()       // sets the window to 2 years for Dip Buyer
+    launch()
   } else {
     const sharedParams = new URLSearchParams(location.search)
     if (sharedParams.get('strategy')) {

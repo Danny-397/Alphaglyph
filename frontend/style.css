@@ -1556,3 +1556,33 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border: 1px solid var(--border);
   color: var(--muted);
 }
+
+/* ── Custom strategy rule builder ────────────────────────────────────────── */
+.rule-builder {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.rb-section { margin-bottom: 14px; }
+.rb-section:last-child { margin-bottom: 0; }
+.rb-head {
+  font-size: 12px; color: var(--muted); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.rb-head strong { color: var(--text); }
+.rb-head .rb-logic { width: auto; padding: 3px 7px; font-size: 11px; }
+.rb-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.rb-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rb-row select, .rb-row input {
+  padding: 5px 8px; font-size: 12px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.rb-left, .rb-op, .rb-right { flex: 1; min-width: 112px; }
+.rb-num { width: 88px; }
+.rb-del {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 17px; line-height: 1; padding: 0 4px;
+}
+.rb-del:hover { color: var(--red); }

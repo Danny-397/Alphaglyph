@@ -74,7 +74,59 @@ def _kelly(wins: list, losses: list, half: bool = True) -> float | None:
 
 # ── Signal generation ──────────────────────────────────────────────────────────
 
-def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '') -> pd.DataFrame:
+# ── Custom rule evaluator (user-built strategies) ─────────────────────────────
+# A safe, whitelist-only evaluator — no eval/exec. Each condition compares an
+# indicator to a number or another indicator; conditions combine with all/any.
+
+def _indicator_series(df: pd.DataFrame, name: str) -> pd.Series:
+    if name == 'range52':                       # position in the 52-week range, 0–1
+        lo = df['Close'].rolling(252, min_periods=40).min()
+        hi = df['Close'].rolling(252, min_periods=40).max()
+        return ((df['Close'] - lo) / (hi - lo)).clip(0, 1)
+    if name == 'close':
+        return df['Close']
+    if name == 'volume':
+        return df['Volume'] if 'Volume' in df.columns else pd.Series(0.0, index=df.index)
+    return df[name] if name in df.columns else pd.Series(0.0, index=df.index)
+
+
+def _condition(df: pd.DataFrame, c: dict) -> pd.Series:
+    left  = _indicator_series(df, c.get('left'))
+    rv    = c.get('right')
+    if isinstance(rv, str) and rv:
+        right = _indicator_series(df, rv)
+        right_prev = right.shift(1)
+    else:
+        try:
+            right = float(rv)
+        except (TypeError, ValueError):
+            right = 0.0
+        right_prev = right
+    op = c.get('op')
+    if op == 'lt':
+        return left < right
+    if op == 'gt':
+        return left > right
+    if op == 'cross_up':
+        return (left.shift(1) <= right_prev) & (left > right)
+    if op == 'cross_dn':
+        return (left.shift(1) >= right_prev) & (left < right)
+    return pd.Series(False, index=df.index)
+
+
+def _eval_group(df: pd.DataFrame, group: dict | None) -> pd.Series:
+    conds = (group or {}).get('conditions') or []
+    valid = [_condition(df, c) for c in conds if c.get('left') and c.get('op')]
+    if not valid:
+        return pd.Series(False, index=df.index)
+    out = valid[0]
+    for s in valid[1:]:
+        out = (out & s) if (group or {}).get('logic') == 'all' else (out | s)
+    return out.fillna(False)
+
+
+def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '',
+                 custom_rules: dict | None = None) -> pd.DataFrame:
     raw = df.copy()                  # ml branch needs unmodified OHLCV
     df = feat.compute_features(df)
     df.dropna(inplace=True)
@@ -116,6 +168,10 @@ def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '') -> pd.DataFr
         else:
             buy  = pd.Series(False, index=df.index)
             sell = pd.Series(False, index=df.index)
+    elif strategy == 'custom':
+        # User-built rules: buy/sell when their indicator conditions are met.
+        buy  = _eval_group(df, (custom_rules or {}).get('buy'))
+        sell = _eval_group(df, (custom_rules or {}).get('sell'))
     elif strategy == 'hold':
         buy  = pd.Series(False, index=df.index)
         sell = pd.Series(False, index=df.index)
@@ -216,6 +272,7 @@ def run_backtest(
     slippage_pct:     float = 0.0005,
     use_markowitz:    bool  = False,
     range_sizing:     bool  = False,
+    custom_rules:     dict | None = None,
 ) -> dict:
     """
     Run a full backtest with transaction costs, rolling Kelly sizing,
@@ -282,7 +339,7 @@ def run_backtest(
                 tagged[f'signal_{strat}'] = sf['signal'].reindex(tagged.index).fillna(0)
             data[ticker] = tagged
         else:
-            data[ticker] = _add_signals(raw, strategy, ticker)
+            data[ticker] = _add_signals(raw, strategy, ticker, custom_rules)
 
     if not data:
         return {'error': 'No sufficient data for the selected tickers and date range.'}

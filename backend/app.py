@@ -118,7 +118,39 @@ def _start_keepalive():
 
 _start_keepalive()
 
-VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive',)
+VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive', 'custom')
+
+# Whitelist for user-built custom strategies (no eval — only these are allowed).
+_CUSTOM_INDICATORS = {'close', 'volume', 'sma20', 'sma50', 'rsi14', 'macd_line',
+                      'macd_signal', 'macd_hist', 'vol_ma20', 'return_1d',
+                      'return_5d', 'range52'}
+_CUSTOM_OPS = {'lt', 'gt', 'cross_up', 'cross_dn'}
+
+
+def _sanitize_rules(rules):
+    """Keep only whitelisted indicators/operators; bound the number of rules."""
+    def clean_group(g):
+        out = []
+        for c in (g.get('conditions') or [])[:8]:
+            left = c.get('left')
+            op   = c.get('op')
+            right = c.get('right')
+            if left not in _CUSTOM_INDICATORS or op not in _CUSTOM_OPS:
+                continue
+            if isinstance(right, str):
+                if right not in _CUSTOM_INDICATORS:
+                    continue
+            else:
+                try:
+                    right = float(right)
+                except (TypeError, ValueError):
+                    continue
+            out.append({'left': left, 'op': op, 'right': right})
+        return {'logic': 'all' if g.get('logic') == 'all' else 'any', 'conditions': out}
+
+    rules = rules or {}
+    return {'buy': clean_group(rules.get('buy') or {}),
+            'sell': clean_group(rules.get('sell') or {})}
 
 
 # ── Regime ────────────────────────────────────────────────────────────────────
@@ -379,9 +411,12 @@ def run_backtest():
     slippage_pct    = float(data.get('slippage_pct',   0.0005))
     use_markowitz   = bool(data.get('use_markowitz', False))
     range_sizing    = bool(data.get('range_sizing', False))
+    custom_rules    = _sanitize_rules(data.get('custom_rules')) if strategy == 'custom' else None
 
     if strategy not in VALID_STRATEGIES:
         return jsonify({'error': 'Invalid strategy'}), 400
+    if strategy == 'custom' and not custom_rules['buy']['conditions']:
+        return jsonify({'error': 'Add at least one BUY condition for a custom strategy'}), 400
     if not (1_000 <= initial_capital <= 10_000_000):
         return jsonify({'error': 'Capital must be between $1,000 and $10,000,000'}), 400
     if not tickers:
@@ -399,6 +434,7 @@ def run_backtest():
         commission_pct, slippage_pct,
         use_markowitz=use_markowitz,
         range_sizing=range_sizing,
+        custom_rules=custom_rules,
     )
     return jsonify(result)
 
