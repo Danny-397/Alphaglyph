@@ -377,6 +377,7 @@ def run_backtest():
     commission_pct  = float(data.get('commission_pct', 0.001))
     slippage_pct    = float(data.get('slippage_pct',   0.0005))
     use_markowitz   = bool(data.get('use_markowitz', False))
+    range_sizing    = bool(data.get('range_sizing', False))
 
     if strategy not in VALID_STRATEGIES:
         return jsonify({'error': 'Invalid strategy'}), 400
@@ -396,6 +397,7 @@ def run_backtest():
         initial_capital, walk_forward, risk_tolerance,
         commission_pct, slippage_pct,
         use_markowitz=use_markowitz,
+        range_sizing=range_sizing,
     )
     return jsonify(result)
 

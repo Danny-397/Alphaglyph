@@ -40,6 +40,11 @@ import stats as st
 
 logger = logging.getLogger(__name__)
 
+# Dip-weighted sizing bounds: a buy at the 52-week low gets up to RANGE_MAX× the
+# normal size; at the 52-week high it gets RANGE_MIN×. Opt-in (range_sizing).
+RANGE_MAX = 2.5
+RANGE_MIN = 0.3
+
 
 # ── Kelly helper (rolling, no look-ahead) ─────────────────────────────────────
 
@@ -191,6 +196,7 @@ def run_backtest(
     commission_pct:   float = 0.001,
     slippage_pct:     float = 0.0005,
     use_markowitz:    bool  = False,
+    range_sizing:     bool  = False,
 ) -> dict:
     """
     Run a full backtest with transaction costs, rolling Kelly sizing,
@@ -261,6 +267,13 @@ def run_backtest(
 
     if not data:
         return {'error': 'No sufficient data for the selected tickers and date range.'}
+
+    # 52-week range, for optional dip-weighted sizing. Trailing rolling window
+    # (≤ today, no look-ahead): low/high of the prior ~year of closes.
+    if range_sizing:
+        for df in data.values():
+            df['low52']  = df['Close'].rolling(252, min_periods=40).min()
+            df['high52'] = df['Close'].rolling(252, min_periods=40).max()
 
     all_dates = sorted(set().union(*[set(df.index) for df in data.values()]))
 
@@ -376,7 +389,17 @@ def run_backtest(
                 kelly_f     = _kelly(kelly_wins, kelly_losses)
                 base_shares = risk.calculate_position_size_kelly(
                     port_val, price, cash, kelly_f, sizing_prof)
-                shares = max(int(base_shares * size_mult), 0)
+
+                # Dip-weighted sizing: bet bigger the closer the price is to its
+                # 52-week low, smaller near the high.
+                rmult = 1.0
+                if range_sizing and 'low52' in df.columns:
+                    lo, hi = row.get('low52'), row.get('high52')
+                    if pd.notna(lo) and pd.notna(hi) and hi > lo:
+                        pct   = min(max((price - float(lo)) / (float(hi) - float(lo)), 0.0), 1.0)
+                        rmult = RANGE_MAX - (RANGE_MAX - RANGE_MIN) * pct
+
+                shares = max(int(base_shares * size_mult * rmult), 0)
 
                 if shares > 0:
                     buy_cost    = price * shares * cost_pct

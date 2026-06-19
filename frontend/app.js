@@ -754,6 +754,7 @@ function initBacktest() {
       commission_pct:  commPct / 100,
       slippage_pct:    slipPct / 100,
       use_markowitz:   el('bt-markowitz').checked,
+      range_sizing:    el('bt-range-sizing').checked,
     }
 
     el('empty-state').hidden      = true
@@ -1456,6 +1457,7 @@ function initSandbox() {
       risk_tolerance: riskEl ? riskEl.dataset.risk : 'moderate',
       commission_pct: 0.001,
       slippage_pct: 0.0005,
+      range_sizing: !!el('sb-range-sizing')?.checked,
     }
 
     el('sb-error').hidden = true
@@ -2006,6 +2008,7 @@ function initAccount() {
       tickers:    [...tickers],
       start_date: since ? daysAgo(since) : today(),
       opened_at:  today(),
+      range_sizing: !!el('acct-range-sizing').checked,
     }
     el('acct-error').hidden = true
     el('acct-loading').hidden = false
@@ -2041,6 +2044,7 @@ function initAccount() {
         strategy: acct.strategy, tickers: acct.tickers,
         start_date: acct.start_date, end_date: today(),
         initial_capital: acct.capital, risk_tolerance: acct.risk,
+        range_sizing: !!acct.range_sizing,
       }),
     })
     if (data && !data.error && (data.equity_curve || []).length) {
