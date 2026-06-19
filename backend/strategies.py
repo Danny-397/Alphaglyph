@@ -34,14 +34,13 @@ def ma_crossover_signal(ticker: str) -> tuple[str | None, float | None]:
         return None, None
 
     price  = float(df['Close'].iloc[-1])
-    prev20 = float(df['sma20'].iloc[-2])
-    prev50 = float(df['sma50'].iloc[-2])
     curr20 = float(df['sma20'].iloc[-1])
     curr50 = float(df['sma50'].iloc[-1])
 
-    if prev20 <= prev50 and curr20 > curr50:
+    # Trend stance: long while the fast average is above the slow one.
+    if curr20 > curr50:
         return 'BUY', price
-    if prev20 >= prev50 and curr20 < curr50:
+    if curr20 < curr50:
         return 'SELL', price
     return 'HOLD', price
 
@@ -70,17 +69,14 @@ def macd_signal(ticker: str) -> tuple[str | None, float | None]:
     if df is None or len(df) < 2:
         return None, None
 
-    price      = float(df['Close'].iloc[-1])
-    volume_ok  = float(df['Volume'].iloc[-1]) > float(df['vol_ma20'].iloc[-1])
-
-    prev_m = float(df['macd_line'].iloc[-2])
-    prev_s = float(df['macd_signal'].iloc[-2])
+    price  = float(df['Close'].iloc[-1])
     curr_m = float(df['macd_line'].iloc[-1])
     curr_s = float(df['macd_signal'].iloc[-1])
 
-    if prev_m <= prev_s and curr_m > curr_s and volume_ok:
+    # Momentum stance: long while MACD is above its signal line.
+    if curr_m > curr_s:
         return 'BUY', price
-    if prev_m >= prev_s and curr_m < curr_s:
+    if curr_m < curr_s:
         return 'SELL', price
     return 'HOLD', price
 

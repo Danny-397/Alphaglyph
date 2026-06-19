@@ -64,21 +64,21 @@ def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '') -> pd.DataFr
     df.dropna(inplace=True)
 
     if strategy == 'ma_crossover':
-        buy  = (df['sma20'].shift(1) <= df['sma50'].shift(1)) & (df['sma20'] > df['sma50'])
-        sell = (df['sma20'].shift(1) >= df['sma50'].shift(1)) & (df['sma20'] < df['sma50'])
+        # Trend STANCE (not a one-shot cross): stay long while the fast average
+        # is above the slow one. This rides the whole uptrend and lets the bot
+        # re-enter if a stop knocks it out while the trend is still intact —
+        # instead of selling on the first wobble and sitting in cash until a
+        # brand-new golden cross that may never come during a sustained run.
+        buy  = df['sma20'] > df['sma50']
+        sell = df['sma20'] < df['sma50']
     elif strategy == 'rsi':
+        # Mean reversion stays event-based: buy oversold, sell overbought.
         buy  = df['rsi14'] < 30
         sell = df['rsi14'] > 70
     elif strategy == 'macd':
-        buy  = (
-            (df['macd_line'].shift(1) <= df['macd_signal'].shift(1)) &
-            (df['macd_line'] > df['macd_signal']) &
-            (df['Volume'] > df['vol_ma20'])
-        )
-        sell = (
-            (df['macd_line'].shift(1) >= df['macd_signal'].shift(1)) &
-            (df['macd_line'] < df['macd_signal'])
-        )
+        # Momentum STANCE: long while MACD is above its signal line.
+        buy  = df['macd_line'] > df['macd_signal']
+        sell = df['macd_line'] < df['macd_signal']
     elif strategy == 'ml':
         # Transformer signals: one batched ONNX call over every window in the
         # range.  Each day's window ends on that day — no look-ahead.  Without

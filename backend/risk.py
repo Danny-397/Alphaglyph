@@ -7,32 +7,32 @@ import pytz
 RISK_PROFILES = {
     'conservative': {
         'stop_loss_pct':    0.03,   # 3%  — kept for legacy display
-        'trail_pct':        0.03,   # 3%  — trailing distance from peak
-        'take_profit_pct':  0.10,   # 10% — take gains early
-        'max_position_pct': 0.05,   # 5%  — small positions
-        'min_cash_reserve': 0.30,   # 30% — large cash cushion
-        'max_daily_trades': 6,
-        'vol_size_mult':    0.25,   # 25% normal size in HIGH_VOLATILITY
+        'trail_pct':        0.10,   # 10% — wide enough to not whipsaw on noise
+        'take_profit_pct':  0.40,   # 40% — let winners run (only caps blow-off tops)
+        'max_position_pct': 0.12,   # per-position cap
+        'min_cash_reserve': 0.15,   # 15% cash cushion (more deployed than before)
+        'max_daily_trades': 8,
+        'vol_size_mult':    0.40,   # 40% normal size in HIGH_VOLATILITY
         'trade_high_vol':   False,  # sit out HIGH_VOLATILITY regime entirely
     },
     'moderate': {
         'stop_loss_pct':    0.05,   # 5%  — kept for legacy display
-        'trail_pct':        0.05,   # 5%  — trailing distance from peak
-        'take_profit_pct':  0.15,   # 15%
-        'max_position_pct': 0.10,   # 10%
-        'min_cash_reserve': 0.20,   # 20%
-        'max_daily_trades': 10,
-        'vol_size_mult':    0.50,   # 50% normal size in HIGH_VOLATILITY
+        'trail_pct':        0.15,   # 15% — gives trends room to breathe
+        'take_profit_pct':  1.00,   # 100% — effectively off; trend/stop is the exit
+        'max_position_pct': 0.18,
+        'min_cash_reserve': 0.05,   # stay close to fully invested
+        'max_daily_trades': 12,
+        'vol_size_mult':    0.60,
         'trade_high_vol':   True,
     },
     'aggressive': {
         'stop_loss_pct':    0.07,   # 7%  — kept for legacy display
-        'trail_pct':        0.07,   # 7%  — wider trail, lets winners run
-        'take_profit_pct':  0.20,   # 20% — let winners run
-        'max_position_pct': 0.15,   # 15% — larger bets
-        'min_cash_reserve': 0.10,   # 10% — more deployed capital
-        'max_daily_trades': 15,
-        'vol_size_mult':    1.00,   # full size even in HIGH_VOLATILITY
+        'trail_pct':        0.22,   # 22% — only a major reversal exits
+        'take_profit_pct':  2.00,   # effectively off — ride the full trend
+        'max_position_pct': 0.30,   # concentrated bets
+        'min_cash_reserve': 0.02,
+        'max_daily_trades': 20,
+        'vol_size_mult':    1.00,
         'trade_high_vol':   True,
     },
 }

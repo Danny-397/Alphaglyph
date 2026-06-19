@@ -177,6 +177,54 @@ def chart():
     return jsonify(data)
 
 
+@app.route('/api/scan')
+@limiter.limit('20 per minute')
+def scan():
+    """
+    Live Signal Scanner: for each ticker, the CURRENT stance of every strategy
+    (BUY / SELL / HOLD) plus the ML transformer's direction probability — so a
+    user can see, at a glance, what the strategies say about their stocks right
+    now. Stateless; data fetches are cached so repeat scans are fast.
+    """
+    raw = request.args.get('tickers', '')
+    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or list(strategies.WATCHLIST)
+    tickers = tickers[:20]
+
+    ml_loaded = ml_runtime.get_info().get('loaded')
+    out = []
+    for t in tickers:
+        sigs  = {}
+        price = None
+        for strat in ('ma_crossover', 'rsi', 'macd'):
+            try:
+                s, p = strategies.get_signal(strat, t)
+            except Exception:
+                s, p = None, None
+            sigs[strat] = s
+            if p:
+                price = p
+
+        row = {'ticker': t}
+        if ml_loaded:
+            try:
+                mlp = ml_runtime.live_prediction(t)
+            except Exception:
+                mlp = None
+            if mlp and mlp.get('available'):
+                sigs['ml'] = mlp.get('signal')
+                row['p_up'] = mlp.get('p_up')
+                row['q50']  = mlp.get('quantiles', {}).get('q50')
+                price = price or mlp.get('price')
+
+        row['price']   = round(price, 2) if price else None
+        row['signals'] = sigs
+        row['buys']    = sum(1 for v in sigs.values() if v == 'BUY')
+        row['sells']   = sum(1 for v in sigs.values() if v == 'SELL')
+        out.append(row)
+
+    return jsonify({'scanned': out, 'count': len(out), 'ml_loaded': bool(ml_loaded)})
+
+
 @app.route('/api/ml/info')
 def ml_info():
     """ML transformer status: whether a trained model is deployed, its
