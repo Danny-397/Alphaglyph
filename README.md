@@ -1,4 +1,4 @@
-# ◈ AlphaGlyph — A Quant & ML Paper-Trading Bot
+# ◈ AlphaGlyph — A Backtesting & Strategy-Validation Lab
 
 **A backtesting & strategy-validation lab.** Run classical quantitative strategies, a patient "dip-buyer" value strategy, build-your-own-rule custom strategies, or a multi-modal machine-learning transformer on real historical prices with simulated capital — every trade explained in plain English — then do what most backtests don't: **check whether the edge is genuine skill or just luck**, with the same statistical tests institutional quant funds use (Monte Carlo, Deflated Sharpe, Fama-French). The backend is fully stateless, so the demo is free-tier-proof.
 
@@ -13,12 +13,11 @@
 
 ---
 
-## ⚠️ Disclaimer — Paper Trading Only
+## ⚠️ Disclaimer — Educational, Simulated Only
 
 > This project is for **educational purposes only.**
-> AlphaGlyph runs an **internal paper-trading simulator** — orders are filled at real market prices (from yfinance) but with simulated cash. No brokerage account, no API keys, no real money is ever involved.
-> **This bot never trades real money.**
-> Nothing here constitutes financial advice. Past backtesting performance does not guarantee future results.
+> AlphaGlyph backtests strategies at **real historical market prices** with **simulated capital** — there is no brokerage account, no API keys, and **no real money is ever involved.**
+> Nothing here constitutes financial advice. Past backtested performance does not guarantee future results.
 
 ---
 
@@ -26,7 +25,7 @@
 
 AlphaGlyph is a full-stack quantitative platform with one thing most student trading projects don't have: **honesty about whether its results are real.**
 
-Anyone can pick a strategy, watch a bot trade it (in the browser, on real prices), and see **every decision explained** — what the strategy saw, in which market regime, and why it bought or sold. But most backtesting tools show you a Sharpe ratio and stop there. This one goes further — after every simulation it applies three independent statistical tests borrowed from professional quant finance:
+Anyone can pick a strategy, run it on real historical prices, and see **every decision explained** — what the strategy saw, in which market regime, and why it bought or sold (with an optional animated replay of the whole run). But most backtesting tools show you a Sharpe ratio and stop there. This one goes further — after every simulation it applies three independent statistical tests borrowed from professional quant finance:
 
 1. **Monte Carlo Resampling** (1,000 bootstrap paths) — does this strategy actually beat random?
 2. **Deflated Sharpe Ratio** (Lopez de Prado, 2014) — is the Sharpe genuine after correcting for multiple-testing bias and non-normal returns?
@@ -40,7 +39,7 @@ The whole experience is one page — the **Backtester** — where you pick a str
 
 ## What Makes This Different
 
-| Typical student trading bot | This project |
+| Typical student trading project | This project |
 |---|---|
 | Fixed stop-loss from entry | Trailing stop — floor rises as price climbs, locking in gains |
 | Fixed position sizing | Kelly Criterion sizing — fraction derived from historical win rate and odds ratio |
@@ -158,12 +157,51 @@ All indicator maths (SMA, EMA, RSI, MACD, ADX, Bollinger Bands) are implemented 
 
 ---
 
+## Architecture
+
+A deliberately simple, **stateless** design: the browser holds all UI state, the
+backend is a pure compute layer (every request is a self-contained market
+computation), and the machine-learning model is trained **offline** and shipped
+as a portable ONNX artifact — so the live server never trains, never persists,
+and survives a free-tier cold start with nothing to recover.
+
+```mermaid
+flowchart LR
+    subgraph Client["🌐 Browser — Vercel (static)"]
+        H[Home] --- B[Backtester] --- T[Tools]
+    end
+
+    subgraph API["⚙️ Flask API — Render (stateless)"]
+        BT[backtest.py<br/>walk-forward · Kelly · costs]
+        ST[stats.py<br/>PSR · Deflated Sharpe · Fama-French]
+        MC[monte_carlo.py<br/>1,000 bootstrap paths]
+        PF[portfolio.py<br/>Markowitz frontier]
+        RG[regime.py<br/>ADX · BBW · vol]
+        ML[ml_runtime.py<br/>ONNX inference]
+    end
+
+    subgraph Data["📊 Market data (cascading fallback)"]
+        TI[Tiingo] --> YF[yfinance] --> SQ[Stooq]
+    end
+
+    subgraph Offline["🧪 Offline ML pipeline (Colab)"]
+        DS[dataset.py<br/>12y · chrono 60/20/20] --> MD[model.py<br/>multi-modal transformer] --> TR[train.py<br/>+ ONNX export]
+    end
+
+    Client -->|JSON over HTTPS| API
+    API --> Data
+    TR -.->|ships model.onnx| ML
+    ST --> FF[(Fama-French factors<br/>cached + disk fallback)]
+```
+
+---
+
 ## Project Structure
 
 ```
 alphaglyph/
 ├── backend/                  (stateless Flask API — no DB, no server bot)
-│   ├── app.py           REST API — 11 stateless endpoints
+│   ├── app.py           REST API — 8 stateless endpoints
 │   ├── strategies.py    Signal generators (MA, RSI, MACD, Dip Buyer, ML, current-stance scanner)
 │   ├── backtest.py      Historical simulation — walk-forward, Kelly, costs, regime tagging,
 │   │                    dip-weighted sizing, and the safe custom-rule evaluator
