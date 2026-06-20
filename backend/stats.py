@@ -22,6 +22,9 @@ from __future__ import annotations
 
 import io
 import logging
+import os
+import tempfile
+import time
 import zipfile
 
 import numpy as np
@@ -33,10 +36,29 @@ logger = logging.getLogger(__name__)
 _EULER_MASCHERONI = 0.5772156649
 _TRADING_DAYS     = 252
 
-FF3_URL = (
-    'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/'
-    'data_library/F-F_Research_Data_Factors_daily_CSV.zip'
-)
+# Ken French moves these files around occasionally (the old /data_library/ path
+# started 404-ing — the real reason the Fama-French test kept showing n/a). Try
+# the current /ftp/ location first and keep the old one as a fallback.
+_FF3_BASE = 'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/'
+FF3_URLS = [
+    _FF3_BASE + 'ftp/F-F_Research_Data_Factors_daily_CSV.zip',
+    _FF3_BASE + 'data_library/F-F_Research_Data_Factors_daily_CSV.zip',
+]
+FF3_URL = FF3_URLS[0]   # kept for backward compatibility / tests
+# Dartmouth blocks the default python-requests user agent from some cloud IPs,
+# which is the usual cause of an intermittent "n/a" on the Fama-French test.
+_FF3_HEADERS = {
+    'User-Agent': ('Mozilla/5.0 (compatible; AlphaGlyph/1.0; '
+                   '+https://alphaglyph.org)'),
+}
+_FF3_TIMEOUT = 20
+_FF3_RETRIES = 3
+# The factors update once a day, so a parsed copy is good to reuse for hours.
+_FF3_TTL_SECONDS = 12 * 3600
+_FF3_DISK_PATH   = os.path.join(tempfile.gettempdir(),
+                                'alphaglyph_ff3_daily.csv')
+# Process-level cache of the *parsed* DataFrame: {'df': DataFrame, 'ts': float}.
+_FF3_CACHE: dict = {'df': None, 'ts': 0.0}
 
 
 # ── Probabilistic Sharpe Ratio ─────────────────────────────────────────────────
@@ -142,17 +164,64 @@ def deflated_sharpe_ratio(daily_returns: np.ndarray,
 # ── Fama-French 3-Factor data layer ───────────────────────────────────────────
 
 def _fetch_ff3_raw() -> str | None:
-    """Download and decompress the Ken French daily FF3 CSV. Returns text or None."""
+    """
+    Download and decompress the Ken French daily FF3 CSV. Returns the CSV text,
+    or None only if every option fails.
+
+    Robustness: a browser-like User-Agent (Dartmouth blocks the default requests
+    UA from some cloud IPs), a few retries with backoff, and — if the network is
+    down entirely — a fall back to the last successfully fetched copy on disk.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(_FF3_RETRIES):
+        for url in FF3_URLS:
+            try:
+                import requests
+                resp = requests.get(url, timeout=_FF3_TIMEOUT,
+                                    headers=_FF3_HEADERS)
+                resp.raise_for_status()
+                with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+                    csv_name = next(n for n in z.namelist()
+                                    if n.upper().endswith('.CSV'))
+                    text = z.read(csv_name).decode('latin-1')
+                try:                               # persist for offline fallback
+                    with open(_FF3_DISK_PATH, 'w', encoding='latin-1') as fh:
+                        fh.write(text)
+                except OSError:
+                    pass
+                return text
+            except Exception as exc:               # network / parse / zip error
+                last_exc = exc
+        time.sleep(0.6 * (attempt + 1))
+
+    # Every live attempt failed — reuse the last good copy if we have one.
     try:
-        import requests
-        resp = requests.get(FF3_URL, timeout=15)
-        resp.raise_for_status()
-        with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-            csv_name = next(n for n in z.namelist() if n.upper().endswith('.CSV'))
-            return z.read(csv_name).decode('latin-1')
-    except Exception as exc:
-        logger.warning('Could not fetch Fama-French factors: %s', exc)
+        with open(_FF3_DISK_PATH, 'r', encoding='latin-1') as fh:
+            logger.warning('Fama-French live fetch failed (%s); using cached '
+                           'copy from disk.', last_exc)
+            return fh.read()
+    except OSError:
+        logger.warning('Could not fetch Fama-French factors: %s', last_exc)
         return None
+
+
+def _get_ff3_data() -> pd.DataFrame:
+    """
+    Return the parsed FF3 factor DataFrame, cached in-process for a few hours so
+    repeated backtests don't re-hit the network (the daily factors barely move).
+    Returns an empty DataFrame if data is genuinely unavailable.
+    """
+    fresh = (_FF3_CACHE['df'] is not None
+             and (time.time() - _FF3_CACHE['ts']) < _FF3_TTL_SECONDS)
+    if fresh:
+        return _FF3_CACHE['df']
+
+    raw = _fetch_ff3_raw()
+    df  = _parse_ff3_csv(raw) if raw else pd.DataFrame()
+    if not df.empty:
+        _FF3_CACHE['df'] = df
+        _FF3_CACHE['ts'] = time.time()
+    return df
 
 
 def _parse_ff3_csv(text: str) -> pd.DataFrame:
@@ -231,13 +300,12 @@ def fama_french_decomposition(
     values = np.array([p['value'] for p in port_hist], dtype=float)
     rets   = pd.Series(np.diff(values) / values[:-1], index=dates[1:])
 
-    # Load FF3 factors
+    # Load FF3 factors (cached in-process; falls back to last good disk copy)
     if ff3_data is None:
-        raw = _fetch_ff3_raw()
-        if raw is None:
+        ff3_data = _get_ff3_data()
+        if ff3_data.empty:
             return {'enabled': False,
                     'reason': 'Could not download Fama-French factors (no internet?).'}
-        ff3_data = _parse_ff3_csv(raw)
 
     if ff3_data.empty:
         return {'enabled': False, 'reason': 'Failed to parse Fama-French data.'}
