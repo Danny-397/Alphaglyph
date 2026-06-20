@@ -144,7 +144,7 @@ All indicator maths (SMA, EMA, RSI, MACD, ADX, Bollinger Bands) are implemented 
 - No React, no Vue, no Webpack — open any `.html` file in a browser
 
 ### CI/CD
-- GitHub Actions: syntax check (`py_compile`), flake8 lint, pytest (99 tests), DB + simulator smoke test
+- GitHub Actions: syntax check (`py_compile`), flake8 lint, pytest (130 tests), DB + simulator smoke test
 - Security audit via pip-audit (non-blocking, runs as separate job)
 
 ---
@@ -266,7 +266,7 @@ python -m http.server 3000 -d frontend
 ```bash
 cd backend
 pytest tests/ -v
-# 99 tests, all should pass
+# 130 tests, all should pass
 ```
 
 ---
@@ -351,18 +351,39 @@ Source: *Markowitz, H. (1952). "Portfolio Selection." Journal of Finance.*
 
 ---
 
+## Methodology & Honest Limitations
+
+Backtesting is easy to get wrong in ways that flatter the result. Here is exactly how this engine works, and — just as importantly — what it does **not** prove.
+
+### How the backtest avoids look-ahead bias
+- **Trailing indicators only.** Every signal at day *T* is computed from data up to and including day *T* (rolling SMAs, RSI, MACD, the 52-week range). No indicator reads a future bar. This is verified by an automated test (`test_backtest.py::TestNoLookahead`): truncating the future must not change a single past trade.
+- **Rolling Kelly sizing.** Position sizing uses the Kelly fraction from trades that closed *before* the current date — never the full-sample win rate.
+- **Walk-forward mode** trains/warms up on the first 70% and reports metrics only on the held-out final 30%.
+- **ML train/validation/test split is chronological (60/20/20).** The transformer is trained on the oldest 60% of dates, tuned on the next 20%, and reported on the most recent 20% — split by date, never randomly. On the Backtest page, an ML backtest is **forced to start after the model's validation cutoff**, so it only ever runs on data the model never saw.
+
+### What it honestly does *not* claim
+- **The ML model is roughly a coin flip (test AUC ≈ 0.51).** That is not a bug to hide — next-day equity direction is genuinely close to unpredictable, and any project claiming otherwise should be distrusted. The value here is the **rigour of the evaluation** (chronological splits, purged boundaries, out-of-sample gating, Deflated Sharpe), not a magic edge.
+- **"Beats the market" is period-dependent.** Simple technical strategies frequently *underperform* buy-and-hold out-of-sample, especially in strong trends. A good-looking single-period return means little — that's exactly why the Monte Carlo percentile, Deflated Sharpe Ratio, and Fama-French alpha are shown: to ask whether a result is real or luck.
+- **Fills are modelled at the daily close** on the signal day, with a flat commission + slippage cost per side. Real execution (next-open fills, market impact, partial fills, borrow costs) is not modelled.
+- **The 52-week range is taken within the fetched window**, so on a short backtest it approximates a shorter range; strategies that depend on it (Dip Buyer) default to a multi-year window.
+- **Survivorship/selection:** results are shown for liquid large-caps that exist today. Free-tier market data can also be rate-limited or revised.
+- **Paper trading only — no real money, not financial advice.** Past backtested performance does not predict future returns.
+
+---
+
 ## Test Suite
 
 ```
 backend/tests/
-├── test_risk.py       26 tests  — trailing stop, Kelly sizing, risk profiles, daily limits
-├── test_simulator.py  20 tests  — buy/sell fills, cash flow, P&L, position tracking
-├── test_features.py   13 tests  — SMA/RSI/MACD correctness on synthetic OHLCV data
-├── test_portfolio.py  17 tests  — Markowitz constraints, efficient frontier math
-└── test_stats.py      23 tests  — PSR/DSR math, FF3 CSV parsing, OLS regression
+├── test_risk.py       — trailing stop, Kelly sizing, risk profiles, daily limits
+├── test_simulator.py  — buy/sell fills, cash flow, P&L, position tracking
+├── test_features.py   — SMA/RSI/MACD correctness on synthetic OHLCV data
+├── test_portfolio.py  — Markowitz constraints, efficient frontier math
+├── test_stats.py      — PSR/DSR math, FF3 CSV parsing, OLS regression
+└── test_backtest.py   — NO LOOK-AHEAD, P&L accounting, custom-rule evaluator
 ```
 
-All 99 tests pass with zero network calls — every test uses synthetic in-memory data or monkeypatched API calls. Run with `pytest tests/ -v` from the `backend/` directory.
+All **130 tests** pass with zero network calls — every test uses synthetic in-memory data or monkeypatched market-data/Fama-French calls, so the suite is fast and deterministic. Run with `pytest tests/ -v` from the `backend/` directory.
 
 ---
 
