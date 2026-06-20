@@ -31,7 +31,6 @@ jobs:
       - name: Syntax check (py_compile)
         run: |
           python -m py_compile app.py
-          python -m py_compile bot.py
           python -m py_compile strategies.py
           python -m py_compile backtest.py
           python -m py_compile risk.py

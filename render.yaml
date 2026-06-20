@@ -14,13 +14,10 @@ services:
     # gunicorn.conf.py is auto-discovered — sets workers=1, timeout=120,
     # threads=4, and binds to $PORT.
 
-    # No brokerage API keys needed — the bot uses an internal paper-trading
-    # simulator that fills orders at real yfinance prices.
-    #
-    # No persistent disk: the SQLite DB lives on the ephemeral filesystem and
-    # resets on each deploy. To keep trade history across deploys, add a disk
-    # mounted at /data and set DATABASE_PATH=/data/alphaglyph.db (requires a
-    # paid Render plan — disks are not available on the free tier).
+    # The API is fully stateless — no database and no persistent disk needed.
+    # Every endpoint is a pure market computation; the bots run in the browser.
+    # The app self-pings RENDER_EXTERNAL_URL (set automatically) to stay warm on
+    # the free tier. No brokerage API keys are ever required.
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"            # pandas/numpy/scipy ship wheels for 3.11;

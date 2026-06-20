@@ -1,9 +1,9 @@
 # Gunicorn production configuration for AlphaGlyph
 #
-# CRITICAL — workers must be 1.
-# The trading bot runs in a background thread inside the Flask process.
-# Multiple workers = multiple bot instances trading the same simulated account
-# simultaneously, which will cause duplicate orders.
+# workers = 1 on purpose.
+# The rate limiter uses in-process memory storage and the keep-warm self-ping
+# runs in a single background thread — one worker keeps both consistent and is
+# plenty for this stateless API (threads handle concurrent requests).
 #
 # Render start command: gunicorn app:app
 # (gunicorn auto-discovers this file when it's in the working directory)
