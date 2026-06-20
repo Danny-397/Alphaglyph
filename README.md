@@ -57,9 +57,9 @@ The whole experience is one page — the **Backtester** — where you pick a str
 ## Feature Overview
 
 ### Strategies (6 + adaptive + custom)
-- **MA Crossover** — trend stance: long while the 20-day average is above the 50-day
-- **RSI Mean Reversion** — buy oversold, sell overbought
-- **MACD Momentum** — long while MACD is above its signal line
+- **MA Crossover** — trend stance with a 1% hysteresis band: long while the 20-day average is ≥1% above the 50-day, exit only when it falls ≥1% below (the dead band stops the whipsaw that bleeds costs when the averages hug each other)
+- **RSI Mean Reversion** — buy oversold dips (RSI < 40) *only within an uptrend* (20-day > 50-day average); exit when overbought or the trend breaks, so it doesn't catch falling knives on the way down
+- **MACD Momentum** — trend stance: long while the MACD line is above zero (far less churn than the noisy signal-line cross)
 - **Dip Buyer (52-week value)** — buys *more* as a stock falls toward its 52-week low, averages down on further drops, keeps cash in reserve for the next dip, and sells on recovery toward the high
 - **ML Transformer** — a trained multi-modal transformer served via ONNX (see below)
 - **Custom (build-your-own rules)** — a no-code rule builder: define BUY/SELL from indicators (price, SMAs, RSI, MACD, volume, returns, 52-week range) with operators (below / above / crosses above / crosses below) combined with ALL/ANY

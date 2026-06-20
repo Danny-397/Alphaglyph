@@ -41,10 +41,12 @@ def ma_crossover_signal(ticker: str) -> tuple[str | None, float | None]:
     curr20 = float(df['sma20'].iloc[-1])
     curr50 = float(df['sma50'].iloc[-1])
 
-    # Trend stance: long while the fast average is above the slow one.
-    if curr20 > curr50:
+    # Trend stance with a 1% hysteresis band — matches the backtest engine so the
+    # scanner and a backtest agree on the stance instead of flip-flopping when the
+    # two averages hug each other.
+    if curr20 > curr50 * 1.01:
         return 'BUY', price
-    if curr20 < curr50:
+    if curr20 < curr50 * 0.99:
         return 'SELL', price
     return 'HOLD', price
 
@@ -58,10 +60,16 @@ def rsi_signal(ticker: str) -> tuple[str | None, float | None]:
 
     price   = float(df['Close'].iloc[-1])
     rsi_val = float(df['rsi14'].iloc[-1])
+    sma20   = float(df['sma20'].iloc[-1])
+    sma50   = float(df['sma50'].iloc[-1])
+    uptrend = sma20 > sma50
 
-    if rsi_val < 30:
+    # Buy oversold dips only within an uptrend; exit when overbought or the trend
+    # breaks. The trend filter (matching the backtest) keeps it from buying every
+    # oversold reading on the way down in a falling stock.
+    if rsi_val < 40 and uptrend:
         return 'BUY', price
-    if rsi_val > 70:
+    if rsi_val > 70 or not uptrend:
         return 'SELL', price
     return 'HOLD', price
 
@@ -75,12 +83,13 @@ def macd_signal(ticker: str) -> tuple[str | None, float | None]:
 
     price  = float(df['Close'].iloc[-1])
     curr_m = float(df['macd_line'].iloc[-1])
-    curr_s = float(df['macd_signal'].iloc[-1])
 
-    # Momentum stance: long while MACD is above its signal line.
-    if curr_m > curr_s:
+    # Momentum stance: long while the MACD line is above zero (a confirmed
+    # uptrend), matching the backtest. The zero line trades far less than the
+    # signal-line cross, which oscillates and churns.
+    if curr_m > 0:
         return 'BUY', price
-    if curr_m < curr_s:
+    if curr_m < 0:
         return 'SELL', price
     return 'HOLD', price
 

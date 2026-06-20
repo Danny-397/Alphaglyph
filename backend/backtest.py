@@ -132,21 +132,27 @@ def _add_signals(df: pd.DataFrame, strategy: str, ticker: str = '',
     df.dropna(inplace=True)
 
     if strategy == 'ma_crossover':
-        # Trend STANCE (not a one-shot cross): stay long while the fast average
-        # is above the slow one. This rides the whole uptrend and lets the bot
-        # re-enter if a stop knocks it out while the trend is still intact —
-        # instead of selling on the first wobble and sitting in cash until a
-        # brand-new golden cross that may never come during a sustained run.
-        buy  = df['sma20'] > df['sma50']
-        sell = df['sma20'] < df['sma50']
+        # Trend STANCE with a hysteresis band: go long when the 20-day average is
+        # at least 1% above the 50-day, and don't exit until it falls 1% below.
+        # The dead band stops the position flip-flopping (and bleeding costs) when
+        # the two averages hug each other in a choppy market.
+        band = 0.01
+        buy  = df['sma20'] > df['sma50'] * (1 + band)
+        sell = df['sma20'] < df['sma50'] * (1 - band)
     elif strategy == 'rsi':
-        # Mean reversion stays event-based: buy oversold, sell overbought.
-        buy  = df['rsi14'] < 30
-        sell = df['rsi14'] > 70
+        # Buy oversold DIPS within an uptrend (price above its 50-day average) and
+        # exit when overbought or the uptrend breaks. The trend filter is what
+        # keeps mean reversion from catching falling knives in a downtrend — the
+        # classic failure mode of buying every oversold reading.
+        buy  = (df['rsi14'] < 40) & (df['sma20'] > df['sma50'])
+        sell = (df['rsi14'] > 70) | (df['sma20'] < df['sma50'])
     elif strategy == 'macd':
-        # Momentum STANCE: long while MACD is above its signal line.
-        buy  = df['macd_line'] > df['macd_signal']
-        sell = df['macd_line'] < df['macd_signal']
+        # Momentum STANCE: long while the MACD line is above zero (a confirmed
+        # uptrend). Using the zero line instead of the line/signal cross trades far
+        # less — the signal-line cross oscillates constantly and churns the
+        # position; the zero-line cross only flips when the trend genuinely turns.
+        buy  = df['macd_line'] > 0
+        sell = df['macd_line'] < 0
     elif strategy == 'dip_buyer':
         # Value: buy near the 52-week low, sell when recovered toward the high.
         low52  = df['Close'].rolling(252, min_periods=40).min()

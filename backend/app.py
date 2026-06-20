@@ -343,7 +343,7 @@ def compare_strategies():
         try:
             r = backtester.run_backtest(
                 strat, tickers, start_date, end_date,
-                initial_capital, False, risk_tolerance, 0.001, 0.0005)
+                initial_capital, False, risk_tolerance, 0.0003, 0.0003)
         except Exception as exc:
             logger.warning('compare: %s failed: %s', strat, exc)
             results.append({'strategy': strat, 'label': LABELS.get(strat, strat), 'error': str(exc)})
@@ -407,8 +407,11 @@ def run_backtest():
     initial_capital = float(data.get('initial_capital', 100_000))
     walk_forward    = bool(data.get('walk_forward', False))
     risk_tolerance  = data.get('risk_tolerance', 'moderate')
-    commission_pct  = float(data.get('commission_pct', 0.001))
-    slippage_pct    = float(data.get('slippage_pct',   0.0005))
+    # Realistic costs for liquid US large-caps in the commission-free era:
+    # ~0.03% commission/fees + ~0.03% slippage per side. The old 0.10%/0.05%
+    # default badly overstated costs and unfairly dragged active strategies.
+    commission_pct  = float(data.get('commission_pct', 0.0003))
+    slippage_pct    = float(data.get('slippage_pct',   0.0003))
     use_markowitz   = bool(data.get('use_markowitz', False))
     range_sizing    = bool(data.get('range_sizing', False))
     custom_rules    = _sanitize_rules(data.get('custom_rules')) if strategy == 'custom' else None
