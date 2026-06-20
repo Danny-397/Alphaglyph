@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AlphaGlyph — The Paper-Trading Bot That Shows Its Work</title>
-  <meta name="description" content="AlphaGlyph is an autonomous paper-trading bot: it runs real quant and machine-learning strategies on any stock by itself, then explains every trade in plain English. No code, no account, no real money.">
+  <title>AlphaGlyph — Backtest a Strategy and Find Out If the Edge Is Real</title>
+  <meta name="description" content="AlphaGlyph is a backtesting & strategy-validation lab. Run any quant or ML strategy on real historical prices, then check whether the edge is genuine or luck with the same statistical tests quant funds use — Monte Carlo, Deflated Sharpe, Fama-French.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
@@ -18,22 +18,19 @@
     <div class="lp-nav-inner">
       <a href="index.html" class="lp-brand">
         <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <!-- Alpha Glyph — α whose tail breaks out like a price path -->
           <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
           <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
           <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
         </svg>
         <span class="lp-brand-mark">AlphaGlyph</span>
-        <span class="lp-brand-sub">Autonomous Trading Bot</span>
+        <span class="lp-brand-sub">Strategy Validation Lab</span>
       </a>
       <div class="lp-nav-links">
         <a href="#how"        class="lp-nav-link">How it works</a>
-        <a href="#features"   class="lp-nav-link">Features</a>
-        <a href="dashboard.html" class="lp-nav-link">Live bot</a>
-        <a href="signals.html"   class="lp-nav-link">Signals</a>
-        <a href="account.html"   class="lp-nav-link">Account</a>
+        <a href="#validation" class="lp-nav-link">Validation</a>
+        <a href="tools.html"  class="lp-nav-link">Tools</a>
         <a href="https://github.com/Danny-397/alphaglyph" class="lp-nav-link" target="_blank" rel="noopener">Source</a>
-        <a href="sandbox.html" class="btn btn-primary btn-sm lp-nav-link">Launch a bot →</a>
+        <a href="backtest.html" class="btn btn-primary btn-sm lp-nav-link">Open the Backtester →</a>
       </div>
     </div>
   </nav>
@@ -42,38 +39,38 @@
   <header class="hero">
     <div class="container hero-grid">
       <div>
-        <span class="hero-eyebrow">● Autonomous · Explainable · No code · Real prices, never real money</span>
-        <h1>The paper-trading bot that trades for you — and shows you <span class="accent">exactly why</span>.</h1>
+        <span class="hero-eyebrow">● Backtesting · Statistical validation · Real prices, never real money</span>
+        <h1>Backtest any strategy — and find out if the edge is <span class="accent">real</span>.</h1>
         <p class="hero-sub">
-          Every other simulator makes <em>you</em> place the trades. AlphaGlyph runs real quant and
-          machine-learning strategies on any stock <strong>completely on its own</strong> — then explains
-          every single move in plain English: the market it saw, the signal it acted on, and what its ML
-          transformer forecast. Watch it think, learn how it works, and launch your own in seconds.
+          AlphaGlyph runs quant and machine-learning strategies on real historical prices with simulated
+          capital, then does what most backtests don't: it checks whether the result is <strong>genuine skill
+          or just luck</strong>, using the same statistical tests quant funds use. Six strategies, a no-code
+          rule builder, an ML transformer — and an honest verdict on every run.
         </p>
         <div class="hero-cta">
-          <a href="sandbox.html" class="btn btn-primary">Launch a bot — 10s →</a>
-          <a href="dashboard.html" class="btn btn-ghost">Watch the live bot</a>
+          <a href="backtest.html" class="btn btn-primary">Open the Backtester →</a>
+          <a href="tools.html" class="btn btn-ghost">Explore the tools</a>
         </div>
-        <p class="hero-note">No code · No account · No real money · Every decision explained</p>
+        <p class="hero-note">No code · No account · No real money · Every trade explained in plain English</p>
       </div>
 
-      <!-- Hero visual: a real bot decision, narrated — the whole pitch in one card -->
+      <!-- Hero visual: the actual differentiator — the validation verdict -->
       <div class="verdict">
-        <div class="verdict-top">● Live decision · NVDA</div>
+        <div class="verdict-top">Strategy Validation Report</div>
         <div class="verdict-headline">
-          <span class="tick">▲</span> BUY · 55 sh @ $180.93
+          <span class="tick">✓</span> Statistically Significant
         </div>
         <div class="verdict-row">
           <span class="ck">✓</span>
-          <span><span class="lbl">Why —</span> <span class="val">20-day average crossed above the 50-day</span> (momentum turning up)</span>
+          <span><span class="lbl">Monte Carlo —</span> <span class="val">92nd percentile</span> of 1,000 resampled paths</span>
         </div>
         <div class="verdict-row">
           <span class="ck">✓</span>
-          <span><span class="lbl">Market —</span> <span class="val">Trending up</span> · strategy auto-selected: MA Crossover</span>
+          <span><span class="lbl">Deflated Sharpe —</span> <span class="val">96.4% confidence</span> the edge is real</span>
         </div>
         <div class="verdict-row">
           <span class="ck">✓</span>
-          <span><span class="lbl">ML check —</span> transformer <span class="val">P(up) 56%</span>, +1.9% 5-day forecast</span>
+          <span><span class="lbl">Fama-French —</span> <span class="val">+6.8%/yr alpha</span> (|t| = 2.31, significant)</span>
         </div>
       </div>
     </div>
@@ -82,10 +79,10 @@
   <!-- ── Stat strip ─────────────────────────────────────────────────────── -->
   <section class="stats">
     <div class="stats-inner">
-      <div class="stat"><div class="stat-num">5</div><div class="stat-lbl">Strategies (incl. ML)</div></div>
-      <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">Lines of code to run one</div></div>
-      <div class="stat"><div class="stat-num">100%</div><div class="stat-lbl">Of trades explained</div></div>
-      <div class="stat"><div class="stat-num">~10s</div><div class="stat-lbl">To launch your own</div></div>
+      <div class="stat"><div class="stat-num">6</div><div class="stat-lbl">Strategies + custom rules</div></div>
+      <div class="stat"><div class="stat-num">1,000</div><div class="stat-lbl">Monte Carlo paths</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-lbl">Validation tests</div></div>
+      <div class="stat"><div class="stat-num">130</div><div class="stat-lbl">Passing tests</div></div>
       <div class="stat"><div class="stat-num">$0</div><div class="stat-lbl">Real money at risk</div></div>
     </div>
   </section>
@@ -95,73 +92,72 @@
     <div class="container">
       <div class="section-head">
         <div class="section-tag">How it works</div>
-        <h2>Watch a bot trade — and finally understand how.</h2>
-        <p>Most trading bots are black boxes that just show a number going up or down. AlphaGlyph narrates the entire decision so you actually learn.</p>
+        <h2>Run a strategy. See the trades. Get an honest verdict.</h2>
+        <p>The whole flow is one page — the Backtester — with everything explained, not hidden behind a number.</p>
       </div>
 
       <div class="features">
         <div class="feature">
           <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
           </div>
-          <h3>1 · It reads the market</h3>
-          <p>Every few minutes it measures trend strength and volatility, classifies the market into one of four regimes, and picks the strategy that fits.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
-          </div>
-          <h3>2 · It trades on its own</h3>
-          <p>It generates signals, sizes each position by your edge (Kelly), sets a trailing stop, and executes — you never place an order yourself.</p>
+          <h3>1 · Pick a strategy &amp; run it</h3>
+          <p>Choose from six strategies (or build your own buy/sell rules from indicators), pick stocks and a date range, and simulate it day-by-day on real prices with transaction costs.</p>
         </div>
         <div class="feature">
           <div class="feature-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
-          <h3>3 · It shows its work</h3>
-          <p>Every trade comes with a plain-English reason — what the strategy saw, in what market, and why it bought or sold. No jargon, no black box.</p>
+          <h3>2 · See every trade explained</h3>
+          <p>The equity curve, each trade with a plain-English reason (what it saw, the regime, why it acted), and an optional animated replay of the whole run.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <h3>3 · Is it real, or luck?</h3>
+          <p>Monte Carlo, Deflated Sharpe, and Fama-French synthesise into one verdict: <em>Statistically Significant</em>, <em>Promising</em>, or <em>Inconclusive</em>.</p>
         </div>
       </div>
 
       <div class="hero-cta" style="justify-content:center;margin-top:34px;">
-        <a href="sandbox.html" class="btn btn-primary">Launch a bot — 10s →</a>
-        <a href="dashboard.html" class="btn btn-ghost">Watch the live bot</a>
+        <a href="backtest.html" class="btn btn-primary">Open the Backtester →</a>
       </div>
     </div>
   </section>
 
-  <!-- ── Differentiator: transparency ───────────────────────────────────── -->
-  <section class="section section-alt" id="why-different">
+  <!-- ── Differentiator: validation ─────────────────────────────────────── -->
+  <section class="section section-alt" id="validation">
     <div class="container split">
       <div>
         <div class="section-tag">Why it's different</div>
         <h2 style="font-size:clamp(1.7rem,3vw,2.3rem);font-weight:700;letter-spacing:-0.02em;line-height:1.14;">
-          Other bots say <em>what</em> they did. AlphaGlyph tells you <em>why</em>.
+          Most backtests stop at a Sharpe ratio. This one asks if it's real.
         </h2>
         <p style="color:var(--muted);margin-top:14px;">
-          Transparency is the whole point. Behind every order is the same loop, and you see all of it —
-          so you walk away actually understanding systematic trading instead of just trusting a black box.
+          Any strategy can look good on historical data by chance. AlphaGlyph runs three
+          independent statistical tests and synthesises them into a single verdict.
         </p>
         <ul class="split-list">
           <li>
             <span class="n">01</span>
             <div>
-              <h4>See the setup</h4>
-              <p>The market regime it detected — trending, ranging, or volatile — and the strategy it chose for it.</p>
+              <h4>Resample reality</h4>
+              <p>1,000 bootstrap paths build a distribution — your result either stands out or it doesn't.</p>
             </div>
           </li>
           <li>
             <span class="n">02</span>
             <div>
-              <h4>See the decision</h4>
-              <p>The exact signal that fired, plus the ML transformer's probability and full return forecast — in numbers you can read.</p>
+              <h4>Correct for luck</h4>
+              <p>The Deflated Sharpe Ratio penalises testing many strategies, the way good science corrects for multiple comparisons.</p>
             </div>
           </li>
           <li>
             <span class="n">03</span>
             <div>
-              <h4>See the outcome</h4>
-              <p>Why it exited — stop, target, or signal flip — the profit or loss booked, and how the run stacks up against buy-and-hold.</p>
+              <h4>Isolate true skill</h4>
+              <p>Factor decomposition strips out market, size, and value exposure to reveal whether any genuine alpha remains.</p>
             </div>
           </li>
         </ul>
@@ -170,18 +166,20 @@
       <div class="code-panel">
         <div class="code-bar">
           <span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span>
-          <span class="code-title">bot.py — one decision, narrated</span>
+          <span class="code-title">stats.py — deflated_sharpe_ratio()</span>
         </div>
-        <pre class="code-body"><span class="c"># Every cycle, for each stock it watches:</span>
-regime   = detect_regime(SPY)        <span class="c"># trend + volatility</span>
-strategy = pick_for(regime, risk)    <span class="c"># adaptive choice</span>
-signal   = strategy.signal(ticker)   <span class="c"># BUY / SELL / HOLD</span>
+        <pre class="code-body"><span class="c"># Probability the Sharpe is real after</span>
+<span class="c"># testing N strategies on noisy data</span>
+<span class="k">def</span> deflated_sharpe_ratio(returns, n_strategies):
+    sr   = annualized_sharpe(returns)
+    skew = <span class="n">scipy</span>.stats.skew(returns)
+    kurt = <span class="n">scipy</span>.stats.kurtosis(returns)
 
-<span class="k">if</span> signal == BUY <span class="k">and</span> risk_ok(ticker):
-    buy(ticker, kelly_size(edge))
-    explain(why(strategy, regime))
-    <span class="c"># → "Bought NVDA: 20-day crossed above</span>
-    <span class="c">#    the 50-day, in an up-trending market."</span></pre>
+    <span class="c"># expected max Sharpe from pure luck</span>
+    sr_star = expected_max_sharpe(n_strategies)
+
+    <span class="k">return</span> psr(sr, sr_star, skew, kurt)
+    <span class="c"># → 0.964  ✓ significant</span></pre>
       </div>
     </div>
   </section>
@@ -191,63 +189,52 @@ signal   = strategy.signal(ticker)   <span class="c"># BUY / SELL / HOLD</span>
     <div class="container">
       <div class="section-head">
         <div class="section-tag">Under the hood</div>
-        <h2>Built like a real quant desk — open for you to see.</h2>
-        <p>Every indicator, model, and statistical test is implemented from first principles. No black-box libraries.</p>
+        <h2>A real quantitative toolkit — built from first principles.</h2>
+        <p>Every indicator, model, and statistical method is implemented from scratch — no black-box TA libraries.</p>
       </div>
 
       <div class="features">
-        <!-- ML transformer -->
+        <div class="feature">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>
+          </div>
+          <h3>Six strategies + a custom rule builder</h3>
+          <p>MA Crossover, RSI, MACD, a patient Dip Buyer, an ML transformer — and a no-code builder to define your own buy/sell rules from indicators.</p>
+        </div>
         <div class="feature">
           <div class="feature-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M12 11l-6 6M12 11l6 6"/></svg>
           </div>
-          <h3>An ML transformer you can watch think</h3>
-          <p>A multi-modal transformer forecasts a full return distribution and direction probability per stock — and the dashboard shows it live, not just a buy/sell flag.</p>
+          <h3>An ML transformer — evaluated honestly</h3>
+          <p>A multi-modal transformer trained with a chronological 60/20/20 split; backtests run strictly out-of-sample. The win is the rigour, not a magic edge.</p>
         </div>
-
-        <!-- No-code bot -->
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 12l2 2 4-4"/></svg>
-          </div>
-          <h3>Run your own — no code</h3>
-          <p>Pick a strategy, your stocks, and your risk. It paper-trades on real prices instantly, right in your browser. No programming, no account.</p>
-        </div>
-
-        <!-- Regime detection -->
         <div class="feature">
           <div class="feature-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v6h-6"/></svg>
           </div>
           <h3>Adaptive regime detection</h3>
-          <p>ADX, Bollinger Band Width, and realized volatility classify the market into four regimes and automatically switch the strategy to match.</p>
+          <p>ADX, Bollinger Band Width, and realized volatility classify the market into four regimes; the adaptive strategy switches to match.</p>
         </div>
-
-        <!-- Risk -->
         <div class="feature">
           <div class="feature-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <h3>Trailing stops &amp; Kelly sizing</h3>
-          <p>A trailing stop locks in gains as price climbs; the Kelly Criterion sizes each position by your historical edge, not a fixed percentage.</p>
+          <p>Wide trailing stops let winners run; the Kelly Criterion sizes positions by the historical edge, not a fixed percentage. No look-ahead — and it's tested.</p>
         </div>
-
-        <!-- Strategy leaderboard -->
         <div class="feature">
           <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor"/></svg>
           </div>
-          <h3>Strategy leaderboard</h3>
-          <p>Run every strategy on the same stocks and period, then rank them head-to-head by return, Sharpe, drawdown, and more.</p>
+          <h3>Leaderboard &amp; optimizer</h3>
+          <p>Rank every strategy on the same data, and compute the Markowitz efficient frontier (max-Sharpe and min-variance portfolios) in the Tools tab.</p>
         </div>
-
-        <!-- Validation -->
         <div class="feature">
           <div class="feature-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
           </div>
           <h3>Honest by design</h3>
-          <p>Monte Carlo, the Deflated Sharpe Ratio, and Fama-French factor attribution tell you whether an edge is genuine — or just luck.</p>
+          <p>Monte Carlo, Deflated Sharpe (López de Prado), and Fama-French attribution tell you whether an edge is genuine — or just luck.</p>
         </div>
       </div>
     </div>
@@ -256,11 +243,11 @@ signal   = strategy.signal(ticker)   <span class="c"># BUY / SELL / HOLD</span>
   <!-- ── CTA ────────────────────────────────────────────────────────────── -->
   <section class="cta">
     <div class="container">
-      <h2>Launch your first bot.</h2>
-      <p>Pick a strategy and a few stocks, and watch AlphaGlyph trade — explaining every move — in about ten seconds. No code, no account, no risk.</p>
+      <h2>Backtest a strategy now.</h2>
+      <p>Pick a strategy and a few stocks, run it on real history in seconds, and see whether the edge holds up — no account required.</p>
       <div class="cta-btns">
-        <a href="sandbox.html" class="btn btn-primary">Launch a bot — 10s →</a>
-        <a href="dashboard.html" class="btn btn-ghost">Watch the live bot</a>
+        <a href="backtest.html" class="btn btn-primary">Open the Backtester →</a>
+        <a href="tools.html" class="btn btn-ghost">Explore the tools</a>
       </div>
     </div>
   </section>
@@ -278,27 +265,25 @@ signal   = strategy.signal(ticker)   <span class="c"># BUY / SELL / HOLD</span>
             </svg>
             <span class="lp-brand-mark">AlphaGlyph</span>
           </span>
-          <p class="footer-tagline">An autonomous, explainable paper-trading bot — watch real quant &amp; ML strategies trade, and understand every move.</p>
+          <p class="footer-tagline">A backtesting &amp; strategy-validation lab — run any strategy on real history, and find out whether its edge is genuine or just luck.</p>
         </div>
         <div class="footer-links">
           <div class="footer-col">
-            <h5>Platform</h5>
-            <a href="sandbox.html">Run Your Own Bot</a>
-            <a href="dashboard.html">Live Dashboard</a>
-            <a href="backtest.html">Backtest</a>
-            <a href="portfolio.html">Portfolio Optimizer</a>
+            <h5>App</h5>
+            <a href="backtest.html">Backtester</a>
+            <a href="tools.html">Tools (Signals · Optimizer)</a>
           </div>
           <div class="footer-col">
             <h5>Project</h5>
             <a href="https://github.com/Danny-397/alphaglyph" target="_blank" rel="noopener">Source Code</a>
             <a href="#how">How it works</a>
-            <a href="#features">Features</a>
+            <a href="#validation">Validation</a>
           </div>
         </div>
       </div>
       <div class="disclaimer">
-        <strong>Disclaimer —</strong> AlphaGlyph is an educational project. It runs an internal
-        paper-trading simulator that fills orders at real market prices with simulated cash.
+        <strong>Disclaimer —</strong> AlphaGlyph is an educational project. It backtests strategies at
+        real market prices with simulated cash.
         <strong>No real money is ever involved and nothing here is financial advice.</strong>
         Past backtested performance does not guarantee future results.
         <br>© 2026 AlphaGlyph · Built by Danny.

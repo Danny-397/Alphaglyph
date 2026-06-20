@@ -23,16 +23,12 @@
         <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
       </svg>
       <span class="nav-brand-name">AlphaGlyph</span>
-      <span class="nav-brand-sub">Autonomous Trading Bot</span>
+      <span class="nav-brand-sub">Strategy Validation Lab</span>
     </div>
     <div class="nav-links">
-      <a href="index.html"     class="nav-link">Home</a>
-      <a href="dashboard.html" class="nav-link">Dashboard</a>
-      <a href="signals.html"   class="nav-link">Signals</a>
-      <a href="account.html"   class="nav-link">Account</a>
-      <a href="sandbox.html"   class="nav-link">My Bot</a>
-      <a href="backtest.html"  class="nav-link active">Backtest</a>
-      <a href="portfolio.html" class="nav-link">Portfolio</a>
+      <a href="index.html"    class="nav-link">Home</a>
+      <a href="backtest.html" class="nav-link active">Backtest</a>
+      <a href="tools.html"    class="nav-link">Tools</a>
     </div>
     <span class="nav-badge">PAPER TRADING</span>
   </nav>
@@ -226,6 +222,26 @@
 
           <!-- Summary hero stats -->
           <div class="stats-grid" id="summary-stats" style="margin-bottom:20px;"></div>
+
+          <!-- Optional animated replay of the run -->
+          <div class="card" id="bt-playback" style="margin-bottom:20px;">
+            <div class="section-header" style="display:flex;align-items:center;gap:10px;">
+              Watch it trade
+              <select id="bt-replay-speed" style="width:auto;padding:5px 8px;margin-left:auto;">
+                <option value="slow">Slow</option>
+                <option value="normal" selected>Normal</option>
+                <option value="fast">Fast</option>
+              </select>
+              <button class="btn btn-sm btn-primary" id="bt-replay-btn">▶ Play</button>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">
+              Replay the backtest day-by-day — the equity curve grows and each trade streams in with a plain-English reason.
+            </p>
+            <div class="chart-wrap" style="height:240px;"><canvas id="bt-replay-chart"></canvas></div>
+            <div class="scroll-box" id="bt-replay-feed" style="max-height:240px;margin-top:12px;">
+              <div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">Press Play to replay the run.</div>
+            </div>
+          </div>
 
           <!-- Tab card -->
           <div class="card">

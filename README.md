@@ -1,6 +1,6 @@
 # ◈ AlphaGlyph — A Quant & ML Paper-Trading Bot
 
-**A paper-trading bot that trades for you — and shows its work.** It runs classical quantitative strategies, a patient "dip-buyer" value strategy, build-your-own-rule custom strategies, and a multi-modal machine-learning transformer on real market prices with simulated capital — explaining every trade in plain English and adapting to the market regime — then rigorously validates whether an edge is statistically real with the same mathematical tools institutional quant funds use. The bots run entirely in the visitor's browser, so the demo is free-tier-proof and never sleeps.
+**A backtesting & strategy-validation lab.** Run classical quantitative strategies, a patient "dip-buyer" value strategy, build-your-own-rule custom strategies, or a multi-modal machine-learning transformer on real historical prices with simulated capital — every trade explained in plain English — then do what most backtests don't: **check whether the edge is genuine skill or just luck**, with the same statistical tests institutional quant funds use (Monte Carlo, Deflated Sharpe, Fama-French). The backend is fully stateless, so the demo is free-tier-proof.
 
 [![CI](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml/badge.svg)](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -34,7 +34,7 @@ Anyone can pick a strategy, watch a bot trade it (in the browser, on real prices
 
 …synthesised into a verdict card: **STATISTICALLY SIGNIFICANT**, **PROMISING — NEEDS MORE DATA**, or **INCONCLUSIVE — MAY BE NOISE**.
 
-Around that core: browser-run bots (**My Bot** and a live **Dip Buyer** demo), a forward-tracked **Paper Account**, a **Live Signal Scanner**, a **Stock Explorer**, a **Strategy Leaderboard**, a Markowitz **portfolio optimizer**, and a backtesting engine with walk-forward cross-validation and transaction-cost modelling. See **[Methodology & Honest Limitations](#methodology--honest-limitations)** for exactly what it does and doesn't claim.
+The whole experience is one page — the **Backtester** — where you pick a strategy (or build your own rules), run it with walk-forward cross-validation and transaction costs, watch an optional animated replay of every explained trade, and get the verdict. A small **Tools** tab adds a live signal scanner and a Markowitz portfolio optimizer. See **[Methodology & Honest Limitations](#methodology--honest-limitations)** for exactly what it does and doesn't claim.
 
 ---
 
@@ -66,7 +66,7 @@ Around that core: browser-run bots (**My Bot** and a live **Dip Buyer** demo), a
 - **Adaptive Mode** — detects the current market regime from SPY and auto-selects the fitting strategy
 
 ### Bots & sizing
-- **Browser-run bots** — **My Bot** lets anyone build and watch a bot trade on real prices; the **Dashboard** runs a live **Dip Buyer** demo. Both reuse the real backtest engine and run client-side, so they never sleep and need no server state.
+- **Animated replay** — any backtest can be replayed day-by-day: the equity curve grows and each trade streams in with a plain-English reason. Runs client-side from the result, so it needs no server state.
 - **Trailing Stop-Loss** — exit floor rises with price so winners are protected
 - **Kelly Criterion Sizing** — position size from the Kelly formula on live win rate / odds; falls back to fixed sizing under 10 closed trades
 - **Optional dip-weighted sizing** — bet bigger near the 52-week low, smaller near the high
@@ -119,16 +119,11 @@ Indicators: **ADX** (Wilder's smoothing), **Bollinger Band Width** (consolidatio
 
 Stops are intentionally wide and take-profit is largely disabled by design: the engine **lets winners run** rather than capping them, which is why trend strategies can ride a full move instead of selling early. (Dip Buyer overrides this with its own tranche/averaging logic.)
 
-### Pages & UI
-- **Landing** (`index.html`) — marketing page built around the niche, links into the app
-- **Dashboard** — a live **Dip Buyer** demo bot running in your browser (animated equity curve, trade feed with plain-English reasons, end-of-run verdict), plus live **Market Regime**, the **ML transformer's live forecasts** (direction probability + return distribution), and a **Stock Explorer**
-- **My Bot** — build your own bot (strategy/risk/stocks/capital or custom rules), watch it trade with play/pause/speed, and get a shareable link
-- **Signals** — a Live Signal Scanner: what every strategy + the ML model says about your watchlist right now
-- **Account** — a forward-tracked Paper Account that extends over real calendar time
-- **Backtest** — sticky sidebar form, custom rule builder, Strategy Leaderboard, and 4-tab results (Performance / Monte Carlo / ⚗ Research / Trades)
-- **Portfolio** — Markowitz efficient frontier, optimal weights, correlation heatmap
-- **Strategy Validation Report** — Monte Carlo + DSR + Fama-French synthesised into one colour-coded verdict
-- Vanilla HTML/CSS/JS + Chart.js — zero frontend frameworks, zero build step
+### Pages (intentionally just three)
+- **Home** (`index.html`) — landing page; the whole pitch is "run a strategy, then find out if the edge is real."
+- **Backtest** (`backtest.html`) — **the core.** Pick any of 6 strategies or build your own rules, run it on real history with transaction costs, and get: the equity curve, every trade explained in plain English, an **optional animated replay** of the run, the **Strategy Leaderboard**, and 4-tab results (Performance / Monte Carlo / ⚗ Research / Trades) ending in the **Strategy Validation Report** (Monte Carlo + Deflated Sharpe + Fama-French → one colour-coded verdict).
+- **Tools** (`tools.html`) — two utilities beyond backtesting, as tabs: a **Live Signal Scanner** (what every strategy + the ML model says about your watchlist now) and the **Markowitz Portfolio Optimizer** (efficient frontier, optimal weights, correlation heatmap).
+- Vanilla HTML/CSS/JS + Chart.js — zero frontend frameworks, zero build step.
 
 ---
 
@@ -193,12 +188,9 @@ alphaglyph/
 │   └── train.py         Train + ONNX export + parity check
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
 │   ├── index.html       Landing page
-│   ├── dashboard.html   Live Dip Buyer demo bot + market intelligence
-│   ├── signals.html     Live Signal Scanner
-│   ├── account.html     Forward-tracked Paper Account
-│   ├── sandbox.html     "My Bot" builder + live playback
-│   ├── backtest.html    Backtest + custom rule builder + Strategy Leaderboard
-│   ├── portfolio.html   Markowitz optimizer
+│   ├── backtest.html    The core: backtest + custom rule builder + leaderboard
+│   │                    + validation report + optional animated replay
+│   ├── tools.html       Signal Scanner + Markowitz optimizer (tabs)
 │   ├── landing.css · style.css · config.js
 │   └── app.js           All client logic (one file, page-routed)
 ├── .github/workflows/   ci.yml · keepwarm.yml
@@ -213,10 +205,10 @@ The API is **fully stateless** — no database, no server-side bot. Every endpoi
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/backtest` | POST | Full backtest with walk-forward, Kelly, Monte Carlo, DSR, Fama-French. Powers My Bot, the Account, and the Dashboard demo. |
+| `/api/backtest` | POST | Full backtest with walk-forward, Kelly, Monte Carlo, DSR, Fama-French. The core of the app. |
 | `/api/compare` | POST | Run every strategy on the same inputs → ranked leaderboard |
 | `/api/scan` | GET | Live Signal Scanner: current stance of every strategy + ML per ticker |
-| `/api/chart` | GET | Price + a strategy's indicators + buy/sell markers (Stock Explorer) |
+| `/api/chart` | GET | Price + a strategy's indicators + the exact buy/sell signal dates for one ticker |
 | `/api/regime` | GET | Detect the current market regime from live SPY data |
 | `/api/ml/info` | GET | ML model status, architecture, train/val/test metrics, thresholds |
 | `/api/ml/predictions` | GET | The transformer's live per-ticker forecast (P(up), q10–q90 distribution, vol) |
@@ -279,12 +271,12 @@ python backend/app.py
 ### 4. Open the frontend
 ```bash
 # Option A: open directly — index.html is the landing page;
-# use the nav (Dashboard, Signals, My Bot, …) to reach the app
+# use the nav (Backtest, Tools) to reach the app
 open frontend/index.html
 
 # Option B: local dev server (avoids CORS issues)
 python -m http.server 3000 -d frontend
-# → http://localhost:3000  (dashboard at /dashboard.html)
+# → http://localhost:3000  (Backtester at /backtest.html)
 ```
 
 ### 5. Run the test suite
@@ -304,8 +296,8 @@ All environment variables are **optional** — the app runs out of the box with 
 |---|---|---|
 | `TIINGO_API_KEY` | No (recommended) | Free key from [tiingo.com](https://www.tiingo.com). Primary market-data source — yfinance/Stooq are rate-limited and often blocked on cloud IPs, so set this for reliable backtesting in production. |
 | `PORT` | No | Flask port (default: 5000) |
-| `DATABASE_PATH` | No | SQLite path (default: `backend/alphaglyph.db`). Set to `/data/alphaglyph.db` on Render for persistence. |
 | `CORS_ORIGINS` | No | Allowed CORS origins (default: `*`). Set to your Vercel URL in production. |
+| `KEEPALIVE_SECONDS` | No | Self-ping interval to keep the free Render instance warm (default: 600). `RENDER_EXTERNAL_URL` is set by Render automatically. |
 
 ### Market data sources
 
@@ -321,16 +313,14 @@ AlphaGlyph tries data sources in order: **Tiingo** (if `TIINGO_API_KEY` is set) 
 2. New Web Service → connect repo → root directory: `backend/`
 3. Build: `pip install -r requirements.txt`
 4. Start: `gunicorn app:app` (gunicorn.conf.py auto-discovered)
-5. Environment variables (both optional):
+5. Environment variables (all optional):
 
 | Variable | Value |
 |---|---|
-| `DATABASE_PATH` | `/data/alphaglyph.db` |
+| `TIINGO_API_KEY` | your free Tiingo key (recommended for reliable data) |
 | `CORS_ORIGINS` | `https://your-project.vercel.app` |
 
-`render.yaml` in the repo root configures all of this automatically — Render detects it on import.
-
-**Persistent disk**: Add a Render disk mounted at `/data` — otherwise SQLite is wiped on every deploy. (`render.yaml` declares this disk for you.)
+`render.yaml` in the repo root configures the service automatically — Render detects it on import. **No database or persistent disk is required** — the API is fully stateless.
 
 ### Frontend → Vercel
 
@@ -340,9 +330,8 @@ AlphaGlyph tries data sources in order: **Tiingo** (if `TIINGO_API_KEY` is set) 
 
 ### Deployment notes
 
-- **`workers = 1` is mandatory.** `gunicorn.conf.py` enforces this. Multiple workers = multiple bot threads = duplicate orders against the same simulated account.
-- **Render free tier spins down** after 15 min of inactivity. The bot is **tick-driven** — trading cycles run on incoming requests (dashboard polls + `/health` pings), with the database as the single source of truth for whether it's running. So it self-recovers after any spin-down or worker recycle; **no manual restart needed**. A bundled GitHub Actions cron (`.github/workflows/keepwarm.yml`) pings `/health` every ~10 min to keep the instance awake; for rock-solid uptime also point a free pinger ([cron-job.org](https://cron-job.org) or UptimeRobot) at the same URL. `BOT_AUTOSTART=true` (default) keeps the demo bot on by default.
-- **State persistence**: set `DATABASE_URL` to a free Postgres (Neon/Supabase) so the track record — and an explicit owner *stop* — survive redeploys. On ephemeral SQLite the state resets on each restart and the always-on default takes over.
+- **`workers = 1`** — `gunicorn.conf.py` keeps the in-process rate limiter and the keep-warm self-ping thread consistent; threads handle concurrent requests. The API is stateless, so there's nothing to coordinate across processes.
+- **Render free tier spins down** after 15 min of inactivity. The app pings its own `RENDER_EXTERNAL_URL` (set automatically by Render) every ~10 min from a background thread, which counts as inbound traffic and keeps the instance warm — no external uptime service needed. A bundled GitHub Actions cron (`.github/workflows/keepwarm.yml`) is a backup; for belt-and-suspenders you can also point a free pinger ([cron-job.org](https://cron-job.org)) at `/health`.
 - **Backtest timeouts**: the Render default timeout is 30s; `gunicorn.conf.py` sets `timeout = 120` to accommodate long backtests with many tickers.
 
 ---

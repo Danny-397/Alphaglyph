@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaGlyph — Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body data-page="tools">
+
+  <!-- ── Navigation ─────────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
+      </svg>
+      <span class="nav-brand-name">AlphaGlyph</span>
+      <span class="nav-brand-sub">Strategy Validation Lab</span>
+    </div>
+    <div class="nav-links">
+      <a href="index.html"    class="nav-link">Home</a>
+      <a href="backtest.html" class="nav-link">Backtest</a>
+      <a href="tools.html"    class="nav-link active">Tools</a>
+    </div>
+    <span class="nav-badge">PAPER TRADING</span>
+  </nav>
+
+  <!-- ── Main ───────────────────────────────────────────────────────────── -->
+  <main class="page-wrap" data-page="tools">
+
+    <div class="page-header">
+      <h1>Tools</h1>
+      <p>Two utilities beyond backtesting: a live signal scanner for your watchlist, and a Markowitz portfolio optimizer. Educational, not financial advice.</p>
+    </div>
+
+    <div class="tab-list" style="margin-bottom:16px;">
+      <button class="tab-btn active" data-tab="tab-signals">Signal Scanner</button>
+      <button class="tab-btn" data-tab="tab-portfolio">Portfolio Optimizer</button>
+    </div>
+
+    <!-- ── SIGNAL SCANNER ───────────────────────────────────────────────── -->
+    <div class="tab-panel active" id="tab-signals">
+
+      <div class="card sig-regime" id="sig-regime" style="margin-bottom:16px;">
+        <span class="regime-badge" id="sig-regime-badge">—</span>
+        <span id="sig-regime-desc" style="font-size:13px;color:var(--muted);">Reading the market…</span>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-header" style="display:flex;align-items:center;gap:10px;">
+          Your Watchlist
+          <button class="btn btn-sm" id="sig-scan" style="margin-left:auto;">↻ Rescan</button>
+        </div>
+        <div class="ticker-input-row">
+          <input type="text" id="sig-ticker-input" placeholder="Add a ticker (e.g. AMZN) and press Enter" maxlength="8" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-sm" id="sig-ticker-add">Add</button>
+        </div>
+        <div class="ticker-error" id="sig-ticker-error" hidden></div>
+        <div class="chip-grid" id="sig-tickers" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header" style="display:flex;align-items:center;gap:8px;">
+          Current Signals
+          <span id="sig-updated" style="margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:11px;"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table sig-table">
+            <thead>
+              <tr>
+                <th>Ticker</th><th>Price</th><th>MA Crossover</th><th>RSI</th><th>MACD</th><th>ML Transformer</th><th>Consensus</th>
+              </tr>
+            </thead>
+            <tbody id="sig-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Scanning your watchlist <span class="dots"><span></span><span></span><span></span></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5;">
+          Each strategy's <strong>current stance</strong> on the latest close. The ML cell shows the transformer's signal and its probability of an up-move. Educational, not advice.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── PORTFOLIO OPTIMIZER ──────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-portfolio">
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="section-header">Configure Optimization</div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Tickers (click to toggle)</label>
+            <div class="chip-grid" id="opt-tickers">
+              <div class="ticker-chip selected" data-ticker="AAPL">AAPL</div>
+              <div class="ticker-chip selected" data-ticker="MSFT">MSFT</div>
+              <div class="ticker-chip selected" data-ticker="NVDA">NVDA</div>
+              <div class="ticker-chip selected" data-ticker="GOOGL">GOOGL</div>
+              <div class="ticker-chip selected" data-ticker="TSLA">TSLA</div>
+              <div class="ticker-chip selected" data-ticker="JPM">JPM</div>
+              <div class="ticker-chip selected" data-ticker="SPY">SPY</div>
+            </div>
+          </div>
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
+              <label class="form-label">Start Date</label>
+              <input type="date" id="opt-start">
+            </div>
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
+              <label class="form-label">End Date</label>
+              <input type="date" id="opt-end">
+            </div>
+            <button class="btn btn-primary" id="opt-run-btn" style="flex-shrink:0;padding:9px 24px;">Optimize Portfolio</button>
+          </div>
+          <div id="opt-error" class="error-banner" hidden></div>
+        </div>
+      </div>
+
+      <div id="opt-loading" hidden>
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <strong>Running optimization <span class="dots"><span></span><span></span><span></span></span></strong>
+          <p>Computing efficient frontier and Markowitz weights.</p>
+        </div>
+      </div>
+
+      <div id="opt-results" hidden>
+        <div class="two-col" style="margin-bottom:20px;">
+          <div class="card">
+            <div class="section-header">Efficient Frontier</div>
+            <div class="chart-wrap" style="height:400px;"><canvas id="frontier-chart"></canvas></div>
+            <p class="text-muted" style="margin-top:12px;font-size:12px;line-height:1.6;">
+              Each point is a sampled portfolio. The curve is the efficient frontier — minimum volatility for each return level.
+              <strong style="color:var(--yellow);">★</strong> = max-Sharpe (tangency). <strong style="color:var(--text);">◆</strong> = min-variance.
+            </p>
+          </div>
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="section-header" style="color:var(--yellow);">★ Max-Sharpe Portfolio</div>
+              <div id="max-sharpe-stats" style="margin-bottom:16px;"></div>
+              <div id="max-sharpe-weights"></div>
+            </div>
+            <div class="card">
+              <div class="section-header">◆ Min-Variance Portfolio</div>
+              <div id="min-var-stats" style="margin-bottom:16px;"></div>
+              <div id="min-var-weights"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">Correlation Matrix</div>
+          <p class="text-muted" style="font-size:12px;margin-bottom:16px;">
+            Pairwise Pearson correlation of daily returns. Deep green = high positive correlation, deep red = negative.
+          </p>
+          <div class="table-wrap" id="corr-matrix"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

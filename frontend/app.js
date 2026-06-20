@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   AlphaGlyph — Autonomous Trading Bot — app.js
+   AlphaGlyph — Strategy Validation Lab — app.js
    Vanilla JS · Chart.js 4 · No frameworks
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -66,9 +66,9 @@ const REGIME_COLORS = {
   HIGH_VOLATILITY: '#e3913b',
 }
 
-// AlphaGlyph's whole point: the bot shows its work. Every trade is turned into a
-// plain-English reason a beginner can follow — what the strategy saw, in what
-// market, and why it acted. Used by the live dashboard and the My Bot sandbox.
+// Every trade is turned into a plain-English reason a beginner can follow — what
+// the strategy saw, in which market regime, and why it acted. Used by the
+// backtest trades table and the animated replay.
 const REGIME_PHRASE = {
   TRENDING_UP:     'an up-trending market',
   TRENDING_DOWN:   'a down-trending market',
@@ -123,7 +123,7 @@ function setConn(reachable) {
     b = document.createElement('div')
     b.id = 'conn-banner'
     b.className = 'conn-banner'
-    b.innerHTML = '<span class="conn-dot"></span> Waking the bot up — the free server sleeps after inactivity and takes ~30s to start. Retrying automatically…'
+    b.innerHTML = '<span class="conn-dot"></span> Waking the server up — the free instance sleeps after inactivity and takes ~30s to start. Retrying automatically…'
     document.body.appendChild(b)
   }
   b.classList.add('show')
@@ -316,268 +316,6 @@ function makeRuleBuilder(container) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  DASHBOARD
-// ════════════════════════════════════════════════════════════════════════════
-function initDashboard() {
-  let seChart = null    // Stock Explorer price chart
-  let seSub   = null    // Stock Explorer indicator sub-chart
-
-  // ── Live market regime (stateless — /api/regime) ───────────────────────
-  async function loadRegime() {
-    const r = await api('/api/regime')
-    const badge = el('regime-badge')
-    if (!badge || !r || r.error) return
-    badge.textContent = (r.label || r.regime || 'UNKNOWN').toUpperCase()
-    badge.className   = 'regime-badge ' + (r.regime || '')
-    el('regime-description').textContent = r.description || ''
-    el('ri-adx').textContent = r.adx     != null ? fmtN(r.adx, 1)          : '—'
-    el('ri-vol').textContent = r.vol_30d != null ? fmtN(r.vol_30d, 1) + '%' : '—'
-    el('ri-bbw').textContent = r.bb_width != null ? fmtN(r.bb_width, 4)    : '—'
-    el('regime-strategy').textContent = STRATEGY_LABELS[r.strategy] || r.strategy || '—'
-  }
-  loadRegime()
-  setInterval(loadRegime, 120000)
-
-  // ── Watchlist → Stock Explorer ticker options ──────────────────────────
-  api('/api/watchlist').then(w => {
-    if (!Array.isArray(w) || !w.length) return
-    const sel = el('se-ticker')
-    if (sel) {
-      sel.innerHTML = w.map(t => `<option value="${t}">${t}</option>`).join('')
-      loadExplorer()
-    }
-  })
-
-  // ── ML Transformer live forecasts ──────────────────────────────────────
-  // Loaded once on open (and on manual refresh), NOT in the 10s poll — the
-  // model output only changes on new daily bars and inference is comparatively
-  // expensive, so a 30-min server cache backs it.
-  async function loadMlInsights() {
-    const card  = el('ml-insights')
-    const tbody = el('ml-tbody')
-    if (!card || !tbody) return
-    const info = await api('/api/ml/info')
-    if (!info || !info.loaded) { card.hidden = true; return }   // no model → hide
-    card.hidden = false
-    el('ml-meta').textContent = `v${info.version} · ${Number(info.n_params || 0).toLocaleString()} params` +
-      (info.test_metrics?.auc ? ` · test AUC ${info.test_metrics.auc}` : '')
-    if (info.horizon) el('ml-horizon').textContent = info.horizon
-
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Running the transformer <span class="dots"><span></span><span></span><span></span></span></td></tr>`
-    const data = await api('/api/ml/predictions')
-    const preds = (data && data.predictions || []).filter(p => p.available)
-    if (!preds.length) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Forecasts momentarily unavailable — try refresh.</td></tr>`
-      return
-    }
-
-    // Shared domain so every row's distribution bar is comparable.
-    const lo = Math.min(...preds.map(p => p.quantiles.q10))
-    const hi = Math.max(...preds.map(p => p.quantiles.q90))
-    const span = (hi - lo) || 1
-    const pos = v => ((v - lo) / span) * 100   // % position within the track
-    const zero = pos(0)
-
-    tbody.innerHTML = preds.map(p => {
-      const q = p.quantiles
-      const pUp = Math.round(p.p_up * 100)
-      const upClr = p.p_up >= 0.55 ? 'positive' : p.p_up <= 0.45 ? 'negative' : ''
-      const sigCls = p.signal === 'BUY' ? 'badge-buy' : p.signal === 'SELL' ? 'badge-sell' : ''
-      const bandClr = q.q50 >= 0 ? 'pos' : 'neg'
-      return `<tr data-ticker="${p.ticker}" class="ml-row" title="Open ${p.ticker} in the Stock Explorer">
-        <td><strong>${p.ticker}</strong><div class="ml-px">${fmt$(p.price)}</div></td>
-        <td>
-          <div class="ml-prob"><div class="ml-prob-fill ${upClr}" style="width:${pUp}%"></div></div>
-          <div class="ml-prob-val ${upClr}">${pUp}%</div>
-        </td>
-        <td>
-          <div class="ml-dist">
-            <div class="ml-dist-zero" style="left:${zero}%"></div>
-            <div class="ml-dist-band ${bandClr}" style="left:${pos(q.q10)}%;width:${pos(q.q90) - pos(q.q10)}%"></div>
-            <div class="ml-dist-iqr ${bandClr}" style="left:${pos(q.q25)}%;width:${pos(q.q75) - pos(q.q25)}%"></div>
-            <div class="ml-dist-med" style="left:${pos(q.q50)}%"></div>
-          </div>
-          <div class="ml-dist-scale"><span>${fmtPct(q.q10, 1)}</span><span>${fmtPct(q.q90, 1)}</span></div>
-        </td>
-        <td class="${clr(q.q50)}"><strong>${fmtPct(q.q50, 1)}</strong></td>
-        <td><span class="badge ${sigCls}">${p.signal}</span></td>
-      </tr>`
-    }).join('')
-
-    // Click a forecast row to inspect that stock in the Stock Explorer below.
-    tbody.querySelectorAll('tr[data-ticker]').forEach(tr => tr.addEventListener('click', () => {
-      const sel = el('se-ticker')
-      if (sel && [...sel.options].some(o => o.value === tr.dataset.ticker)) {
-        sel.value = tr.dataset.ticker
-        loadExplorer()
-        el('stock-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    }))
-  }
-
-  const mlRefresh = el('ml-refresh')
-  if (mlRefresh) mlRefresh.addEventListener('click', loadMlInsights)
-  // Kick off the ML panel, then offer the first-visit tour once layout settles.
-  loadMlInsights().then(() => setTimeout(maybeStartTour, 500))
-
-  // ── Stock Explorer: see what a strategy sees on any stock ──────────────
-  enableMlOption(el('se-strategy'))
-  const seTicker = el('se-ticker'), seStrategy = el('se-strategy')
-  if (seTicker)   seTicker.addEventListener('change', loadExplorer)
-  if (seStrategy) seStrategy.addEventListener('change', loadExplorer)
-
-  async function loadExplorer() {
-    const ticker = el('se-ticker')?.value
-    const strat  = el('se-strategy')?.value || 'ma_crossover'
-    if (!ticker) return
-    const empty = el('se-empty')
-    const data = await api(`/api/chart?ticker=${encodeURIComponent(ticker)}&strategy=${strat}`)
-    if (!data || data.error || !(data.series || []).length) {
-      seChart = destroyChart(seChart); seSub = destroyChart(seSub)
-      el('se-sub-wrap').hidden = true
-      if (empty) { empty.textContent = `No chart data for ${ticker}.`; empty.hidden = false }
-      return
-    }
-    if (empty) empty.hidden = true
-    renderExplorer(data)
-  }
-
-  function renderExplorer(d) {
-    const labels = d.series.map(s => s.date)
-    const buyMap = {}, sellMap = {}
-    d.signals.forEach(s => { (s.action === 'BUY' ? buyMap : sellMap)[s.date] = s.price })
-
-    const datasets = [{
-      label: 'Price', data: d.series.map(s => s.close),
-      borderColor: '#e9efeb', borderWidth: 1.6, fill: false, tension: 0.15, pointRadius: 0, order: 3,
-    }]
-    if (d.strategy === 'ma_crossover') {
-      datasets.push({ label: 'SMA 20', data: d.series.map(s => s.sma20 ?? null), borderColor: '#3fb950', borderWidth: 1.3, fill: false, pointRadius: 0, spanGaps: true, order: 2 })
-      datasets.push({ label: 'SMA 50', data: d.series.map(s => s.sma50 ?? null), borderColor: '#e3b341', borderWidth: 1.3, fill: false, pointRadius: 0, spanGaps: true, order: 2 })
-    }
-    datasets.push({ label: '▲ Buy',  data: labels.map(x => buyMap[x]  ?? null), showLine: false, pointStyle: 'triangle', pointRadius: 8, pointBackgroundColor: '#3fb950', pointBorderColor: '#0b0e0c', pointBorderWidth: 1, order: 1 })
-    datasets.push({ label: '▼ Sell', data: labels.map(x => sellMap[x] ?? null), showLine: false, pointStyle: 'triangle', rotation: 180, pointRadius: 8, pointBackgroundColor: '#f85149', pointBorderColor: '#0b0e0c', pointBorderWidth: 1, order: 1 })
-
-    seChart = destroyChart(seChart)
-    seChart = new Chart(el('se-chart').getContext('2d'), {
-      type: 'line',
-      data: { labels, datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
-          tooltip: { callbacks: { label: c => c.parsed.y == null ? null : ' ' + c.dataset.label + ': ' + fmt$(c.parsed.y) } },
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } },
-          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + v } },
-        },
-      },
-    })
-
-    // Indicator sub-chart for oscillators that don't share the price scale.
-    const subWrap = el('se-sub-wrap')
-    seSub = destroyChart(seSub)
-    if (d.strategy === 'rsi') {
-      subWrap.hidden = false
-      seSub = new Chart(el('se-subchart').getContext('2d'), {
-        type: 'line',
-        data: { labels, datasets: [
-          { label: 'RSI(14)', data: d.series.map(s => s.rsi14 ?? null), borderColor: '#d2a8ff', borderWidth: 1.5, pointRadius: 0, spanGaps: true },
-          { label: '70', data: labels.map(() => 70), borderColor: 'rgba(248,81,73,0.5)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0 },
-          { label: '30', data: labels.map(() => 30), borderColor: 'rgba(63,185,80,0.5)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0 },
-        ] },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { enabled: false } },
-          scales: { x: { display: false }, y: { min: 0, max: 100, ticks: { stepSize: 50 }, grid: { color: 'rgba(36,48,42,0.4)' } } },
-        },
-      })
-    } else if (d.strategy === 'macd') {
-      subWrap.hidden = false
-      seSub = new Chart(el('se-subchart').getContext('2d'), {
-        data: { labels, datasets: [
-          { type: 'bar', label: 'Histogram', data: d.series.map(s => s.macd_hist ?? null), backgroundColor: d.series.map(s => (s.macd_hist >= 0 ? 'rgba(63,185,80,0.5)' : 'rgba(248,81,73,0.5)')) },
-          { type: 'line', label: 'MACD', data: d.series.map(s => s.macd_line ?? null), borderColor: '#58a6ff', borderWidth: 1.4, pointRadius: 0, spanGaps: true },
-          { type: 'line', label: 'Signal', data: d.series.map(s => s.macd_signal ?? null), borderColor: '#e3b341', borderWidth: 1.4, pointRadius: 0, spanGaps: true },
-        ] },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { enabled: false } },
-          scales: { x: { display: false }, y: { grid: { color: 'rgba(36,48,42,0.4)' } } },
-        },
-      })
-    } else {
-      subWrap.hidden = true
-    }
-
-    const nb = d.signals.filter(s => s.action === 'BUY').length
-    const ns = d.signals.filter(s => s.action === 'SELL').length
-    el('se-legend').innerHTML =
-      `<span style="color:var(--green);">▲ ${nb}</span> · <span style="color:var(--red);">▼ ${ns}</span> signals · 1y`
-  }
-
-  // ── First-visit guided tour (coachmarks) ───────────────────────────────
-  function maybeStartTour() {
-    if (localStorage.getItem('tb_tour_done')) return
-    startTour()
-  }
-
-  function startTour() {
-    const steps = [
-      { sel: '#sandbox-live', title: 'A bot trading live',
-        body: 'This is a real bot running in your browser — it trades on real prices and explains every move in plain English.' },
-      { sel: '#ml-insights', title: 'Watch the AI think',
-        body: 'The ML transformer’s live forecasts: the odds of an up-move and a full return distribution for each stock.' },
-      { sel: '#stock-explorer', title: 'See what it sees',
-        body: 'Pick any stock and strategy to see the price, its indicators, and exactly where it would buy or sell.' },
-    ].filter(s => { const e = document.querySelector(s.sel); return e && e.offsetParent !== null })
-    if (!steps.length) { localStorage.setItem('tb_tour_done', '1'); return }
-
-    let i = 0, curEl = null
-    const tip = document.createElement('div')
-    tip.className = 'tour-tip'
-    document.body.appendChild(tip)
-
-    function cleanup() {
-      if (curEl) curEl.classList.remove('tour-highlight')
-      tip.remove()
-      localStorage.setItem('tb_tour_done', '1')
-    }
-    function show() {
-      if (curEl) curEl.classList.remove('tour-highlight')
-      const st = steps[i]
-      const e = document.querySelector(st.sel)
-      if (!e) return cleanup()
-      curEl = e
-      e.classList.add('tour-highlight')
-      e.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      tip.innerHTML =
-        `<div class="tour-tip-title">${st.title}</div>` +
-        `<div class="tour-tip-body">${st.body}</div>` +
-        `<div class="tour-tip-foot">` +
-          `<button class="tour-tip-skip" id="tour-skip">Skip</button>` +
-          `<span>${i + 1} / ${steps.length}</span>` +
-          `<button class="btn btn-sm btn-primary" id="tour-next" style="margin-left:10px;">${i === steps.length - 1 ? 'Got it' : 'Next'}</button>` +
-        `</div>`
-      requestAnimationFrame(() => {
-        const r = e.getBoundingClientRect()
-        const tr = tip.getBoundingClientRect()
-        let top = r.bottom + 12
-        if (top + tr.height > window.innerHeight - 12) top = Math.max(66, r.top - tr.height - 12)
-        const left = Math.min(Math.max(12, r.left), window.innerWidth - tr.width - 12)
-        tip.style.top = top + 'px'
-        tip.style.left = left + 'px'
-      })
-      el('tour-next').onclick = () => { i++; (i >= steps.length) ? cleanup() : show() }
-      el('tour-skip').onclick = cleanup
-    }
-    show()
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 //  BACKTEST
 // ════════════════════════════════════════════════════════════════════════════
 function initBacktest() {
@@ -586,6 +324,82 @@ function initBacktest() {
   let ff3Chart = null
   let cmpChart = null
   let btRules  = null   // custom rule builder (lazy)
+  let lastResult  = null   // latest backtest result, for the replay
+  let replayChart = null
+  let replayTimer = null
+
+  // ── Animated replay of the last backtest ───────────────────────────────
+  function resetReplay() {
+    clearInterval(replayTimer); replayTimer = null
+    replayChart = destroyChart(replayChart)
+    const feed = el('bt-replay-feed')
+    if (feed) feed.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">Press Play to replay the run.</div>'
+    const btn = el('bt-replay-btn')
+    if (btn) btn.textContent = '▶ Play'
+  }
+
+  function pushReplayTrade(t) {
+    const feed = el('bt-replay-feed')
+    if (!feed.querySelector('.sb-feed-item')) feed.innerHTML = ''
+    const isBuy = t.action === 'BUY'
+    const pnl = (t.action === 'SELL' && t.pnl != null)
+      ? `<span class="sb-feed-pnl ${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
+    const item = document.createElement('div')
+    item.className = 'sb-feed-item'
+    item.innerHTML =
+      `<div class="sb-feed-row"><span class="sb-feed-time">${t.date}</span>` +
+      `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
+      `<span class="sb-feed-tkr">${t.ticker}</span>` +
+      `<span class="sb-feed-trade">${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>${pnl}</div>` +
+      `<div class="sb-feed-why">${tradeWhy(t)}</div>`
+    feed.insertBefore(item, feed.firstChild)
+    while (feed.children.length > 150) feed.removeChild(feed.lastChild)
+  }
+
+  function startReplay() {
+    const d = lastResult
+    const curve = (d && d.equity_curve) || []
+    if (!curve.length) return
+    const spyMap = {}; (d.spy_curve || []).forEach(p => { spyMap[p.date] = p.value })
+    const trades = (d.trades || []).slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    let cursor = 0, tp = 0
+    el('bt-replay-feed').innerHTML = ''
+    replayChart = destroyChart(replayChart)
+    replayChart = new Chart(el('bt-replay-chart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Strategy', data: [], borderColor: '#3fb950', borderWidth: 2, backgroundColor: 'rgba(63,185,80,0.07)', fill: true, tension: 0.2, pointRadius: 0 },
+        { label: 'SPY', data: [], borderColor: '#e3b341', borderWidth: 1.5, borderDash: [4, 4], fill: false, tension: 0.2, pointRadius: 0, spanGaps: true },
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } } },
+        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } }, y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } } },
+      },
+    })
+    el('bt-replay-btn').textContent = '⏸ Pause'
+    const SP = { slow: { d: 1, ms: 200 }, normal: { d: 1, ms: 60 }, fast: { d: 5, ms: 30 } }
+    const sp = SP[el('bt-replay-speed').value] || SP.normal
+    replayTimer = setInterval(() => {
+      for (let k = 0; k < sp.d && cursor < curve.length; k++) {
+        const date = curve[cursor].date
+        while (tp < trades.length && trades[tp].date <= date) { pushReplayTrade(trades[tp]); tp++ }
+        cursor++
+      }
+      const slice = curve.slice(0, cursor)
+      replayChart.data.labels = slice.map(p => p.date)
+      replayChart.data.datasets[0].data = slice.map(p => p.value)
+      replayChart.data.datasets[1].data = slice.map(p => (spyMap[p.date] != null ? spyMap[p.date] : null))
+      replayChart.update('none')
+      if (cursor >= curve.length) { clearInterval(replayTimer); replayTimer = null; el('bt-replay-btn').textContent = '↻ Replay' }
+    }, sp.ms)
+  }
+
+  const replayBtn = el('bt-replay-btn')
+  if (replayBtn) replayBtn.addEventListener('click', () => {
+    if (replayTimer) { clearInterval(replayTimer); replayTimer = null; replayBtn.textContent = '▶ Play'; return }
+    startReplay()
+  })
 
   el('bt-start').value = daysAgo(365)
   el('bt-end').value   = today()
@@ -883,6 +697,8 @@ function initBacktest() {
 
   function renderResults(data) {
     const m = data.metrics || {}
+    lastResult = data
+    resetReplay()
 
     const wfb = el('wf-banner')
     if (data.walk_forward?.enabled && data.walk_forward.split_date) {
@@ -1385,605 +1201,6 @@ function initPortfolio() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  SANDBOX — "Run Your Own Bot"
-//  A personal paper-trading bot that lives entirely in the visitor's browser.
-//  It reuses the REAL server strategy engine (/api/backtest) so the signals,
-//  risk management, regime adaptation, Kelly sizing and ML transformer are
-//  identical to the live bot — then plays the result back day-by-day as a live
-//  bot the user owns. No server-side per-user state; it can never "stop".
-// ════════════════════════════════════════════════════════════════════════════
-function initSandbox() {
-  const LS_KEY = 'ag_sandbox_v2'
-  // On the dashboard this same engine runs an auto-launched demo bot (no
-  // builder, no persistence), so visitors land on a bot already trading.
-  const IS_DASHBOARD = document.body.dataset.page === 'dashboard'
-
-  const SPEEDS = {
-    slow:    { days: 1,    ms: 220 },
-    normal:  { days: 1,    ms: 70  },
-    fast:    { days: 5,    ms: 40  },
-    instant: { days: 1e9,  ms: 0   },
-  }
-
-  // ── Run state ──
-  let timeline = []          // [{date, value}] — authoritative portfolio value
-  let trades   = []          // chronologically sorted BUY/SELL events
-  let spyByDate = {}         // date -> SPY buy&hold value (same starting capital)
-  let cursor = 0             // index into timeline (trading days elapsed)
-  let tradePtr = 0           // next trade to reveal
-  let cash = 0, capital = 0
-  let positions = {}         // ticker -> {shares, entry, date, strategy}
-  let closed = []            // realised pnl per closed trade
-  let best = null, worst = null
-  let lastRegime = '—', lastSpy = 0
-  let stratLabel = '—'
-  let speed = 'normal'
-  let playing = false, timer = null, chart = null
-
-  // ── Config form ──
-  let tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
-  const configCard  = el('sandbox-config')
-  const livePanel   = el('sandbox-live')
-  const tickerInput = el('sb-ticker-input')
-  const tickerAdd   = el('sb-ticker-add')
-  const tickerErr   = el('sb-ticker-error')
-
-  if (IS_DASHBOARD && configCard) configCard.hidden = true   // demo: no builder
-
-  enableMlOption(el('sb-strategy'))
-
-  // Dip Buyer is patient (only buys near 52-week lows), so steer it to a window
-  // long enough to actually contain dips.
-  let sbRules = null   // custom rule builder (lazy)
-  function applyStrategyHints() {
-    const strat = el('sb-strategy').value
-    const note  = el('sb-strategy-note')
-    const isDip = strat === 'dip_buyer'
-    if (isDip) el('sb-window').value = '730'
-    if (note) {
-      note.hidden = !isDip
-      if (isDip) note.innerHTML =
-        '🪙 <strong>Dip Buyer</strong> is a patient value strategy — it only buys stocks near their ' +
-        '52-week low and keeps cash in reserve for the next one. Window set to <strong>2 years</strong> so it has dips to act on.'
-    }
-    const rb = el('sb-rule-builder')
-    if (rb) {
-      const isCustom = strat === 'custom'
-      rb.hidden = !isCustom
-      if (isCustom && !sbRules) sbRules = makeRuleBuilder(rb)
-    }
-  }
-  el('sb-strategy').addEventListener('change', applyStrategyHints)
-  applyStrategyHints()
-
-  // First-run 3-step primer (dismissible, remembered)
-  const primer = el('sb-primer')
-  if (primer && !localStorage.getItem('sb_primer_dismissed')) {
-    primer.hidden = false
-    const close = el('sb-primer-close')
-    if (close) close.addEventListener('click', () => {
-      primer.hidden = true
-      localStorage.setItem('sb_primer_dismissed', '1')
-    })
-  }
-
-  // ── One-click preset bots (zero-config launch) ─────────────────────────
-  const PRESETS = [
-    { icon: '🧠', name: 'AI Transformer Bot', desc: 'Trades on a machine-learning return forecast',
-      strategy: 'ml',       risk: 'moderate',     tickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'TSLA'] },
-    { icon: '🌦️', name: 'All-Weather Adaptive', desc: 'Auto-switches strategy to fit the market regime',
-      strategy: 'adaptive', risk: 'moderate',     tickers: ['SPY', 'AAPL', 'MSFT', 'NVDA', 'JPM'] },
-    { icon: '🚀', name: 'Momentum Chaser', desc: 'Rides strong trends with MACD on rising volume',
-      strategy: 'macd',     risk: 'aggressive',   tickers: ['NVDA', 'TSLA', 'AAPL', 'AMD'] },
-    { icon: '🪙', name: 'Bargain Hunter', desc: 'Buys oversold dips, trims overbought rips (RSI)',
-      strategy: 'rsi',      risk: 'conservative', tickers: ['SPY', 'MSFT', 'JPM', 'KO'] },
-  ]
-
-  function renderPresets() {
-    const grid = el('preset-grid')
-    if (!grid) return
-    grid.innerHTML = PRESETS.map((p, i) => `
-      <button class="preset-card" data-i="${i}" type="button">
-        <span class="preset-icon">${p.icon}</span>
-        <span class="preset-name">${p.name}</span>
-        <span class="preset-desc">${p.desc}</span>
-        <span class="preset-go">Launch →</span>
-      </button>`).join('')
-    grid.querySelectorAll('.preset-card').forEach(c =>
-      c.addEventListener('click', () => applyPreset(PRESETS[+c.dataset.i])))
-  }
-
-  function applyPreset(p) {
-    const sel = el('sb-strategy')
-    const opt = sel.querySelector(`option[value="${p.strategy}"]`)
-    if (opt) opt.disabled = false            // ensure ML is selectable even mid-load
-    sel.value = p.strategy
-    el('sb-capital').value = 100000
-    el('sb-window').value = '365'
-    el('sb-risk-btns').querySelectorAll('.risk-btn')
-      .forEach(b => b.classList.toggle('active', b.dataset.risk === p.risk))
-    tickers = [...p.tickers]
-    renderChips()
-    launch()
-  }
-
-  renderPresets()
-
-  function renderChips() {
-    const box = el('sb-tickers')
-    if (!tickers.length) {
-      box.innerHTML = '<span style="font-size:12px;color:var(--muted);">No stocks added yet.</span>'
-      return
-    }
-    box.innerHTML = tickers.map(t =>
-      `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`
-    ).join('')
-    box.querySelectorAll('.chip-x').forEach(b =>
-      b.addEventListener('click', () => { tickers = tickers.filter(x => x !== b.dataset.ticker); renderChips() }))
-  }
-
-  async function addTicker() {
-    const sym = (tickerInput.value || '').trim().toUpperCase()
-    tickerErr.hidden = true
-    if (!sym) return
-    if (tickers.includes(sym)) { tickerInput.value = ''; return }
-    tickerAdd.disabled = true; tickerAdd.textContent = '…'
-    const res = await api('/api/validate_ticker?symbol=' + encodeURIComponent(sym))
-    tickerAdd.disabled = false; tickerAdd.textContent = 'Add'
-    if (res && res.status === 'valid') {
-      tickers.push(res.symbol); renderChips(); tickerInput.value = ''; tickerInput.focus()
-    } else if (res && res.status === 'rate_limited') {
-      tickerErr.textContent = 'Couldn’t verify "' + sym + '" right now — try again in a moment.'; tickerErr.hidden = false
-    } else {
-      tickerErr.textContent = '"' + sym + '" doesn’t exist. Enter a valid ticker symbol.'; tickerErr.hidden = false; tickerInput.select()
-    }
-  }
-
-  tickerAdd.addEventListener('click', addTicker)
-  tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTicker() } })
-  renderChips()
-
-  el('sb-risk-btns').querySelectorAll('.risk-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      el('sb-risk-btns').querySelectorAll('.risk-btn').forEach(b => b.classList.remove('active'))
-      btn.classList.add('active')
-    })
-  })
-
-  function showErr(msg) {
-    const e = el('sb-error'); if (e) { e.textContent = msg; e.hidden = false }
-    // On the dashboard the builder is hidden, so surface failures in the loader.
-    const dl = el('sb-demo-loading')
-    if (IS_DASHBOARD && dl) dl.textContent = msg
-  }
-
-  // ── Launch: run the real engine, then start playback ──
-  el('sb-launch').addEventListener('click', launch)
-
-  async function launch() {
-    if (!tickers.length) { showErr('Add at least one stock to trade.'); return }
-    capital = Math.max(1000, parseFloat(el('sb-capital').value) || 100000)
-    const windowDays = parseInt(el('sb-window').value, 10) || 365
-    const riskEl = el('sb-risk-btns').querySelector('.risk-btn.active')
-    const strategy = el('sb-strategy').value
-    speed = el('sb-speed').value
-    stratLabel = STRATEGY_LABELS[strategy] || strategy
-
-    const payload = {
-      strategy,
-      tickers: [...tickers],
-      start_date: daysAgo(windowDays),
-      end_date: today(),
-      initial_capital: capital,
-      risk_tolerance: riskEl ? riskEl.dataset.risk : 'moderate',
-      commission_pct: 0.001,
-      slippage_pct: 0.0005,
-      range_sizing: !!el('sb-range-sizing')?.checked,
-      ...(strategy === 'custom' && sbRules ? { custom_rules: sbRules.getRules() } : {}),
-    }
-
-    el('sb-error').hidden = true
-    el('sb-loading').hidden = false
-    el('sb-launch').disabled = true
-    const data = await api('/api/backtest', { method: 'POST', body: JSON.stringify(payload) })
-    el('sb-loading').hidden = true
-    el('sb-launch').disabled = false
-
-    if (!data || data.error) {
-      showErr(data?.error || 'Could not reach the bot — the free server may be waking up (~30s). Try again in a moment.')
-      return
-    }
-    if (!data.equity_curve || !data.equity_curve.length) {
-      showErr('Not enough price data for those stocks and window. Try different tickers or a longer history.')
-      return
-    }
-    loadRun({
-      timeline:   data.equity_curve,
-      trades:     data.trades || [],
-      spy:        data.spy_curve || [],
-      capital,
-      speed,
-      stratLabel,
-      cursor: 0,
-    })
-    play()
-    save()
-  }
-
-  // ── (Re)hydrate a run into memory and show the live panel ──
-  function loadRun(run) {
-    timeline   = run.timeline
-    capital    = run.capital
-    speed      = run.speed || 'normal'
-    stratLabel = run.stratLabel || '—'
-    trades = run.trades.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-    spyByDate = {}
-    run.spy.forEach(p => { spyByDate[p.date] = p.value })
-
-    el('sb-strategy-label').textContent = stratLabel
-    el('sb-speed').value = speed
-    el('sb-speed-live').value = speed
-
-    resetState()
-    // fast-forward (no animation) to the saved cursor
-    const target = Math.min(run.cursor || 0, timeline.length - 1)
-    while (cursor < target) { cursor++; applyTradesUpTo(timeline[cursor].date) }
-
-    configCard.hidden = true
-    const presetsEl = el('sandbox-presets')
-    if (presetsEl) presetsEl.hidden = true
-    const demoLoading = el('sb-demo-loading')
-    if (demoLoading) demoLoading.hidden = true
-    livePanel.hidden = false
-    buildChart()
-    renderAll()
-    pause()
-  }
-
-  function resetState() {
-    cursor = 0; tradePtr = 0; cash = capital
-    positions = {}; closed = []; best = null; worst = null
-    lastRegime = '—'; lastSpy = capital
-    clearFeed()
-    applyTradesUpTo(timeline[0].date)   // reveal day-zero trades
-  }
-
-  // ── Trade application (reconstructs cash & open positions exactly) ──
-  function applyTradesUpTo(dateStr) {
-    while (tradePtr < trades.length && trades[tradePtr].date <= dateStr) {
-      applyTrade(trades[tradePtr]); tradePtr++
-    }
-  }
-
-  function applyTrade(t) {
-    const cost = t.cost || 0
-    if (t.action === 'BUY') {
-      cash -= t.price * t.shares + cost
-      positions[t.ticker] = { shares: t.shares, entry: t.price, date: t.date, strategy: t.strategy }
-    } else {
-      cash += t.price * t.shares - cost
-      delete positions[t.ticker]
-      if (t.pnl != null) {
-        closed.push(t.pnl)
-        if (best  == null || t.pnl > best)  best  = t.pnl
-        if (worst == null || t.pnl < worst) worst = t.pnl
-      }
-    }
-    if (t.regime) lastRegime = t.regime
-    pushFeed(t)
-  }
-
-  // ── Playback loop ──
-  function step() {
-    const conf = SPEEDS[speed]
-    const advance = speed === 'instant' ? timeline.length : conf.days
-    for (let k = 0; k < advance && cursor < timeline.length - 1; k++) {
-      cursor++
-      applyTradesUpTo(timeline[cursor].date)
-    }
-    renderAll()
-    save()
-    if (cursor >= timeline.length - 1) finish()
-  }
-
-  function play() {
-    const v = el('sb-verdict'); if (v) v.hidden = true
-    if (cursor >= timeline.length - 1) resetState()   // at the end → replay
-    playing = true
-    el('sb-playpause').textContent = '⏸ Pause'
-    el('sb-dot').className = 'dot dot-green'
-    el('sb-state-text').textContent = 'YOUR BOT IS LIVE'
-    clearInterval(timer)
-    if (speed === 'instant') { step() }
-    else { timer = setInterval(step, SPEEDS[speed].ms) }
-    renderAll()
-  }
-
-  function pause() {
-    playing = false
-    clearInterval(timer); timer = null
-    el('sb-playpause').textContent = '⏵ Resume'
-    el('sb-dot').className = 'dot dot-yellow'
-    el('sb-state-text').textContent = 'PAUSED'
-  }
-
-  function finish() {
-    playing = false
-    clearInterval(timer); timer = null
-    el('sb-dot').className = 'dot dot-green'
-    el('sb-state-text').textContent = 'CAUGHT UP TO TODAY'
-    el('sb-playpause').textContent = '↻ Replay'
-    showVerdict()
-  }
-
-  // Plain-English wrap-up of how the bot did — closes the loop satisfyingly.
-  function showVerdict() {
-    const v = el('sb-verdict'); if (!v) return
-    const finalVal = timeline[timeline.length - 1].value
-    const ret   = (finalVal - capital) / capital * 100
-    const spyRet = lastSpy ? (lastSpy - capital) / capital * 100 : null
-    const vs    = spyRet != null ? ret - spyRet : null
-    const wins  = closed.filter(p => p > 0).length
-    const wr    = closed.length ? Math.round(wins / closed.length * 100) : null
-    const sells = trades.filter(t => t.action === 'SELL' && t.pnl != null)
-    let bestT = null
-    sells.forEach(t => { if (!bestT || t.pnl > bestT.pnl) bestT = t })
-
-    el('sb-verdict-headline').innerHTML =
-      `${ret >= 0 ? '📈' : '📉'} ${stratLabel}: ${fmt$(capital)} → <strong>${fmt$(finalVal)}</strong> ` +
-      `<span class="${clr(ret)}">(${fmtPct(ret)})</span>`
-
-    let s
-    if (!closed.length) {
-      s = `Over ${timeline.length} trading days this strategy found no trades that met its rules on ` +
-          `these stocks — a real, honest outcome (it stays in cash rather than forcing bad trades). ` +
-          `Try another preset, different stocks, or a longer window.`
-    } else {
-      s = `Over ${timeline.length} trading days your bot made <strong>${closed.length}</strong> ` +
-          `completed trade${closed.length === 1 ? '' : 's'}`
-      if (wr != null) s += ` with a <strong>${wr}%</strong> win rate`
-      s += '. '
-      if (vs != null) {
-        s += vs >= 0
-          ? `It <strong class="positive">beat</strong> buy-and-hold (SPY) by <strong>${fmtPct(vs)}</strong>. `
-          : `It <strong class="negative">trailed</strong> buy-and-hold by <strong>${fmtPct(Math.abs(vs))}</strong>. `
-      }
-      if (bestT) s += `Best call: <strong>${bestT.ticker}</strong> for ${fmt$(bestT.pnl)}.`
-    }
-    el('sb-verdict-text').innerHTML = s
-    v.hidden = false
-  }
-
-  // ── Controls ──
-  el('sb-playpause').addEventListener('click', () => { playing ? pause() : play() })
-  el('sb-restart').addEventListener('click', () => { resetState(); renderAll(); play() })
-  el('sb-speed-live').addEventListener('change', e => {
-    speed = e.target.value
-    if (playing) play()    // restart timer at new cadence
-  })
-  function reconfigure() {
-    if (IS_DASHBOARD) { location.href = 'sandbox.html'; return }   // build on the full page
-    pause()
-    localStorage.removeItem(LS_KEY)
-    const v = el('sb-verdict'); if (v) v.hidden = true
-    livePanel.hidden = true
-    configCard.hidden = false
-    const presetsEl = el('sandbox-presets')
-    if (presetsEl) presetsEl.hidden = false
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-  el('sb-reconfigure').addEventListener('click', reconfigure)
-  el('sb-verdict-new').addEventListener('click', reconfigure)
-  el('sb-verdict-again').addEventListener('click', () => { resetState(); renderAll(); play() })
-
-  // ── Shareable bot link ─────────────────────────────────────────────────
-  el('sb-share').addEventListener('click', async () => {
-    const riskEl = el('sb-risk-btns').querySelector('.risk-btn.active')
-    const params = new URLSearchParams({
-      strategy: el('sb-strategy').value,
-      risk:     riskEl ? riskEl.dataset.risk : 'moderate',
-      capital:  String(Math.round(capital || 100000)),
-      window:   el('sb-window').value,
-      tickers:  tickers.join(','),
-    })
-    const url = `${location.origin}${location.pathname}?${params.toString()}`
-    const btn = el('sb-share')
-    const restore = () => { btn.textContent = '🔗 Share' }
-    try {
-      await navigator.clipboard.writeText(url)
-      btn.textContent = '✓ Link copied!'
-      setTimeout(restore, 1800)
-    } catch (_) {
-      window.prompt('Copy your bot link:', url)
-    }
-  })
-
-  function applySharedConfig(sp) {
-    const strat = sp.get('strategy')
-    const sel = el('sb-strategy')
-    const opt = strat && sel.querySelector(`option[value="${strat}"]`)
-    if (!opt) return false                       // unknown strategy → ignore
-    opt.disabled = false
-    sel.value = strat
-    const risk = sp.get('risk') || 'moderate'
-    el('sb-risk-btns').querySelectorAll('.risk-btn')
-      .forEach(b => b.classList.toggle('active', b.dataset.risk === risk))
-    const cap = parseFloat(sp.get('capital'))
-    if (cap >= 1000) el('sb-capital').value = cap
-    const win = sp.get('window')
-    if (['180', '365', '730', '1825'].includes(win)) el('sb-window').value = win
-    const tk = (sp.get('tickers') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
-    if (tk.length) { tickers = tk.slice(0, 12); renderChips() }
-    launch()
-    return true
-  }
-
-  // ── Rendering ──
-  function renderAll() {
-    const day  = timeline[cursor]
-    const val  = day.value
-    const ret  = (val - capital) / capital * 100
-    lastSpy = spyByDate[day.date] != null ? spyByDate[day.date] : lastSpy
-    const invested = Math.max(0, val - cash)
-
-    el('sb-simdate').textContent = day.date + '  ·  Day ' + (cursor + 1) + ' / ' + timeline.length
-    el('sb-value').textContent  = fmt$(val)
-    const rEl = el('sb-return'); rEl.textContent = fmtPct(ret); rEl.className = 'hero-stat-value ' + clr(ret)
-    el('sb-cash').textContent   = fmt$(cash)
-    el('sb-positions-count').textContent = Object.keys(positions).length
-    el('sb-invested').textContent = fmt$(invested)
-
-    const spyRet = lastSpy ? (lastSpy - capital) / capital * 100 : 0
-    const vs = ret - spyRet
-    const vsEl = el('sb-vsspy'); vsEl.textContent = fmtPct(vs); vsEl.className = 'perf-value ' + clr(vs)
-
-    el('sb-trades').textContent  = closed.length
-    const wins = closed.filter(p => p > 0).length
-    el('sb-winrate').textContent = closed.length ? Math.round(wins / closed.length * 100) + '%' : '—'
-    const bEl = el('sb-best');  bEl.textContent  = best  != null ? fmt$(best)  : '—'; bEl.className  = 'perf-value ' + clr(best)
-    const wEl = el('sb-worst'); wEl.textContent  = worst != null ? fmt$(worst) : '—'; wEl.className  = 'perf-value ' + clr(worst)
-
-    const rb = el('sb-regime-badge')
-    rb.textContent = lastRegime
-    rb.className = 'regime-badge ' + (lastRegime !== '—' ? lastRegime : '')
-
-    const pct = timeline.length > 1 ? cursor / (timeline.length - 1) * 100 : 100
-    el('sb-progress').style.width = pct + '%'
-
-    renderPositions()
-    updateChart()
-  }
-
-  function renderPositions() {
-    const tbody = el('sb-positions-tbody')
-    const rows = Object.entries(positions)
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open positions</td></tr>'
-      return
-    }
-    tbody.innerHTML = rows.map(([tkr, p]) => `
-      <tr>
-        <td><strong>${tkr}</strong></td>
-        <td>${fmtN(p.shares, 0)}</td>
-        <td>${fmt$(p.entry)}</td>
-        <td style="color:var(--muted);font-size:11px;">${p.date}</td>
-        <td style="color:var(--blue);font-size:11px;">${STRATEGY_LABELS[p.strategy] || p.strategy || '—'}</td>
-      </tr>`).join('')
-  }
-
-  // ── Live trade feed ──
-  function clearFeed() {
-    el('sb-feed').innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">Your bot’s trades will appear here as it runs…</div>'
-  }
-
-  function pushFeed(t) {
-    const box = el('sb-feed')
-    if (!box.querySelector('.sb-feed-item')) box.innerHTML = ''   // drop the placeholder
-    const isBuy = t.action === 'BUY'
-    const pnlTxt = (t.action === 'SELL' && t.pnl != null)
-      ? `<span class="sb-feed-pnl ${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
-    const item = document.createElement('div')
-    item.className = 'sb-feed-item'
-    item.innerHTML =
-      `<div class="sb-feed-row">` +
-        `<span class="sb-feed-time">${t.date}</span>` +
-        `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
-        `<span class="sb-feed-tkr">${t.ticker}</span>` +
-        `<span class="sb-feed-trade">${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>` +
-        pnlTxt +
-      `</div>` +
-      `<div class="sb-feed-why">${tradeWhy(t)}</div>`
-    box.insertBefore(item, box.firstChild)
-    while (box.children.length > 120) box.removeChild(box.lastChild)
-  }
-
-  // ── Chart ──
-  function buildChart() {
-    chart = destroyChart(chart)
-    chart = new Chart(el('sb-chart').getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: 'Your Bot', data: [], borderColor: '#3fb950', borderWidth: 2,
-            backgroundColor: 'rgba(63,185,80,0.07)', fill: true, tension: 0.25, pointRadius: 0 },
-          { label: 'Buy & Hold SPY', data: [], borderColor: '#e3b341', borderWidth: 1.5,
-            borderDash: [4, 4], fill: false, tension: 0.25, pointRadius: 0, spanGaps: true },
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
-          tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt$(c.parsed.y) } },
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } },
-          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
-        },
-      },
-    })
-  }
-
-  function updateChart() {
-    if (!chart) return
-    const slice = timeline.slice(0, cursor + 1)
-    chart.data.labels = slice.map(p => p.date)
-    chart.data.datasets[0].data = slice.map(p => p.value)
-    chart.data.datasets[1].data = slice.map(p => (spyByDate[p.date] != null ? spyByDate[p.date] : null))
-    chart.update('none')
-  }
-
-  // ── Persistence (survives reloads — the bot is "always there") ──
-  function save() {
-    if (IS_DASHBOARD) return   // the dashboard demo is ephemeral — never persist
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        timeline, trades, spy: Object.entries(spyByDate).map(([date, value]) => ({ date, value })),
-        capital, speed, stratLabel, cursor,
-      }))
-    } catch (_) { /* storage full / disabled — non-fatal */ }
-  }
-
-  function restore() {
-    let saved
-    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch (_) { saved = null }
-    if (saved && Array.isArray(saved.timeline) && saved.timeline.length) {
-      loadRun(saved)
-      return true
-    }
-    return false
-  }
-
-  // Dashboard: auto-launch a demo bot so visitors land on one already trading.
-  // Full My Bot page: a shared link (?strategy=…) launches that exact bot,
-  // otherwise restore a previous run paused where it left off.
-  if (IS_DASHBOARD) {
-    // Demo the Dip Buyer value strategy: buy more as a stock falls (in the red),
-    // trim as it rises (in the green), over a 2-year window so it has dips to act on.
-    const sel = el('sb-strategy')
-    const opt = sel.querySelector('option[value="dip_buyer"]')
-    if (opt) opt.disabled = false
-    sel.value = 'dip_buyer'
-    el('sb-risk-btns').querySelectorAll('.risk-btn')
-      .forEach(b => b.classList.toggle('active', b.dataset.risk === 'moderate'))
-    el('sb-capital').value = 100000
-    tickers = ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'TSLA', 'JPM', 'META']
-    renderChips()
-    applyStrategyHints()       // sets the window to 2 years for Dip Buyer
-    launch()
-  } else {
-    const sharedParams = new URLSearchParams(location.search)
-    if (sharedParams.get('strategy')) {
-      if (!applySharedConfig(sharedParams)) restore()
-    } else {
-      restore()
-    }
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 //  LIVE SIGNAL SCANNER
 //  What every strategy + the ML transformer says about your stocks right now.
 // ════════════════════════════════════════════════════════════════════════════
@@ -2083,238 +1300,7 @@ function initSignals() {
   scan()
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-//  PAPER ACCOUNT — a persistent portfolio tracked FORWARD over real time.
-//  The config (capital, strategy, risk, stocks, start date) lives in
-//  localStorage. Each sync re-runs the backtest from the fixed start date to
-//  today — so as real days pass, the record genuinely extends.
-// ════════════════════════════════════════════════════════════════════════════
-function initAccount() {
-  const LS_KEY = 'ag_account_v1'
-  let acctChart = null
-  let tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
-
-  const setup = el('acct-setup')
-  const view  = el('acct-view')
-  const tickerInput = el('acct-ticker-input')
-  const tickerAdd   = el('acct-ticker-add')
-  const tickerErr   = el('acct-ticker-error')
-
-  enableMlOption(el('acct-strategy'))
-
-  function applyAcctHints() {
-    const note  = el('acct-strategy-note')
-    const isDip = el('acct-strategy').value === 'dip_buyer'
-    if (isDip) el('acct-since').value = '730'
-    if (note) {
-      note.hidden = !isDip
-      if (isDip) note.innerHTML =
-        '🪙 <strong>Dip Buyer</strong> is patient — it only buys near 52-week lows. Tracking set to ' +
-        '<strong>2 years</strong> so it has dips to act on.'
-    }
-  }
-  el('acct-strategy').addEventListener('change', applyAcctHints)
-  applyAcctHints()
-
-  function load() { try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch (_) { return null } }
-  function store(a) { try { localStorage.setItem(LS_KEY, JSON.stringify(a)) } catch (_) {} }
-
-  // ── Setup form ──
-  function renderChips() {
-    const box = el('acct-tickers')
-    box.innerHTML = tickers.length
-      ? tickers.map(t => `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`).join('')
-      : '<span style="font-size:12px;color:var(--muted);">No stocks added.</span>'
-    box.querySelectorAll('.chip-x').forEach(b => b.addEventListener('click', () => {
-      tickers = tickers.filter(x => x !== b.dataset.ticker); renderChips()
-    }))
-  }
-  async function addTicker() {
-    const sym = (tickerInput.value || '').trim().toUpperCase()
-    tickerErr.hidden = true
-    if (!sym || tickers.includes(sym)) { tickerInput.value = ''; return }
-    tickerAdd.disabled = true; tickerAdd.textContent = '…'
-    const res = await api('/api/validate_ticker?symbol=' + encodeURIComponent(sym))
-    tickerAdd.disabled = false; tickerAdd.textContent = 'Add'
-    if (res && res.status === 'valid') { tickers.push(res.symbol); renderChips(); tickerInput.value = ''; tickerInput.focus() }
-    else { tickerErr.textContent = res && res.status === 'rate_limited' ? 'Couldn’t verify right now — try again.' : `"${sym}" doesn’t exist.`; tickerErr.hidden = false }
-  }
-  tickerAdd.addEventListener('click', addTicker)
-  tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTicker() } })
-  el('acct-risk-btns').querySelectorAll('.risk-btn').forEach(btn => btn.addEventListener('click', () => {
-    el('acct-risk-btns').querySelectorAll('.risk-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active')
-  }))
-
-  el('acct-open').addEventListener('click', async () => {
-    if (!tickers.length) { el('acct-error').textContent = 'Add at least one stock.'; el('acct-error').hidden = false; return }
-    const since = parseInt(el('acct-since').value, 10) || 0
-    const riskEl = el('acct-risk-btns').querySelector('.risk-btn.active')
-    const acct = {
-      capital:    Math.max(1000, parseFloat(el('acct-capital').value) || 100000),
-      strategy:   el('acct-strategy').value,
-      risk:       riskEl ? riskEl.dataset.risk : 'moderate',
-      tickers:    [...tickers],
-      start_date: since ? daysAgo(since) : today(),
-      opened_at:  today(),
-      range_sizing: !!el('acct-range-sizing').checked,
-    }
-    el('acct-error').hidden = true
-    el('acct-loading').hidden = false
-    el('acct-open').disabled = true
-    const ok = await sync(acct)
-    el('acct-loading').hidden = true
-    el('acct-open').disabled = false
-    if (ok) { store(acct); showView() }
-    else { el('acct-error').textContent = 'Could not open the account — the server may be waking up. Try again.'; el('acct-error').hidden = false }
-  })
-
-  el('acct-sync').addEventListener('click', async () => {
-    const acct = load(); if (!acct) return
-    el('acct-sync-loading').hidden = false
-    await sync(acct)
-    el('acct-sync-loading').hidden = true
-  })
-  el('acct-reset').addEventListener('click', () => {
-    if (!confirm('Reset your paper account? This clears its history.')) return
-    localStorage.removeItem(LS_KEY)
-    acctChart = destroyChart(acctChart)
-    showSetup()
-  })
-
-  function showSetup() { view.hidden = true; setup.hidden = false; renderChips() }
-  function showView()  { setup.hidden = true; view.hidden = false }
-
-  // ── Sync: re-run the backtest from the account's start date to today ──
-  async function sync(acct) {
-    const data = await api('/api/backtest', {
-      method: 'POST',
-      body: JSON.stringify({
-        strategy: acct.strategy, tickers: acct.tickers,
-        start_date: acct.start_date, end_date: today(),
-        initial_capital: acct.capital, risk_tolerance: acct.risk,
-        range_sizing: !!acct.range_sizing,
-      }),
-    })
-    if (data && !data.error && (data.equity_curve || []).length) {
-      await render(acct, data)
-      return true
-    }
-    // A just-opened account (start too recent for a 30-bar backtest) is simply
-    // all cash — show that rather than failing. It fills in as trading days pass.
-    const ageDays = Math.floor((Date.now() - new Date(acct.start_date).getTime()) / 86400000)
-    if (ageDays <= 45) { renderEmpty(acct); return true }
-    return false
-  }
-
-  function renderEmpty(acct) {
-    el('acct-since-label').textContent = 'Tracking since ' + acct.start_date
-    el('acct-strat-label').textContent = STRATEGY_LABELS[acct.strategy] || acct.strategy
-    el('acct-synced').textContent = 'Just opened'
-    el('acct-value').textContent = fmt$(acct.capital)
-    el('acct-return').textContent = '—'; el('acct-return').className = 'hero-stat-value'
-    el('acct-vsspy').textContent = '—';  el('acct-vsspy').className = 'hero-stat-value'
-    el('acct-cash').textContent = fmt$(acct.capital)
-    el('acct-trades').textContent = '0'; el('acct-winrate').textContent = '—'
-    el('acct-npos').textContent = '0';   el('acct-dd').textContent = '—'
-    acctChart = destroyChart(acctChart)
-    el('acct-holdings').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">All in cash — just opened</td></tr>'
-    el('acct-feed').innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">Your account is open. It needs ~30 trading days of history before the strategy starts trading — check back as it fills in.</div>'
-  }
-
-  async function render(acct, data) {
-    const trades = (data.trades || []).slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-    const curve  = data.equity_curve
-    const finalV = curve[curve.length - 1].value
-    const ret    = (finalV - acct.capital) / acct.capital * 100
-    const bench  = data.metrics ? data.metrics.benchmark_return : null
-    const vs     = bench != null ? ret - bench : null
-
-    // Reconstruct cash + open positions from the trade ledger.
-    let cash = acct.capital
-    const pos = {}
-    trades.forEach(t => {
-      const cost = t.cost || 0
-      if (t.action === 'BUY') { cash -= t.price * t.shares + cost; pos[t.ticker] = { shares: t.shares, entry: t.price, date: t.date } }
-      else { cash += t.price * t.shares - cost; delete pos[t.ticker] }
-    })
-
-    el('acct-since-label').textContent = 'Tracking since ' + acct.start_date
-    el('acct-strat-label').textContent = STRATEGY_LABELS[acct.strategy] || acct.strategy
-    el('acct-synced').textContent = 'Synced ' + new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    el('acct-value').textContent = fmt$(finalV)
-    const rEl = el('acct-return'); rEl.textContent = fmtPct(ret); rEl.className = 'hero-stat-value ' + clr(ret)
-    const vEl = el('acct-vsspy'); vEl.textContent = vs == null ? '—' : fmtPct(vs); vEl.className = 'hero-stat-value ' + clr(vs)
-    el('acct-cash').textContent = fmt$(cash)
-
-    const m = data.metrics || {}
-    el('acct-trades').textContent  = m.total_trades ?? '—'
-    el('acct-winrate').textContent = m.win_rate != null ? m.win_rate + '%' : '—'
-    el('acct-npos').textContent    = Object.keys(pos).length
-    el('acct-dd').textContent      = m.max_drawdown != null ? '-' + fmtN(m.max_drawdown) + '%' : '—'
-
-    // Equity vs SPY chart
-    const labels = curve.map(p => p.date)
-    const spyMap = {}; (data.spy_curve || []).forEach(p => { spyMap[p.date] = p.value })
-    acctChart = destroyChart(acctChart)
-    acctChart = new Chart(el('acct-chart').getContext('2d'), {
-      type: 'line',
-      data: { labels, datasets: [
-        { label: 'Your account', data: curve.map(p => p.value), borderColor: '#3fb950', borderWidth: 2, backgroundColor: 'rgba(63,185,80,0.07)', fill: true, tension: 0.25, pointRadius: 0 },
-        { label: 'Buy & Hold SPY', data: labels.map(d => spyMap[d] ?? null), borderColor: '#e3b341', borderWidth: 1.5, borderDash: [4, 4], fill: false, tension: 0.25, pointRadius: 0, spanGaps: true },
-      ] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt$(c.parsed.y) } } },
-        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } }, y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } } },
-      },
-    })
-
-    // Trade feed (newest first)
-    const feed = el('acct-feed')
-    if (!trades.length) feed.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">No trades yet — the strategy is waiting for a setup.</div>'
-    else feed.innerHTML = trades.slice().reverse().slice(0, 100).map(t => {
-      const isBuy = t.action === 'BUY'
-      const pnl = (t.action === 'SELL' && t.pnl != null) ? `<span class="sb-feed-pnl ${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
-      return `<div class="sb-feed-item"><div class="sb-feed-row"><span class="sb-feed-time">${t.date}</span>` +
-        `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
-        `<span class="sb-feed-tkr">${t.ticker}</span><span class="sb-feed-trade">${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>${pnl}</div>` +
-        `<div class="sb-feed-why">${tradeWhy(t)}</div></div>`
-    }).join('')
-
-    // Holdings with live prices + P&L (one scan call for the held tickers)
-    const held = Object.keys(pos)
-    const tbody = el('acct-holdings')
-    if (!held.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">All in cash right now</td></tr>'; return }
-    tbody.innerHTML = held.map(t => `<tr><td><strong>${t}</strong></td><td>${fmtN(pos[t].shares, 0)}</td><td>${fmt$(pos[t].entry)}</td><td>—</td><td>—</td></tr>`).join('')
-    const scan = await api('/api/scan?tickers=' + encodeURIComponent(held.join(',')))
-    if (scan && scan.scanned) {
-      const px = {}; scan.scanned.forEach(r => { px[r.ticker] = r.price })
-      tbody.innerHTML = held.map(t => {
-        const p = pos[t], cur = px[t]
-        const pnl = cur != null ? (cur - p.entry) * p.shares : null
-        const pct = cur != null && p.entry ? (cur - p.entry) / p.entry * 100 : null
-        return `<tr><td><strong>${t}</strong></td><td>${fmtN(p.shares, 0)}</td><td>${fmt$(p.entry)}</td><td>${fmt$(cur)}</td><td class="${clr(pnl)}">${pnl != null ? fmt$(pnl) + ' (' + fmtPct(pct) + ')' : '—'}</td></tr>`
-      }).join('')
-    }
-  }
-
-  // ── Boot ──
-  const existing = load()
-  if (existing) {
-    tickers = existing.tickers || tickers
-    showView()
-    el('acct-sync-loading').hidden = false
-    sync(existing).then(() => { el('acct-sync-loading').hidden = true })
-  } else {
-    showSetup()
-  }
-}
-
 // ── Router ──────────────────────────────────────────────────────────────────
 const PAGE = document.body.dataset.page
-if (PAGE === 'dashboard') { initSandbox(); initDashboard() }  // demo bot + market panels
-if (PAGE === 'backtest')  initBacktest()
-if (PAGE === 'portfolio') initPortfolio()
-if (PAGE === 'sandbox')   initSandbox()
-if (PAGE === 'signals')   initSignals()
-if (PAGE === 'account')   initAccount()
+if (PAGE === 'backtest') initBacktest()
+if (PAGE === 'tools')    { initTabs(document.body); initSignals(); initPortfolio() }
