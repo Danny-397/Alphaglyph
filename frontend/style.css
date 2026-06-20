@@ -593,13 +593,60 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display:         flex;
   flex-direction:  column;
   align-items:     center;
-  gap:             12px;
-  padding:         64px 20px;
+  gap:             10px;
+  padding:         52px 20px;
   color:           var(--muted);
   font-size:       14px;
   text-align:      center;
 }
-.empty-state-icon { font-size: 40px; opacity: .4; }
+.empty-state-icon {
+  font-size:    44px;
+  opacity:      .9;
+  filter:       drop-shadow(0 0 18px rgba(63,185,80,0.35));
+  animation:    empty-float 3.5s ease-in-out infinite;
+}
+@keyframes empty-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+.empty-title { font-size: 19px; color: var(--text); letter-spacing: -0.01em; }
+.empty-sub   { max-width: 460px; line-height: 1.6; }
+
+.empty-preview {
+  display:               grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:                   12px;
+  margin-top:            24px;
+  width:                 100%;
+  max-width:             660px;
+}
+.empty-preview-card {
+  display:        flex;
+  flex-direction: column;
+  align-items:    flex-start;
+  gap:            7px;
+  text-align:     left;
+  padding:        16px;
+  background:     var(--surface);
+  border:         1px solid var(--border);
+  border-radius:  14px;
+  transition:     border-color .15s, transform .15s;
+}
+.empty-preview-card:hover { border-color: var(--green); transform: translateY(-3px); }
+.epc-icon                 { font-size: 24px; line-height: 1; }
+.empty-preview-card strong { color: var(--text); font-size: 13.5px; }
+.empty-preview-card span   { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+.empty-hint {
+  margin-top:    24px;
+  font-size:     13px;
+  color:         var(--text);
+  background:    var(--yellow-dim);
+  border:        1px solid rgba(227,179,65,0.35);
+  padding:       9px 18px;
+  border-radius: 999px;
+}
+@media (max-width: 640px) {
+  .empty-preview { grid-template-columns: 1fr; }
+}
 
 /* ── Scroll box ─────────────────────────────────────────────────────────── */
 .scroll-box {
