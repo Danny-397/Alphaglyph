@@ -1,6 +1,6 @@
 # ◈ AlphaGlyph — A Quant & ML Paper-Trading Bot
 
-**An algorithmic paper-trading bot that trades real market prices with simulated capital — using classical quantitative strategies, a multi-modal machine-learning transformer, and market-regime detection — then rigorously validates whether its own edge is statistically real, with the same mathematical tools institutional quant funds use.**
+**A paper-trading bot that trades for you — and shows its work.** It runs classical quantitative strategies, a patient "dip-buyer" value strategy, build-your-own-rule custom strategies, and a multi-modal machine-learning transformer on real market prices with simulated capital — explaining every trade in plain English and adapting to the market regime — then rigorously validates whether an edge is statistically real with the same mathematical tools institutional quant funds use. The bots run entirely in the visitor's browser, so the demo is free-tier-proof and never sleeps.
 
 [![CI](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml/badge.svg)](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -24,17 +24,17 @@
 
 ## What is this?
 
-AlphaGlyph is a full-stack quantitative research platform that does something most student trading projects don't: **it asks whether its own results are real.**
+AlphaGlyph is a full-stack quantitative platform with one thing most student trading projects don't have: **honesty about whether its results are real.**
 
-Most backtesting tools show you a Sharpe ratio and stop there. This system goes further — after every simulation it applies three independent statistical tests borrowed from professional quant finance:
+Anyone can pick a strategy, watch a bot trade it (in the browser, on real prices), and see **every decision explained** — what the strategy saw, in which market regime, and why it bought or sold. But most backtesting tools show you a Sharpe ratio and stop there. This one goes further — after every simulation it applies three independent statistical tests borrowed from professional quant finance:
 
 1. **Monte Carlo Resampling** (1,000 bootstrap paths) — does this strategy actually beat random?
 2. **Deflated Sharpe Ratio** (Lopez de Prado, 2014) — is the Sharpe genuine after correcting for multiple-testing bias and non-normal returns?
-3. **Fama-French 3-Factor Decomposition** — is the return actually alpha, or is it just passive exposure to known market risk premia that a factor ETF would replicate for free?
+3. **Fama-French 3-Factor Decomposition** — is the return actually alpha, or just passive exposure to known risk premia a factor ETF would replicate for free?
 
-The system synthesizes all three into a verdict card: **STATISTICALLY SIGNIFICANT**, **PROMISING — NEEDS MORE DATA**, or **INCONCLUSIVE — MAY BE NOISE**.
+…synthesised into a verdict card: **STATISTICALLY SIGNIFICANT**, **PROMISING — NEEDS MORE DATA**, or **INCONCLUSIVE — MAY BE NOISE**.
 
-Beyond validation, the platform includes a live trading bot, a backtesting engine with walk-forward cross-validation and transaction cost modeling, and a Markowitz portfolio optimizer that computes the efficient frontier via quadratic programming.
+Around that core: browser-run bots (**My Bot** and a live **Dip Buyer** demo), a forward-tracked **Paper Account**, a **Live Signal Scanner**, a **Stock Explorer**, a **Strategy Leaderboard**, a Markowitz **portfolio optimizer**, and a backtesting engine with walk-forward cross-validation and transaction-cost modelling. See **[Methodology & Honest Limitations](#methodology--honest-limitations)** for exactly what it does and doesn't claim.
 
 ---
 
@@ -44,7 +44,8 @@ Beyond validation, the platform includes a live trading bot, a backtesting engin
 |---|---|
 | Fixed stop-loss from entry | Trailing stop — floor rises as price climbs, locking in gains |
 | Fixed position sizing | Kelly Criterion sizing — fraction derived from historical win rate and odds ratio |
-| Single strategy, single backtest | 4 strategies + adaptive mode; walk-forward out-of-sample testing |
+| Single strategy, single backtest | 6 strategies + adaptive mode + a no-code custom rule builder; walk-forward out-of-sample testing |
+| Black-box decisions | Every trade explained in plain English (what it saw, the regime, why it acted) |
 | "My Sharpe is 1.4" | "My Sharpe is 1.4 and the Deflated Sharpe gives 91% probability it's real after testing 5 strategies" |
 | Backtest return metric | Fama-French alpha decomposition — separates skill from passive factor exposure |
 | No portfolio theory | Markowitz efficient frontier via quadratic programming; max-Sharpe and min-variance portfolios |
@@ -55,13 +56,21 @@ Beyond validation, the platform includes a live trading bot, a backtesting engin
 
 ## Feature Overview
 
-### Trading Engine
-- **4 Quantitative Strategies**: MA Crossover, RSI Mean Reversion, MACD Momentum, ML stub (ready for a trained model)
-- **Adaptive Mode**: Detects the current market regime from SPY data and selects the optimal strategy automatically
-- **Trailing Stop-Loss**: Exit floor rises with price — a position that runs up 12% can't turn into a loss
-- **Kelly Criterion Sizing**: Position size is computed from the Kelly formula using live win rate and avg win/loss; falls back to fixed sizing when fewer than 10 closed trades exist
-- **Risk Profiles**: Conservative / Moderate / Aggressive — each controls stop distance, take-profit target, position cap, cash reserve, and high-volatility behaviour
-- **5-Minute Cycle**: Every five minutes during market hours the bot detects the regime, checks risk gates, sweeps stops, generates signals, and executes BUY/SELL orders
+### Strategies (6 + adaptive + custom)
+- **MA Crossover** — trend stance: long while the 20-day average is above the 50-day
+- **RSI Mean Reversion** — buy oversold, sell overbought
+- **MACD Momentum** — long while MACD is above its signal line
+- **Dip Buyer (52-week value)** — buys *more* as a stock falls toward its 52-week low, averages down on further drops, keeps cash in reserve for the next dip, and sells on recovery toward the high
+- **ML Transformer** — a trained multi-modal transformer served via ONNX (see below)
+- **Custom (build-your-own rules)** — a no-code rule builder: define BUY/SELL from indicators (price, SMAs, RSI, MACD, volume, returns, 52-week range) with operators (below / above / crosses above / crosses below) combined with ALL/ANY
+- **Adaptive Mode** — detects the current market regime from SPY and auto-selects the fitting strategy
+
+### Bots & sizing
+- **Browser-run bots** — **My Bot** lets anyone build and watch a bot trade on real prices; the **Dashboard** runs a live **Dip Buyer** demo. Both reuse the real backtest engine and run client-side, so they never sleep and need no server state.
+- **Trailing Stop-Loss** — exit floor rises with price so winners are protected
+- **Kelly Criterion Sizing** — position size from the Kelly formula on live win rate / odds; falls back to fixed sizing under 10 closed trades
+- **Optional dip-weighted sizing** — bet bigger near the 52-week low, smaller near the high
+- **Risk Profiles** — Conservative / Moderate / Aggressive control stop distance, take-profit, position cap, cash reserve, and high-volatility behaviour
 
 ### Market Regime Detection
 Classifies the market into four states using three independent indicators computed from SPY:
@@ -101,19 +110,24 @@ Indicators: **ADX** (Wilder's smoothing), **Bollinger Band Width** (consolidatio
 
 | Rule | Conservative | Moderate | Aggressive |
 |---|---|---|---|
-| Trailing stop | 3% from peak | 5% from peak | 7% from peak |
-| Take-profit | 10% from entry | 15% from entry | 20% from entry |
-| Max position | 5% of portfolio | 10% of portfolio | 15% of portfolio |
-| Cash reserve | 30% minimum | 20% minimum | 10% minimum |
-| Daily trade cap | 6 | 10 | 15 |
-| High-vol behaviour | Sits out entirely | Half-size positions | Full size |
+| Trailing stop | 10% from peak | 15% from peak | 22% from peak |
+| Take-profit | 40% from entry | off — let winners run | off — let winners run |
+| Max position | 12% of portfolio | 18% of portfolio | 30% of portfolio |
+| Cash reserve | 15% minimum | 5% minimum | 2% minimum |
+| Daily trade cap | 8 | 12 | 20 |
+| High-vol behaviour | Sits out entirely | 60%-size positions | Full size |
 
-### Dashboard & UI
-- **Landing page**: clean green/black marketing page (`index.html`) — distinct from the blue app, links into the platform
-- **Live dashboard**: portfolio value, open positions, equity curve, regime card, recent trades — auto-refreshes every 10 seconds
-- **Backtest interface**: sticky sidebar form + 4-tab results (Performance / Monte Carlo / ⚗ Research / Trades)
-- **Portfolio optimizer**: efficient frontier chart, optimal weight bar displays, correlation matrix heatmap
-- **Strategy Validation Report**: synthesises Monte Carlo, DSR, and Fama-French into a single verdict with colour-coded confidence
+Stops are intentionally wide and take-profit is largely disabled by design: the engine **lets winners run** rather than capping them, which is why trend strategies can ride a full move instead of selling early. (Dip Buyer overrides this with its own tranche/averaging logic.)
+
+### Pages & UI
+- **Landing** (`index.html`) — marketing page built around the niche, links into the app
+- **Dashboard** — a live **Dip Buyer** demo bot running in your browser (animated equity curve, trade feed with plain-English reasons, end-of-run verdict), plus live **Market Regime**, the **ML transformer's live forecasts** (direction probability + return distribution), and a **Stock Explorer**
+- **My Bot** — build your own bot (strategy/risk/stocks/capital or custom rules), watch it trade with play/pause/speed, and get a shareable link
+- **Signals** — a Live Signal Scanner: what every strategy + the ML model says about your watchlist right now
+- **Account** — a forward-tracked Paper Account that extends over real calendar time
+- **Backtest** — sticky sidebar form, custom rule builder, Strategy Leaderboard, and 4-tab results (Performance / Monte Carlo / ⚗ Research / Trades)
+- **Portfolio** — Markowitz efficient frontier, optimal weights, correlation heatmap
+- **Strategy Validation Report** — Monte Carlo + DSR + Fama-French synthesised into one colour-coded verdict
 - Vanilla HTML/CSS/JS + Chart.js — zero frontend frameworks, zero build step
 
 ---
@@ -153,69 +167,69 @@ All indicator maths (SMA, EMA, RSI, MACD, ADX, Bollinger Bands) are implemented 
 
 ```
 alphaglyph/
-├── backend/
-│   ├── app.py           Flask REST API — all 13 endpoints
-│   ├── bot.py           Trading loop, order execution, trailing stop tracking
-│   ├── simulator.py     Internal paper-trading engine (fills at real prices, SQLite state)
-│   ├── strategies.py    Signal generators (MA Crossover, RSI, MACD, ML stub)
-│   ├── backtest.py      Historical simulation — walk-forward, Kelly, costs, regime tagging
-│   ├── features.py      Centralised indicator engineering (SMA, RSI, MACD, ATR, returns)
+├── backend/                  (stateless Flask API — no DB, no server bot)
+│   ├── app.py           REST API — 11 stateless endpoints
+│   ├── strategies.py    Signal generators (MA, RSI, MACD, Dip Buyer, ML, current-stance scanner)
+│   ├── backtest.py      Historical simulation — walk-forward, Kelly, costs, regime tagging,
+│   │                    dip-weighted sizing, and the safe custom-rule evaluator
+│   ├── ml_runtime.py    ONNX inference for the transformer (lazy load, graceful degrade)
+│   ├── ml_features.py   Multi-modal feature frames (price + macro + news sentiment)
+│   ├── features.py      Indicator engineering (SMA, RSI, MACD, ATR, returns) — from scratch
 │   ├── regime.py        Market regime detection (ADX, BB Width, realised volatility)
-│   ├── risk.py          Risk gate: trailing stop, Kelly sizing, profiles, daily limits
+│   ├── risk.py          Risk profiles: trailing stop, Kelly sizing, caps, daily limits
 │   ├── portfolio.py     Markowitz efficient frontier via SciPy SLSQP
-│   ├── monte_carlo.py   Bootstrap resampling — 1,000 equity paths, fan chart bands
+│   ├── monte_carlo.py   Bootstrap resampling — 1,000 equity paths, fan-chart bands
 │   ├── stats.py         PSR, Deflated Sharpe Ratio, Fama-French 3-factor OLS
-│   ├── database.py      SQLite persistence (WAL mode, Kelly computation, live metrics)
-│   ├── gunicorn.conf.py workers=1 (one bot thread — prevents duplicate orders)
-│   ├── requirements.txt
-│   └── tests/
-│       ├── test_risk.py       26 tests — stop/take, trailing stop, sizing, Kelly, risk gates
-│       ├── test_simulator.py  20 tests — buy/sell fills, cash flow, P&L, position tracking
-│       ├── test_features.py   13 tests — SMA, RSI, MACD correctness on synthetic data
-│       ├── test_portfolio.py  17 tests — Markowitz constraints, frontier math, data layer
-│       └── test_stats.py      23 tests — PSR/DSR math, FF3 CSV parsing, OLS regression
-├── frontend/
-│   ├── index.html       Landing page (green/black marketing page)
-│   ├── dashboard.html   Live trading dashboard
-│   ├── backtest.html    Backtest interface with Research tab
-│   ├── portfolio.html   Markowitz portfolio optimizer
-│   ├── landing.css      Landing page styles (green/black, distinct from app)
-│   ├── style.css        App design system (Inter + JetBrains Mono, dark blue)
-│   ├── config.js        Sets the Render backend URL for production
-│   └── app.js           All client logic — dashboard, backtest, portfolio optimizer
-├── .github/
-│   └── workflows/ci.yml
-├── .flake8
-├── .env.example
-└── README.md
+│   ├── simulator.py     Standalone paper-trading sim + database.py — retained & tested,
+│   │                    not used by the stateless API
+│   ├── gunicorn.conf.py
+│   └── tests/           130 tests, fully offline
+│       ├── test_backtest.py   no look-ahead, P&L accounting, custom-rule evaluator
+│       ├── test_risk.py · test_simulator.py · test_features.py
+│       └── test_portfolio.py · test_stats.py
+├── ml/                       (offline training — run in Colab, not on the server)
+│   ├── dataset.py       Builds the 12-year multi-ticker dataset (chronological 60/20/20)
+│   ├── model.py         The multi-modal transformer
+│   └── train.py         Train + ONNX export + parity check
+├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
+│   ├── index.html       Landing page
+│   ├── dashboard.html   Live Dip Buyer demo bot + market intelligence
+│   ├── signals.html     Live Signal Scanner
+│   ├── account.html     Forward-tracked Paper Account
+│   ├── sandbox.html     "My Bot" builder + live playback
+│   ├── backtest.html    Backtest + custom rule builder + Strategy Leaderboard
+│   ├── portfolio.html   Markowitz optimizer
+│   ├── landing.css · style.css · config.js
+│   └── app.js           All client logic (one file, page-routed)
+├── .github/workflows/   ci.yml · keepwarm.yml
+├── .flake8 · .env.example · README.md
 ```
 
 ---
 
 ## API Reference
 
+The API is **fully stateless** — no database, no server-side bot. Every endpoint is a pure market computation, which is what makes it free-tier-proof.
+
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/status` | GET | Bot state, portfolio summary, regime, Kelly fraction, live Sharpe & drawdown |
-| `/api/start` | POST | Start the trading bot with a given strategy |
-| `/api/stop` | POST | Send stop signal to the bot loop |
-| `/api/strategy` | POST | Switch active strategy while running |
-| `/api/risk_tolerance` | POST | Switch risk profile (conservative / moderate / aggressive) |
-| `/api/regime` | GET | Detect current market regime from live SPY data |
-| `/api/trades` | GET | Trade history with limit and strategy filters |
-| `/api/portfolio/history` | GET | Portfolio value time-series snapshots |
-| `/api/portfolio/optimize` | POST | Run Markowitz efficient frontier optimization |
-| `/api/activity` | GET | Recent bot activity log |
-| `/api/indicators` | GET | Current indicator values for all watchlist tickers |
-| `/api/watchlist` | GET | Current watchlist tickers |
-| `/api/backtest` | POST | Full backtest with walk-forward, Kelly, Monte Carlo, DSR, Fama-French |
-| `/health` | GET | Health check (returns `{"status": "ok"}`) |
+| `/api/backtest` | POST | Full backtest with walk-forward, Kelly, Monte Carlo, DSR, Fama-French. Powers My Bot, the Account, and the Dashboard demo. |
+| `/api/compare` | POST | Run every strategy on the same inputs → ranked leaderboard |
+| `/api/scan` | GET | Live Signal Scanner: current stance of every strategy + ML per ticker |
+| `/api/chart` | GET | Price + a strategy's indicators + buy/sell markers (Stock Explorer) |
+| `/api/regime` | GET | Detect the current market regime from live SPY data |
+| `/api/ml/info` | GET | ML model status, architecture, train/val/test metrics, thresholds |
+| `/api/ml/predictions` | GET | The transformer's live per-ticker forecast (P(up), q10–q90 distribution, vol) |
+| `/api/portfolio/optimize` | POST | Markowitz efficient frontier optimisation |
+| `/api/validate_ticker` | GET | Check whether a ticker symbol exists |
+| `/api/watchlist` | GET | Default watchlist tickers |
+| `/health` | GET | Health check (`{"status": "ok", "ml": "loaded"}`) |
 
 ### Backtest request body
 
 ```json
 {
-  "strategy":        "adaptive",
+  "strategy":        "dip_buyer",
   "tickers":         ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA", "JPM", "SPY"],
   "start_date":      "2023-01-01",
   "end_date":        "2024-01-01",
@@ -224,7 +238,18 @@ alphaglyph/
   "risk_tolerance":  "moderate",
   "commission_pct":  0.001,
   "slippage_pct":    0.0005,
-  "use_markowitz":   false
+  "use_markowitz":   false,
+  "range_sizing":    false,
+  "custom_rules":    null
+}
+```
+
+For `"strategy": "custom"`, supply `custom_rules`:
+
+```json
+{
+  "buy":  {"logic": "all", "conditions": [{"left": "rsi14", "op": "lt", "right": 30}]},
+  "sell": {"logic": "any", "conditions": [{"left": "rsi14", "op": "gt", "right": 70}]}
 }
 ```
 
@@ -243,7 +268,7 @@ cd alphaglyph
 pip install -r backend/requirements.txt
 ```
 
-No API keys or brokerage account needed — the internal simulator handles order execution.
+No API keys or brokerage account needed — backtests and bots fill orders at real market prices with simulated cash. (A free Tiingo key is optional but recommended for reliable market data from cloud IPs.)
 
 ### 3. Run the backend
 ```bash
@@ -254,7 +279,7 @@ python backend/app.py
 ### 4. Open the frontend
 ```bash
 # Option A: open directly — index.html is the landing page;
-# click "Launch Platform" to reach the dashboard
+# use the nav (Dashboard, Signals, My Bot, …) to reach the app
 open frontend/index.html
 
 # Option B: local dev server (avoids CORS issues)
