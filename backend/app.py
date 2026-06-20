@@ -55,9 +55,9 @@ def _client_ip() -> str:
     return get_remote_address()
 
 
-# Per-IP rate limiting. The dashboard polls ~24 req/min per open tab, so the
-# default ceiling is generous enough for normal use (several tabs) while still
-# stopping a script that floods the API. The expensive endpoints (backtest,
+# Per-IP rate limiting. The scanner and backtest pages make a handful of calls
+# per visit, so the default ceiling is generous enough for normal use (several
+# tabs) while still stopping a script that floods the API. The expensive endpoints (backtest,
 # portfolio optimize) get a much stricter cap below — those do heavy compute and
 # uncached data downloads, so they're the real abuse/availability risk.
 # Storage is in-process memory, which is correct here because gunicorn runs a
@@ -180,35 +180,6 @@ def get_regime():
 
 # ── Data endpoints ────────────────────────────────────────────────────────────
 
-@app.route('/api/watchlist')
-def get_watchlist():
-    return jsonify(strategies.WATCHLIST)
-
-
-@app.route('/api/chart')
-@limiter.limit('60 per minute')
-def chart():
-    """
-    Price + the strategy's indicators + the exact BUY/SELL signal dates for one
-    ticker over the past year — powers the Stock Explorer so users can see what
-    a strategy "sees". Markers come from the same logic the backtest uses.
-    """
-    ticker   = request.args.get('ticker', '').strip().upper()
-    strategy = request.args.get('strategy', 'ma_crossover')
-    if not ticker:
-        return jsonify({'error': 'ticker required'}), 400
-    if strategy not in VALID_STRATEGIES:
-        return jsonify({'error': 'Invalid strategy'}), 400
-    try:
-        data = backtester.chart_series(strategy, ticker)
-    except Exception as exc:
-        logger.warning('chart failed for %s/%s: %s', ticker, strategy, exc)
-        return jsonify({'error': 'Could not build chart'}), 500
-    if not data:
-        return jsonify({'error': f'No data for {ticker}'}), 404
-    return jsonify(data)
-
-
 @app.route('/api/scan')
 @limiter.limit('20 per minute')
 def scan():
@@ -263,43 +234,6 @@ def ml_info():
     architecture, validation/test metrics, and decision thresholds.
     The frontend uses this to enable the ML strategy option."""
     return jsonify(ml_runtime.get_info())
-
-
-@app.route('/api/ml/predictions')
-@limiter.limit('30 per minute')
-def ml_predictions():
-    """
-    Live transformer forecasts for the watchlist (or ?tickers=AAPL,MSFT).
-
-    For each ticker returns the direction probability, the q10–q90 return
-    distribution over the model's horizon, the vol forecast, and the mapped
-    signal — the rich output behind the BUY/SELL/HOLD action, for the ML
-    Insights panel. 503 if no model is deployed.
-    """
-    info = ml_runtime.get_info()
-    if not info.get('loaded'):
-        return jsonify({'loaded': False, 'reason': info.get('reason'), 'predictions': []}), 503
-
-    raw = request.args.get('tickers', '')
-    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or list(strategies.WATCHLIST)
-    tickers = tickers[:12]   # cap to keep the request bounded
-
-    preds = []
-    for t in tickers:
-        try:
-            p = ml_runtime.live_prediction(t)
-        except Exception as exc:
-            logger.warning('ml prediction failed for %s: %s', t, exc)
-            p = None
-        if p:
-            preds.append(p)
-
-    return jsonify({
-        'loaded':      True,
-        'horizon':     info.get('horizon'),
-        'version':     info.get('version'),
-        'predictions': preds,
-    })
 
 
 @app.route('/api/compare', methods=['POST'])

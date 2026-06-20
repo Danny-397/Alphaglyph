@@ -8,22 +8,6 @@
 const _isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
 const API_BASE = window.RENDER_URL || (_isLocal ? 'http://localhost:5000' : '')
 
-// Owner token for bot controls. The owner unlocks the dashboard once by
-// visiting it with ?admin=<token>; it's stored in the browser and the URL is
-// cleaned. Sent as a header on every API call (harmless on read endpoints).
-const ADMIN_TOKEN = (() => {
-  try {
-    const url = new URL(location.href)
-    const q = url.searchParams.get('admin')
-    if (q) {
-      localStorage.setItem('ag_admin', q)
-      url.searchParams.delete('admin')
-      history.replaceState({}, '', url.toString())
-    }
-    return localStorage.getItem('ag_admin') || ''
-  } catch (_) { return '' }
-})()
-
 if (!_isLocal && !window.RENDER_URL) {
   console.error(
     '%c⚠ AlphaGlyph: RENDER_URL is not set in config.js.\n' +
@@ -143,7 +127,6 @@ async function api(path, opts = {}, _attempt = 0) {
       ...opts,
       headers: {
         'Content-Type': 'application/json',
-        ...(ADMIN_TOKEN ? { 'X-Admin-Token': ADMIN_TOKEN } : {}),
         ...(opts.headers || {}),
       },
     })

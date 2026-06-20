@@ -208,13 +208,10 @@ The API is **fully stateless** — no database, no server-side bot. Every endpoi
 | `/api/backtest` | POST | Full backtest with walk-forward, Kelly, Monte Carlo, DSR, Fama-French. The core of the app. |
 | `/api/compare` | POST | Run every strategy on the same inputs → ranked leaderboard |
 | `/api/scan` | GET | Live Signal Scanner: current stance of every strategy + ML per ticker |
-| `/api/chart` | GET | Price + a strategy's indicators + the exact buy/sell signal dates for one ticker |
 | `/api/regime` | GET | Detect the current market regime from live SPY data |
 | `/api/ml/info` | GET | ML model status, architecture, train/val/test metrics, thresholds |
-| `/api/ml/predictions` | GET | The transformer's live per-ticker forecast (P(up), q10–q90 distribution, vol) |
 | `/api/portfolio/optimize` | POST | Markowitz efficient frontier optimisation |
 | `/api/validate_ticker` | GET | Check whether a ticker symbol exists |
-| `/api/watchlist` | GET | Default watchlist tickers |
 | `/health` | GET | Health check (`{"status": "ok", "ml": "loaded"}`) |
 
 ### Backtest request body

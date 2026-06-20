@@ -16,7 +16,6 @@ signal return values:  'BUY' | 'SELL' | 'HOLD' | None  (None = data error)
 """
 
 import logging
-import pandas as pd
 import features as feat
 
 logger = logging.getLogger(__name__)
@@ -152,37 +151,3 @@ def get_signal(strategy: str, ticker: str) -> tuple[str | None, float | None]:
         logger.error('Unknown strategy: %s', strategy)
         return None, None
     return fn(ticker)
-
-
-# ── Indicator snapshot for dashboard ─────────────────────────────────────────
-
-def get_indicator_data(ticker: str, strategy: str) -> dict:
-    """Returns current indicator values for the watchlist table."""
-    df = feat.get_feature_df(ticker, period='6mo')
-    if df is None or df.empty:
-        return {}
-
-    result = {'price': round(float(df['Close'].iloc[-1]), 2)}
-
-    if strategy == 'ma_crossover':
-        result['sma20'] = round(float(df['sma20'].iloc[-1]), 2)
-        result['sma50'] = round(float(df['sma50'].iloc[-1]), 2)
-
-    elif strategy == 'rsi':
-        result['rsi'] = round(float(df['rsi14'].iloc[-1]), 2)
-
-    elif strategy == 'macd':
-        result['macd']      = round(float(df['macd_line'].iloc[-1]),   4)
-        result['signal']    = round(float(df['macd_signal'].iloc[-1]), 4)
-        result['histogram'] = round(float(df['macd_hist'].iloc[-1]),   4)
-
-    elif strategy == 'ml':
-        # Expose full feature vector so a future ML dashboard can display it
-        row = df.iloc[-1]
-        for col in feat.FEATURE_COLS:
-            if col in df.columns:
-                val = row[col]
-                if pd.notna(val):
-                    result[col] = round(float(val), 4)
-
-    return result
