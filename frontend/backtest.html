@@ -46,7 +46,7 @@
           <label class="form-label">Strategy</label>
           <select id="bt-strategy">
             <option value="ml" disabled>ML Transformer (not trained yet)</option>
-            <option value="dip_buyer" selected>★ Dip Buyer (52-Week Value) — Recommended</option>
+            <option value="dip_buyer" selected>Dip Buyer (52-Week Value) — Recommended</option>
             <option value="adaptive">Adaptive (Regime-Based)</option>
             <option value="ma_crossover">MA Crossover (SMA 20/50)</option>
             <option value="rsi">RSI Mean Reversion (14-period)</option>
@@ -154,7 +154,7 @@
         </p>
 
         <button class="btn btn-sm" id="compare-btn" style="width:100%;margin-top:10px;">
-          ⚖  Compare all strategies
+          Compare all strategies
         </button>
         <p style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;line-height:1.5;">
           Runs every strategy on the same tickers &amp; period and ranks them
@@ -167,29 +167,28 @@
         <!-- Empty state -->
         <div id="empty-state">
           <div class="empty-state">
-            <div class="empty-state-icon">⚗</div>
-            <strong class="empty-title">Let's find out if your strategy actually works ✨</strong>
-            <p class="empty-sub">Pick a strategy and a few stocks on the left, then hit <strong style="color:var(--green);">Run Backtest</strong>. We'll run it through real market history day by day — and tell you honestly whether the edge is real or just luck.</p>
+            <strong class="empty-title">See whether your strategy's edge is real</strong>
+            <p class="empty-sub">Pick a strategy and a few stocks on the left, then run a backtest. AlphaGlyph simulates it on real market history day by day — and tells you, honestly, whether the result is genuine skill or just luck.</p>
 
             <div class="empty-preview">
               <div class="empty-preview-card">
-                <span class="epc-icon">📈</span>
+                <span class="epc-num">01</span>
                 <strong>Performance, explained</strong>
                 <span>Your equity curve vs the S&amp;P 500, every trade in plain English, and an animated replay of the whole run.</span>
               </div>
               <div class="empty-preview-card">
-                <span class="epc-icon">🎲</span>
+                <span class="epc-num">02</span>
                 <strong>Skill or luck?</strong>
                 <span>1,000 Monte Carlo simulations show whether your result truly stands out — or could just be chance.</span>
               </div>
               <div class="empty-preview-card">
-                <span class="epc-icon">✓</span>
+                <span class="epc-num">03</span>
                 <strong>An honest verdict</strong>
-                <span>Deflated Sharpe &amp; Fama-French distil it into one clear call on your strategy's edge.</span>
+                <span>Deflated Sharpe and Fama-French distil it into one clear call on your strategy's edge.</span>
               </div>
             </div>
 
-            <div class="empty-hint">👈 Everything's already filled in — just press <strong>Run Backtest</strong> to give it a spin.</div>
+            <div class="empty-hint">The form is pre-filled — just press <strong>Run Backtest</strong> to begin.</div>
           </div>
         </div>
 
@@ -275,7 +274,7 @@
             <div class="tab-list">
               <button class="tab-btn active" data-tab="perf-tab">Performance</button>
               <button class="tab-btn" data-tab="mc-tab">Monte Carlo</button>
-              <button class="tab-btn" data-tab="research-tab">⚗ Research</button>
+              <button class="tab-btn" data-tab="research-tab">Research</button>
               <button class="tab-btn" data-tab="trades-tab">Trades</button>
             </div>
 

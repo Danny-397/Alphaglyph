@@ -10,7 +10,7 @@ const API_BASE = window.RENDER_URL || (_isLocal ? 'http://localhost:5000' : '')
 
 if (!_isLocal && !window.RENDER_URL) {
   console.error(
-    '%c⚠ AlphaGlyph: RENDER_URL is not set in config.js.\n' +
+    '%cAlphaGlyph: RENDER_URL is not set in config.js.\n' +
     'All API calls will fail. Edit frontend/config.js and set your Render backend URL.',
     'color:#f85149;font-size:14px;font-weight:bold'
   )
@@ -407,7 +407,7 @@ function initBacktest() {
     const valEnd = mlCutoff.val_end
     if (el('bt-start').value < valEnd) el('bt-start').value = valEnd
     note.innerHTML =
-      `🧠 Trained on data through <strong>${mlCutoff.train_end}</strong>, validated through ` +
+      `Trained on data through <strong>${mlCutoff.train_end}</strong>, validated through ` +
       `<strong>${valEnd}</strong>. So you see the model working on data it never trained on, ` +
       `this backtest runs <strong>out-of-sample from ${valEnd}</strong>.`
     note.hidden = false
@@ -420,7 +420,7 @@ function initBacktest() {
       el('bt-start').value = daysAgo(730)   // 2y so it has dips to buy
       const note = el('bt-ml-note')
       if (note) {
-        note.innerHTML = '🪙 <strong>Dip Buyer</strong> only buys near 52-week lows — date range set to ' +
+        note.innerHTML = '<strong>Dip Buyer</strong> only buys near 52-week lows — date range set to ' +
           '<strong>2 years</strong> so it has dips to act on.'
         note.hidden = false
       }
@@ -558,9 +558,8 @@ function initBacktest() {
     // ── Leaderboard table ──
     el('cmp-tbody').innerHTML = ranked.map((r, i) => {
       const vs = (r.total_return != null && bench != null) ? r.total_return - bench : null
-      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1)
       return `<tr>
-        <td>${medal}</td>
+        <td style="font-weight:700;color:var(--muted);">${i + 1}</td>
         <td><span style="color:${CMP_COLORS[r.strategy] || 'var(--text)'};font-weight:700;">${r.label}</span></td>
         <td class="${clr(r.total_return)}"><strong>${fmtPct(r.total_return)}</strong></td>
         <td class="${clr(vs)}">${vs == null ? '—' : fmtPct(vs)}</td>
