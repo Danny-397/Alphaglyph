@@ -291,5 +291,16 @@
     </div>
   </footer>
 
+  <!-- Pre-warm the free-tier backend the moment someone lands here, so it's
+       already awake by the time they open the Backtester. This hides the Render
+       cold start behind the few seconds a visitor spends reading the page. -->
+  <script src="config.js"></script>
+  <script>
+    try {
+      var base = window.RENDER_URL || ''
+      if (base) fetch(base + '/health', { mode: 'no-cors', cache: 'no-store' }).catch(function () {})
+    } catch (e) { /* never let a warm-up ping break the page */ }
+  </script>
+
 </body>
 </html>
