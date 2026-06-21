@@ -230,6 +230,7 @@ def run_backtest(
     slippage_pct:     float = 0.0005,
     use_markowitz:    bool  = False,
     range_sizing:     bool  = False,
+    cash_in_market:   bool  = False,
     custom_rules:     dict | None = None,
 ) -> dict:
     """
@@ -334,8 +335,24 @@ def run_backtest(
         spend = min(base, csh - pv * DIP_RESERVE)
         return max(int(spend / px), 0) if px > 0 and spend > 0 else 0
 
+    # Reserve-in-market: when enabled, idle cash earns the S&P 500's return instead
+    # of 0% — the strategy's dry powder is parked in VOO/SPY (modelled with the
+    # already-downloaded SPY series) and effectively rotated into names as they dip
+    # and back out as they recover. Most impactful for the patient Dip Buyer, which
+    # otherwise sits on a large cash pile during a rising market.
+    spy_close_map = ({d: float(v) for d, v in spy_raw['Close'].items()}
+                     if cash_in_market and spy_raw is not None else {})
+    prev_spy_close = None
+
     for date in all_dates:
         recording = (split_date is None) or (date.strftime('%Y-%m-%d') >= split_date)
+
+        # Grow idle cash at the S&P 500's daily return (reserve held in VOO/SPY).
+        today_spy = spy_close_map.get(date)
+        if today_spy:
+            if cash_in_market and prev_spy_close:
+                cash *= today_spy / prev_spy_close
+            prev_spy_close = today_spy
 
         # Strategy and regime for today
         if is_adaptive:

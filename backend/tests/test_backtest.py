@@ -157,3 +157,42 @@ class TestPnLAccounting:
                             100_000, False, 'moderate', 0.001, 0.0005, custom_rules=rules)
         assert 'error' not in r
         assert r['metrics']['total_trades'] >= 0
+
+
+# ── Reserve-in-market (idle cash parked in VOO/SPY) ────────────────────────────
+
+class TestCashInMarket:
+    # A strategy that never buys → the account stays 100% in the reserve, which
+    # lets us check the reserve policy in isolation.
+    _NEVER = {'buy':  {'logic': 'all', 'conditions': [{'left': 'rsi14', 'op': 'lt', 'right': -1}]},
+              'sell': {'logic': 'all', 'conditions': [{'left': 'rsi14', 'op': 'gt', 'right': 200}]}}
+
+    def _run(self, cash_in_market):
+        return bt.run_backtest('custom', ['AAA'], '2020-06-01', '2021-06-01',
+                               100_000, False, 'moderate', 0.0, 0.0,
+                               cash_in_market=cash_in_market, custom_rules=self._NEVER)
+
+    def test_reserve_policy(self):
+        flat = self._run(False)
+        mkt  = self._run(True)
+        fm, mm = flat['metrics'], mkt['metrics']
+
+        # The strategy never trades under either policy.
+        assert fm['total_trades'] == 0 and mm['total_trades'] == 0
+
+        # Pure-cash reserve stays flat at the starting capital (earns 0%).
+        assert abs(fm['total_return']) < 0.01
+
+        # A 100%-idle reserve parked in SPY compounds at SPY's return over the
+        # *simulated* window — verify it tracks the SPY series across the exact
+        # dates the equity curve covers (the benchmark spans a slightly different
+        # window, so we compare against the series directly).
+        ec       = mkt['equity_curve']
+        spy      = _synth()['Close']
+        first    = pd.Timestamp(ec[0]['date'])
+        last     = pd.Timestamp(ec[-1]['date'])
+        expected = (spy.loc[last] / spy.loc[first] - 1) * 100
+        assert abs(mm['total_return'] - expected) < 0.5
+
+        # The synthetic path moves over the window, so the two policies diverge.
+        assert abs(mm['total_return'] - fm['total_return']) > 0.5

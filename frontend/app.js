@@ -649,6 +649,7 @@ function initBacktest() {
       slippage_pct:    slipPct / 100,
       use_markowitz:   el('bt-markowitz').checked,
       range_sizing:    el('bt-range-sizing').checked,
+      cash_in_market:  el('bt-cash-in-market').checked,
       ...(el('bt-strategy').value === 'custom' && btRules ? { custom_rules: btRules.getRules() } : {}),
     }
 

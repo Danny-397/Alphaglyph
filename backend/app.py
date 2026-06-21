@@ -348,6 +348,7 @@ def run_backtest():
     slippage_pct    = float(data.get('slippage_pct',   0.0003))
     use_markowitz   = bool(data.get('use_markowitz', False))
     range_sizing    = bool(data.get('range_sizing', False))
+    cash_in_market  = bool(data.get('cash_in_market', False))
     custom_rules    = _sanitize_rules(data.get('custom_rules')) if strategy == 'custom' else None
 
     if strategy not in VALID_STRATEGIES:
@@ -371,6 +372,7 @@ def run_backtest():
         commission_pct, slippage_pct,
         use_markowitz=use_markowitz,
         range_sizing=range_sizing,
+        cash_in_market=cash_in_market,
         custom_rules=custom_rules,
     )
     return jsonify(result)
