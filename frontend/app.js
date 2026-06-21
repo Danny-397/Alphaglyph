@@ -559,7 +559,7 @@ function initBacktest() {
     el('cmp-tbody').innerHTML = ranked.map((r, i) => {
       const vs = (r.total_return != null && bench != null) ? r.total_return - bench : null
       return `<tr>
-        <td style="font-weight:700;color:var(--muted);">${i + 1}</td>
+        <td><span class="rank-badge${i === 0 ? ' rank-top' : ''}">${i + 1}</span></td>
         <td><span style="color:${CMP_COLORS[r.strategy] || 'var(--text)'};font-weight:700;">${r.label}</span></td>
         <td class="${clr(r.total_return)}"><strong>${fmtPct(r.total_return)}</strong></td>
         <td class="${clr(vs)}">${vs == null ? '—' : fmtPct(vs)}</td>
