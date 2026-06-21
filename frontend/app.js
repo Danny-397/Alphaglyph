@@ -436,7 +436,7 @@ function initBacktest() {
   applyBtStrategyHints()   // apply hints for the default (recommended) strategy on load
 
   // ── Ticker management (free-text input, validated against the backend) ──
-  let btTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
+  let btTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'PLTR']
   const tickerInput = el('bt-ticker-input')
   const tickerAddBtn = el('bt-ticker-add')
   const tickerErr   = el('bt-ticker-error')
