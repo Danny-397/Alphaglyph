@@ -433,6 +433,7 @@ function initBacktest() {
     }
   }
   el('bt-strategy').addEventListener('change', applyBtStrategyHints)
+  applyBtStrategyHints()   // apply hints for the default (recommended) strategy on load
 
   // ── Ticker management (free-text input, validated against the backend) ──
   let btTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA', 'JPM', 'SPY']
