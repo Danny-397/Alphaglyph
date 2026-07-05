@@ -78,7 +78,13 @@ def run_simulation(
     stds        = sim_returns.std(axis=1)
     means       = sim_returns.mean(axis=1)
     rf_daily    = 0.04 / 252
-    sim_sharpes = np.where(stds > 0, (means - rf_daily) / stds * np.sqrt(252), 0.0)
+    # A resampled path can have zero volatility (e.g. every draw was the same
+    # return), which would make the Sharpe undefined. Divide only where std > 0 —
+    # np.where alone isn't enough because it still evaluates (and warns on) the
+    # 1/0 in the discarded branch before masking it.
+    sim_sharpes = np.zeros_like(stds)
+    np.divide((means - rf_daily) * np.sqrt(252), stds,
+              out=sim_sharpes, where=stds > 0)
 
     # ── Percentile ranks of the actual results ─────────────────────────────────
     actual_pct = float(np.mean(final_values <= actual_final) * 100)
