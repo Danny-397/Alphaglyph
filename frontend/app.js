@@ -873,6 +873,9 @@ function initBacktest() {
         </tbody></table>
         <p style="margin-top:12px;font-size:12px;color:var(--muted);">
           Actual ranks in the <strong style="color:var(--text);">${fmtN(mc.actual_percentile, 0)}th percentile</strong> of 1,000 paths.
+          ${mc.bootstrap_method === 'stationary'
+            ? `<br><span style="opacity:0.8;">Stationary block bootstrap (avg block ${mc.avg_block_len} days) — preserves autocorrelation.</span>`
+            : ''}
         </p>
       </div>
       <div class="card">

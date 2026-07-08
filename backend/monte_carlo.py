@@ -2,12 +2,25 @@
 Monte Carlo simulation for backtest result validation.
 
 Takes the daily return sequence from a completed backtest, resamples it
-1,000 times with replacement (bootstrap), and asks: where does the actual
-result sit in the distribution of random paths?
+1,000 times, and asks: where does the actual result sit in the distribution
+of random paths?
 
 If your strategy's Sharpe of 1.4 ranks in the 92nd percentile of 1,000
 random shuffles, that's statistically meaningful.  If it ranks in the 53rd
 percentile, the strategy is essentially indistinguishable from random.
+
+Bootstrap method
+----------------
+The default is a **stationary block bootstrap** (Politis & Romano, 1994),
+not the naive i.i.d. resample.  A plain i.i.d. bootstrap draws each day
+independently, which destroys the serial correlation real return series have
+(volatility clusters, short-term momentum/mean-reversion) and therefore
+*understates* the variance of the paths — flattering the strategy's
+percentile rank.  The stationary bootstrap instead stitches together blocks
+of consecutive days whose lengths are geometrically distributed (expected
+length ≈ n^(1/3)), so each resampled path preserves the local autocorrelation
+structure while the series as a whole stays stationary.  Pass method='iid'
+to recover the classic independent resample for comparison.
 
 Returns
 -------
@@ -31,11 +44,45 @@ from __future__ import annotations
 import numpy as np
 
 
+def _default_block_len(n: int) -> int:
+    """Expected block length for the stationary bootstrap.
+
+    The n^(1/3) rule is the standard order for the optimal block length of a
+    stationary series; clamped to [2, n] so short backtests still get real
+    blocks without the length exceeding the sample.
+    """
+    return int(min(n, max(2, round(n ** (1.0 / 3.0)))))
+
+
+def _stationary_bootstrap(returns: np.ndarray, n_simulations: int,
+                          avg_block_len: int) -> np.ndarray:
+    """Stationary block bootstrap (Politis & Romano, 1994).
+
+    Returns an (n_simulations, n) array of resampled daily returns in which
+    each path is built from wrap-around blocks of consecutive days whose
+    lengths are geometrically distributed with mean ``avg_block_len`` — so the
+    local autocorrelation of the original series is preserved.
+    """
+    n = len(returns)
+    p = 1.0 / avg_block_len                 # per-step probability of a new block
+    idx = np.empty((n_simulations, n), dtype=np.intp)
+    idx[:, 0] = np.random.randint(0, n, size=n_simulations)
+    new_block   = np.random.random((n_simulations, n)) < p
+    fresh_start = np.random.randint(0, n, size=(n_simulations, n))
+    for t in range(1, n):
+        # Continue the current block (next day, wrapping) unless a new block starts.
+        cont = (idx[:, t - 1] + 1) % n
+        idx[:, t] = np.where(new_block[:, t], fresh_start[:, t], cont)
+    return returns[idx]
+
+
 def run_simulation(
     port_hist: list[dict],
     initial_capital: float,
     actual_sharpe: float,
     n_simulations: int = 1000,
+    method: str = 'stationary',
+    avg_block_len: int | None = None,
 ) -> dict:
     """
     Bootstrap resample the daily return sequence n_simulations times.
@@ -46,6 +93,10 @@ def run_simulation(
     initial_capital : starting cash used in the backtest
     actual_sharpe   : Sharpe ratio the strategy actually achieved
     n_simulations   : number of random paths (default 1000)
+    method          : 'stationary' (default, block bootstrap — preserves
+                      autocorrelation) or 'iid' (classic independent resample)
+    avg_block_len   : expected block length for the stationary bootstrap;
+                      defaults to ~n^(1/3) (ignored when method='iid')
 
     Returns an 'enabled: False' dict if there are fewer than 5 data points.
     """
@@ -66,7 +117,14 @@ def run_simulation(
     # No fixed seed — slight variation across runs is expected and correct.
     # Each run gives slightly different percentile estimates, which demonstrates
     # that the conclusion is stable, not an artifact of a particular sample.
-    sim_returns = np.random.choice(returns, size=(n_simulations, n), replace=True)
+    # Stationary block bootstrap by default so paths keep the serial correlation
+    # (volatility clustering, momentum) that an i.i.d. resample would erase.
+    block_len = avg_block_len or _default_block_len(n)
+    if method == 'iid':
+        sim_returns = np.random.choice(returns, size=(n_simulations, n), replace=True)
+    else:
+        method = 'stationary'
+        sim_returns = _stationary_bootstrap(returns, n_simulations, block_len)
 
     # Equity curves: shape (n_simulations, n)
     # Each row is one simulated path starting from initial_capital
@@ -108,6 +166,8 @@ def run_simulation(
     return {
         'enabled':             True,
         'n_simulations':       n_simulations,
+        'bootstrap_method':    method,
+        'avg_block_len':       block_len if method == 'stationary' else 1,
         'actual_return_pct':   round(actual_return, 2),
         'actual_percentile':   round(actual_pct,    1),
         'sharpe_percentile':   round(sharpe_pct,    1),
