@@ -4,7 +4,7 @@
 
 # ◈ AlphaGlyph — A Backtesting & Strategy-Validation Lab
 
-**A backtesting & strategy-validation lab.** Run classical quantitative strategies, a patient "dip-buyer" value strategy, build-your-own-rule custom strategies, or a multi-modal machine-learning transformer on real historical prices with simulated capital — every trade explained in plain English — then do what most backtests don't: **check whether the edge is genuine skill or just luck**, with the same statistical tests institutional quant funds use (Monte Carlo, Deflated Sharpe, Fama-French). The backend is fully stateless, so the demo is free-tier-proof.
+**A backtesting & strategy-validation lab.** Run classical quantitative strategies, a patient "dip-buyer" value strategy, build-your-own-rule custom strategies, or a multi-modal machine-learning transformer on real historical prices with simulated capital — every trade explained in plain English — then do what most backtests don't: **check whether the edge is genuine skill or just luck**, with the same statistical tests institutional quant funds use (a random-timing permutation test, Deflated Sharpe, Fama-French). The backend is fully stateless, so the demo is free-tier-proof.
 
 [![CI](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml/badge.svg)](https://github.com/Danny-397/alphaglyph/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -31,9 +31,11 @@ AlphaGlyph is a full-stack quantitative platform with one thing most student tra
 
 Anyone can pick a strategy, run it on real historical prices, and see **every decision explained** — what the strategy saw, in which market regime, and why it bought or sold (with an optional animated replay of the whole run). But most backtesting tools show you a Sharpe ratio and stop there. This one goes further — after every simulation it applies three independent statistical tests borrowed from professional quant finance:
 
-1. **Monte Carlo Resampling** (1,000 stationary block-bootstrap paths) — does this strategy actually beat random, once the returns' autocorrelation is respected?
+1. **Skill Test vs Random Timing** (1,000-path permutation test) — does the strategy's Sharpe actually beat "monkey" traders that time the market at random with the same exposure? (This is the real "beats random?" test — see the note below on why a naive bootstrap *can't* answer it.)
 2. **Deflated Sharpe Ratio** (Lopez de Prado, 2014) — is the Sharpe genuine after correcting for multiple-testing bias and non-normal returns?
 3. **Fama-French 3-Factor Decomposition** — is the return actually alpha, or just passive exposure to known risk premia a factor ETF would replicate for free?
+
+A fourth panel — a **Monte Carlo fan chart** (1,000 stationary block-bootstrap paths) — shows the *range of outcomes*, but is honestly labelled as an outcome-spread view, **not** a skill test (a bootstrap of a strategy's own returns sits at ~the 50th percentile by construction, so it can't tell skill from luck — the permutation test is what does that).
 
 …synthesised into a verdict card: **STATISTICALLY SIGNIFICANT**, **PROMISING — NEEDS MORE DATA**, or **INCONCLUSIVE — MAY BE NOISE**.
 
@@ -64,7 +66,7 @@ What I take away from it: the interesting engineering in quant isn't the predict
 | "My Sharpe is 1.4" | "My Sharpe is 1.4 and the Deflated Sharpe gives 91% probability it's real after testing 5 strategies" |
 | Backtest return metric | Fama-French alpha decomposition — separates skill from passive factor exposure |
 | No portfolio theory | Markowitz efficient frontier via quadratic programming; max-Sharpe and min-variance portfolios |
-| No statistical context | Monte Carlo fan chart + Sharpe percentile rank vs 1,000 resampled paths |
+| No statistical context | Permutation skill test vs 1,000 random-timing traders + a Monte Carlo outcome-spread fan chart (honestly distinguished from each other) |
 | No market context | ADX + Bollinger Band Width + realized volatility regime detection; adaptive strategy selection |
 
 ---
@@ -109,7 +111,8 @@ Indicators: **ADX** (Wilder's smoothing), **Bollinger Band Width** (consolidatio
 - **Calmar ratio**: annualised return / max drawdown — risk-adjusted metric used by hedge funds
 
 ### Statistical Validation
-- **Monte Carlo (1,000 paths)**: resamples the daily return sequence and computes where the actual result ranks in the distribution of random paths. Uses a **stationary block bootstrap** (Politis & Romano, 1994) by default — blocks of consecutive days with geometrically-distributed lengths (mean ≈ n^⅓) — so each path preserves the serial correlation (volatility clustering, momentum) that a naive i.i.d. resample erases and thereby *over*-flatters the strategy. Fan chart shows P5/P25/P50/P75/P95 equity bands.
+- **Skill Test — random-timing permutation (the real "beats random?" test)**: builds 1,000 "monkey" traders that go long the SPY benchmark on a *random* subset of days, sized to the strategy's own market exposure, and ranks the strategy's Sharpe against that null. A percentile ≥ 95 means the *timing* beat ~95% of random schedules (p ≲ 0.05). **Why this and not the Monte Carlo below:** a bootstrap of a strategy's own returns is centered on the actual result *by construction* (the resampled mean equals the sample mean), so its percentile is ~50 for almost any strategy and cannot separate skill from luck. The permutation test uses a null with real structure, so its percentile actually moves with skill. *Honest limitation:* the null trades the benchmark, so it blends market-timing skill with asset selection — a genuine null, not a perfect attribution.
+- **Monte Carlo outcome spread (1,000 paths)**: resamples the daily return sequence with a **stationary block bootstrap** (Politis & Romano, 1994) — blocks of consecutive days with geometrically-distributed lengths (mean ≈ n^⅓) — so each path preserves the serial correlation (volatility clustering, momentum) an i.i.d. resample would erase. Shown as a P5/P25/P50/P75/P95 fan chart and labelled in the UI as an **outcome-spread view, not a skill test** (see above).
 - **Probabilistic Sharpe Ratio (PSR)**: P(SR\_true > SR*) corrected for non-normality using skewness and excess kurtosis (Lopez de Prado, 2014, eq. 1)
 - **Deflated Sharpe Ratio (DSR)**: PSR where the benchmark is the *expected maximum Sharpe from N independent random strategies*, scaling correctly with sample size via √(252/T). Tells you whether the best result from a search over strategies is real or just the luckiest of N.
 - **Fama-French 3-Factor Decomposition**: OLS regression of portfolio excess returns against Mkt-RF, SMB (size), and HML (value) factors from Ken French's data library. Reports Jensen's alpha (annualised), factor betas, R², and per-coefficient t-statistics.
@@ -120,6 +123,7 @@ Indicators: **ADX** (Wilder's smoothing), **Bollinger Band Width** (consolidatio
 - Returns the **max-Sharpe (tangency) portfolio** and **global minimum-variance portfolio**
 - Visualises individual asset risk/return scatter, optimal portfolio positions, and a **Pearson correlation heatmap**
 - Optional integration with backtest: when `use_markowitz=true`, optimal weights replace the fixed `max_position_pct` in position sizing
+- **Honest caveat (shown in the UI):** expected returns are historical means, so this is *naive* Markowitz — hypersensitive to the return estimate, prone to over-concentration and unrealistically high "expected" returns. Weights are illustrative; shrinkage (Ledoit-Wolf) or Black-Litterman would be the professional next step.
 
 ### Risk Management (all enforced on every order)
 
@@ -136,7 +140,7 @@ Stops are intentionally wide and take-profit is largely disabled by design: the 
 
 ### Pages (intentionally just three)
 - **Home** (`index.html`) — landing page; the whole pitch is "run a strategy, then find out if the edge is real."
-- **Backtest** (`backtest.html`) — **the core.** Pick any of 6 strategies or build your own rules, run it on real history with transaction costs, and get: the equity curve, every trade explained in plain English, an **optional animated replay** of the run, the **Strategy Leaderboard**, and 4-tab results (Performance / Monte Carlo / ⚗ Research / Trades) ending in the **Strategy Validation Report** (Monte Carlo + Deflated Sharpe + Fama-French → one colour-coded verdict).
+- **Backtest** (`backtest.html`) — **the core.** Pick any of 6 strategies or build your own rules, run it on real history with transaction costs, and get: the equity curve, every trade explained in plain English, an **optional animated replay** of the run, the **Strategy Leaderboard**, and 4-tab results (Performance / Monte Carlo / ⚗ Research / Trades) ending in the **Strategy Validation Report** (Skill Test + Deflated Sharpe + Fama-French → one colour-coded verdict; the Monte Carlo tab is the outcome-spread fan chart).
 - **Tools** (`tools.html`) — two utilities beyond backtesting, as tabs: a **Live Signal Scanner** (what every strategy + the ML model says about your watchlist now) and the **Markowitz Portfolio Optimizer** (efficient frontier, optimal weights, correlation heatmap).
 - Vanilla HTML/CSS/JS + Chart.js — zero frontend frameworks, zero build step.
 
@@ -181,7 +185,7 @@ All indicator maths (SMA, EMA, RSI, MACD, ADX, Bollinger Bands) are implemented 
 - No React, no Vue, no Webpack — open any `.html` file in a browser
 
 ### CI/CD
-- GitHub Actions: syntax check (`py_compile`), flake8 lint, pytest (130 tests), DB + simulator smoke test
+- GitHub Actions: syntax check (`py_compile`), flake8 lint, pytest (140 tests), DB + simulator smoke test
 - Security audit via pip-audit (non-blocking, runs as separate job)
 
 ---
@@ -203,7 +207,7 @@ flowchart LR
     subgraph API["⚙️ Flask API — Render (stateless)"]
         BT[backtest.py<br/>walk-forward · Kelly · costs]
         ST[stats.py<br/>PSR · Deflated Sharpe · Fama-French]
-        MC[monte_carlo.py<br/>1,000 bootstrap paths]
+        MC[monte_carlo.py<br/>skill permutation test<br/>+ bootstrap fan chart]
         PF[portfolio.py<br/>Markowitz frontier]
         RG[regime.py<br/>ADX · BBW · vol]
         ML[ml_runtime.py<br/>ONNX inference]
@@ -249,12 +253,12 @@ alphaglyph/
 │   ├── regime.py        Market regime detection (ADX, BB Width, realised volatility)
 │   ├── risk.py          Risk profiles: trailing stop, Kelly sizing, caps, daily limits
 │   ├── portfolio.py     Markowitz efficient frontier via SciPy SLSQP
-│   ├── monte_carlo.py   Bootstrap resampling — 1,000 equity paths, fan-chart bands
+│   ├── monte_carlo.py   Random-timing permutation skill test + stationary block-bootstrap fan chart
 │   ├── stats.py         PSR, Deflated Sharpe Ratio, Fama-French 3-factor OLS
 │   ├── simulator.py     Standalone paper-trading sim + database.py — retained & tested,
 │   │                    not used by the stateless API
 │   ├── gunicorn.conf.py
-│   └── tests/           130 tests, fully offline
+│   └── tests/           140 tests, fully offline
 │       ├── test_backtest.py   no look-ahead, P&L accounting, custom-rule evaluator
 │       ├── test_risk.py · test_simulator.py · test_features.py
 │       └── test_portfolio.py · test_stats.py
@@ -281,7 +285,7 @@ The API is **fully stateless** — no database, no server-side bot. Every endpoi
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/backtest` | POST | Full backtest with walk-forward, Kelly, Monte Carlo, DSR, Fama-French. The core of the app. |
+| `/api/backtest` | POST | Full backtest with walk-forward, Kelly, skill test, Monte Carlo, DSR, Fama-French. The core of the app. |
 | `/api/compare` | POST | Run every strategy on the same inputs → ranked leaderboard |
 | `/api/scan` | GET | Live Signal Scanner: current stance of every strategy + ML per ticker |
 | `/api/regime` | GET | Detect the current market regime from live SPY data |
@@ -356,7 +360,7 @@ python -m http.server 3000 -d frontend
 ```bash
 cd backend
 pytest tests/ -v
-# 130 tests, all should pass
+# 140 tests, all should pass
 ```
 
 ---
@@ -434,7 +438,12 @@ Source: *Fama, E. F. & French, K. R. (1993). "Common risk factors in the returns
 `min w^T Σ w` s.t. `Σw = 1, w_i ≥ 0` (long-only, fully invested).
 Max-Sharpe: minimise `−(w^T μ − r_f) / √(w^T Σ w)`.
 Solved with `scipy.optimize.minimize(method='SLSQP')`. All annualisation uses 252 trading days.
+Expected returns μ are historical means — naive Markowitz, and deliberately flagged as such in the UI because it is hypersensitive to that estimate.
 Source: *Markowitz, H. (1952). "Portfolio Selection." Journal of Finance.*
+
+### Random-Timing Permutation Test (skill test)
+Null hypothesis: the strategy's timing is no better than chance. We draw 1,000 "monkey" schedules that are long the benchmark on a random subset of `k = round(exposure · T)` days (matched to the strategy's market exposure) and flat otherwise, and compute each schedule's annualised Sharpe the same way the backtest does. The reported statistic is the **percentile rank** of the strategy's Sharpe in that null distribution; `p ≈ 1 − percentile/100` (one-sided). Unlike a bootstrap of the strategy's own returns — whose percentile is ~50 by construction — this null has real structure, so the percentile genuinely tracks skill.
+Related: *Masters, T. (2018). "Permutation and Randomization Tests for Trading System Development."*
 
 ---
 
@@ -451,7 +460,9 @@ Backtesting is easy to get wrong in ways that flatter the result. Here is exactl
 ### What it honestly does *not* claim
 - **The ML model is roughly a coin flip (test AUC ≈ 0.51).** That is not a bug to hide — next-day equity direction is genuinely close to unpredictable, and any project claiming otherwise should be distrusted. The value here is the **rigour of the evaluation** (chronological splits, purged boundaries, out-of-sample gating, Deflated Sharpe), not a magic edge.
 - **The shipped model is currently price-only.** The transformer's architecture is multi-modal (price + macro + news-sentiment blocks, trained with modality dropout), but the committed checkpoint was trained with the macro/news blocks zero-filled because FRED/GDELT were unavailable during that run. So the "multi-modal" claim describes the *architecture and pipeline*, not the extra signal in this particular checkpoint — the macro/news channels light up only after a retrain with those sources reachable. (You can verify this yourself: the macro/news entries in `ml_model_meta.json` have mean/std of exactly `0.0`.)
-- **"Beats the market" is period-dependent.** Simple technical strategies frequently *underperform* buy-and-hold out-of-sample, especially in strong trends. A good-looking single-period return means little — that's exactly why the Monte Carlo percentile, Deflated Sharpe Ratio, and Fama-French alpha are shown: to ask whether a result is real or luck.
+- **"Beats the market" is period-dependent.** Simple technical strategies frequently *underperform* buy-and-hold out-of-sample, especially in strong trends. A good-looking single-period return means little — that's exactly why the skill test, Deflated Sharpe Ratio, and Fama-French alpha are shown: to ask whether a result is real or luck.
+- **The Monte Carlo fan chart is not a skill test.** A bootstrap of a strategy's *own* returns is centered on its actual result by construction, so its percentile hovers near 50 regardless of skill. It is presented (and labelled) as an outcome-*spread* view; the **random-timing permutation test** is the one that actually asks "did this beat random?" — and its null trades the benchmark, so it mixes timing skill with asset selection rather than isolating either perfectly.
+- **The portfolio optimizer is naive Markowitz.** Expected returns are historical means, which makes mean-variance optimization hypersensitive to estimation error — it over-concentrates and projects unrealistically high "expected" returns. Weights are illustrative, not advice; shrinkage or Black-Litterman would be the honest production fix.
 - **Fills are modelled at the daily close** on the signal day, with a flat commission + slippage cost per side. Real execution (next-open fills, market impact, partial fills, borrow costs) is not modelled.
 - **The 52-week range is taken within the fetched window**, so on a short backtest it approximates a shorter range; strategies that depend on it (Dip Buyer) default to a multi-year window.
 - **Survivorship/selection:** results are shown for liquid large-caps that exist today. Free-tier market data can also be rate-limited or revised.
@@ -468,10 +479,11 @@ backend/tests/
 ├── test_features.py   — SMA/RSI/MACD correctness on synthetic OHLCV data
 ├── test_portfolio.py  — Markowitz constraints, efficient frontier math
 ├── test_stats.py      — PSR/DSR math, FF3 CSV parsing, OLS regression
+├── test_monte_carlo.py— block bootstrap + random-timing skill test (percentile tracks skill)
 └── test_backtest.py   — NO LOOK-AHEAD, P&L accounting, custom-rule evaluator
 ```
 
-All **130 tests** pass with zero network calls — every test uses synthetic in-memory data or monkeypatched market-data/Fama-French calls, so the suite is fast and deterministic. Run with `pytest tests/ -v` from the `backend/` directory.
+All **140 tests** pass with zero network calls — every test uses synthetic in-memory data or monkeypatched market-data/Fama-French calls, so the suite is fast and deterministic. Run with `pytest tests/ -v` from the `backend/` directory.
 
 ---
 
@@ -488,7 +500,8 @@ Independent project demonstrating quantitative finance, statistical inference, a
 
 Key concepts implemented from scratch:
 - Wilder's ADX, Bollinger Bands, RSI (Wilder EMA smoothing), MACD
-- Kelly Criterion with Monte Carlo confirmation
-- Markowitz quadratic programming
+- Kelly Criterion sizing (rolling, no look-ahead)
+- Random-timing permutation skill test + stationary block-bootstrap Monte Carlo
+- Markowitz quadratic programming (with an honest naive-mean caveat)
 - Probabilistic and Deflated Sharpe Ratio (Lopez de Prado)
 - Fama-French 3-factor OLS decomposition

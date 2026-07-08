@@ -577,13 +577,23 @@ def run_backtest(
                 for d, v in spy_df['Close'].items()
             ]
 
-    # ── Monte Carlo validation ─────────────────────────────────────────────
+    # ── Monte Carlo outcome distribution (fan chart — NOT a skill test) ────
     mc_result = mc.run_simulation(port_hist, initial_capital, sharpe)
+
+    # Strategy daily returns (reused by the skill test and the DSR below)
+    port_rets = (np.diff([p['value'] for p in port_hist]) /
+                 np.array([p['value'] for p in port_hist[:-1]]))
+
+    # ── Skill test: does the timing beat random market timing? ─────────────
+    # Uses the SPY benchmark as the tradable proxy for the null model.
+    skill_result = {'enabled': False}
+    if spy_curve and len(spy_curve) > 1:
+        spy_vals  = np.array([p['value'] for p in spy_curve], dtype=float)
+        spy_rets  = np.diff(spy_vals) / spy_vals[:-1]
+        skill_result = mc.random_timing_test(sharpe, spy_rets, port_rets)
 
     # ── Deflated Sharpe Ratio (corrects for multiple-testing bias) ─────────
     # n_strategies = 4 valid strategies + adaptive = 5 total tested
-    port_rets = (np.diff([p['value'] for p in port_hist]) /
-                 np.array([p['value'] for p in port_hist[:-1]]))
     dsr_result = (st.deflated_sharpe_ratio(port_rets, n_strategies=5)
                   if len(port_rets) >= 10 else None)
 
@@ -612,6 +622,7 @@ def run_backtest(
             'benchmark_return': round(benchmark_return, 2),
         },
         'monte_carlo':        mc_result,
+        'skill_test':         skill_result,
         'deflated_sharpe':    dsr_result,
         'fama_french':        ff3_result,
         'markowitz_weights':  markowitz_weights if use_markowitz else None,

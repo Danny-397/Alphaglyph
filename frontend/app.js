@@ -154,6 +154,14 @@ const fmt$   = n  => n == null ? '—' : '$' + Number(n).toLocaleString('en-US',
 const fmtPct = (n, d = 2) => n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(d) + '%'
 const fmtN   = (n, d = 2) => n == null ? '—' : Number(n).toFixed(d)
 const clr    = n  => n == null ? '' : n > 0 ? 'positive' : n < 0 ? 'negative' : ''
+// Ordinal suffix: 1→"1st", 2→"2nd", 3→"3rd", 11→"11th", 21→"21st", 51→"51st".
+const ordinal = n => {
+  if (n == null) return '—'
+  const i = Math.round(Number(n)), m100 = i % 100, m10 = i % 10
+  const suffix = (m100 >= 11 && m100 <= 13) ? 'th'
+    : m10 === 1 ? 'st' : m10 === 2 ? 'nd' : m10 === 3 ? 'rd' : 'th'
+  return i + suffix
+}
 const today  = () => new Date().toISOString().slice(0, 10)
 const daysAgo = d => new Date(Date.now() - d * 86400000).toISOString().slice(0, 10)
 
@@ -178,7 +186,7 @@ const GLOSSARY = {
   'Total Costs':      'Commissions and slippage paid across every trade.',
   'Kelly Fraction':   'The mathematically optimal share of capital to risk per trade, from the historical win rate and payoff.',
   'Kelly %':          'The mathematically optimal share of capital to risk per trade, from the historical win rate and payoff.',
-  'vs SPY':           'How the strategy did versus buying and holding SPY — positive means it beat the market.',
+  'vs SPY':           'Excess return over buying and holding SPY (strategy return − SPY return). Positive means it beat the market; SPY\'s own return is in the summary line and equity chart.',
   'Gross Return':     'Return before trading costs are subtracted.',
   'Deflated Sharpe':  'The Sharpe ratio corrected for luck and for testing many strategies. Above 95% means the result is very likely real.',
   'Probabilistic Sharpe': 'The probability the true Sharpe ratio is above zero, after accounting for fat tails and sample size.',
@@ -432,7 +440,16 @@ function initBacktest() {
       if (isCustom && !btRules) btRules = makeRuleBuilder(rb)
     }
   }
-  el('bt-strategy').addEventListener('change', applyBtStrategyHints)
+  el('bt-strategy').addEventListener('change', () => {
+    applyBtStrategyHints()
+    // Changing the strategy invalidates any result on screen — clear it so the
+    // summary/leaderboard can never disagree with the currently-selected strategy.
+    el('results-container').hidden = true
+    el('compare-container').hidden = true
+    if (el('loading-state').hidden && el('compare-loading').hidden) {
+      el('empty-state').hidden = false
+    }
+  })
   applyBtStrategyHints()   // apply hints for the default (recommended) strategy on load
 
   // ── Ticker management (free-text input, validated against the backend) ──
@@ -795,7 +812,7 @@ function initBacktest() {
       statCard('Calmar Ratio',  fmtN(m.calmar_ratio)),
       statCard('Kelly %',       m.kelly_fraction != null ? fmtN(m.kelly_fraction) + '%' : '—'),
       statCard('Gross Return',  fmtPct(m.gross_return)),
-      statCard('vs SPY',        fmtPct(m.benchmark_return), clr((m.total_return || 0) - (m.benchmark_return || 0))),
+      statCard('vs SPY',        fmtPct((m.total_return || 0) - (m.benchmark_return || 0)), clr((m.total_return || 0) - (m.benchmark_return || 0))),
     ].join('')
   }
 
@@ -872,7 +889,10 @@ function initBacktest() {
             .map(([k, v]) => `<tr><td>${k}</td><td class="${clr(v)}">${fmtPct(v)}</td></tr>`).join('')}
         </tbody></table>
         <p style="margin-top:12px;font-size:12px;color:var(--muted);">
-          Actual ranks in the <strong style="color:var(--text);">${fmtN(mc.actual_percentile, 0)}th percentile</strong> of 1,000 paths.
+          The range of outcomes when the strategy's own daily returns are
+          resampled. This is a picture of <strong style="color:var(--text);">outcome spread</strong>,
+          not a skill test — the actual sits near the middle by construction.
+          The <em>Research</em> tab's skill test is what asks whether the timing beat random.
           ${mc.bootstrap_method === 'stationary'
             ? `<br><span style="opacity:0.8;">Stationary block bootstrap (avg block ${mc.avg_block_len} days) — preserves autocorrelation.</span>`
             : ''}
@@ -886,18 +906,18 @@ function initBacktest() {
             .map(([k, v]) => `<tr><td>${k}</td><td>${fmtN(v)}</td></tr>`).join('')}
         </tbody></table>
         <p style="margin-top:12px;font-size:12px;color:var(--muted);">
-          Sharpe ranks in the <strong style="color:var(--text);">${fmtN(mc.sharpe_percentile, 0)}th percentile</strong>.
+          Spread of Sharpe ratios across the ${fmtN(mc.n_simulations || 1000, 0)} resampled paths.
         </p>
       </div>`
   }
 
   function renderResearchTab(data) {
-    const mc  = data.monte_carlo      || {}
-    const dsr = data.deflated_sharpe  || {}
-    const ff3 = data.fama_french      || {}
+    const dsr   = data.deflated_sharpe  || {}
+    const ff3   = data.fama_french      || {}
+    const skill = data.skill_test       || {}
 
-    const mcPct    = mc.actual_percentile ?? 0
-    const test1    = mcPct > 75
+    const skillPct = skill.enabled ? (skill.skill_percentile ?? 0) : null
+    const test1    = skill.enabled && skillPct >= 95   // beat 95% of random-timing schedules
     const test2    = dsr.is_significant ?? false
     const test3    = ff3.enabled && Math.abs(ff3.alpha_t_stat || 0) > 2.0
 
@@ -918,7 +938,9 @@ function initBacktest() {
         <div class="verdict-label">Strategy Validation Report</div>
         <div class="verdict-main">${vText}</div>
         <div class="verdict-tests">
-          ${testRow(test1, `Monte Carlo: actual result ranked in the <strong>${fmtN(mcPct, 0)}th percentile</strong> of 1,000 resampled market paths`)}
+          ${testRow(test1, skill.enabled
+            ? `Skill test: the strategy's Sharpe beat <strong>${ordinal(skillPct)} percentile</strong> of 1,000 random-timing schedules (matched exposure ${fmtN(skill.exposure_pct, 0)}%) — ${skillPct >= 95 ? 'better than random' : 'not distinguishable from random'}`
+            : 'Skill test: needs a benchmark series — run with SPY available')}
           ${testRow(test2, `Deflated Sharpe: <strong>${dsr.dsr != null ? (dsr.dsr * 100).toFixed(1) + '% confidence' : 'n/a'}</strong> result is real — corrected for ${dsr.n_strategies || 5} strategies (DSR&nbsp;=&nbsp;${dsr.dsr != null ? fmtN(dsr.dsr, 3) : 'n/a'})`)}
           ${testRow(test3, ff3.enabled
             ? `Fama-French: annual alpha <strong class="${clr(ff3.alpha_annual)}">${fmtPct(ff3.alpha_annual, 2)}/yr</strong> — ${Math.abs(ff3.alpha_t_stat || 0) > 2 ? 'statistically significant' : 'not significant'} (|t|&nbsp;=&nbsp;${fmtN(Math.abs(ff3.alpha_t_stat || 0), 2)})`
@@ -936,6 +958,28 @@ function initBacktest() {
       </div>`
 
     el('research-detail-grid').innerHTML = `
+      <div class="card">
+        <div class="section-header">Skill Test — vs Random Timing</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+          Compares the strategy's Sharpe to <strong>1,000 "monkey" traders</strong> that
+          go long the market on random days, matched to the strategy's own market
+          exposure. A high percentile means the <strong>timing</strong> — not just being
+          invested — added value. (This is the real skill test; the Monte&nbsp;Carlo tab
+          shows the outcome <em>spread</em>, which sits at ~50% by construction.)
+        </p>
+        ${skill.enabled
+          ? bar('Beat random-timing schedules', skillPct) + `
+            <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);">
+              Strategy Sharpe: <strong style="color:var(--text);">${fmtN(skill.strategy_sharpe)}</strong>
+              &nbsp;·&nbsp; Random median: <strong style="color:var(--text);">${fmtN(skill.null_sharpe_median)}</strong>
+              &nbsp;·&nbsp; Exposure: <strong style="color:var(--text);">${fmtN(skill.exposure_pct, 0)}%</strong>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6;">
+              Honest limitation: the null trades the SPY benchmark, so it blends
+              market-timing skill with asset selection — a genuine null, not a perfect attribution.
+            </p>`
+          : '<p style="color:var(--muted);font-size:13px;">Needs a benchmark series (SPY) over the backtest window.</p>'}
+      </div>
       <div class="card">
         <div class="section-header">Deflated Sharpe Ratio</div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">

@@ -140,6 +140,13 @@
               Each point is a sampled portfolio. The curve is the efficient frontier — minimum volatility for each return level.
               <strong style="color:var(--yellow);">★</strong> = max-Sharpe (tangency). <strong style="color:var(--text);">◆</strong> = min-variance.
             </p>
+            <p class="text-muted" style="margin-top:10px;font-size:11px;line-height:1.6;border-top:1px solid var(--border);padding-top:10px;">
+              ⚠ <strong>Expected returns are historical means.</strong> Naive Markowitz is
+              extremely sensitive to this estimate, so it tends to over-concentrate in
+              whatever happened to run hardest and project unrealistically high "expected"
+              returns. Treat the weights as illustrative, not advice — professional desks
+              use shrinkage (Ledoit-Wolf) or Black-Litterman to temper this. Educational only.
+            </p>
           </div>
           <div>
             <div class="card" style="margin-bottom:16px;">

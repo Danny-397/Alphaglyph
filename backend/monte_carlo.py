@@ -168,6 +168,7 @@ def run_simulation(
         'n_simulations':       n_simulations,
         'bootstrap_method':    method,
         'avg_block_len':       block_len if method == 'stationary' else 1,
+        'is_skill_test':       False,   # this is an outcome-spread view, not a skill test
         'actual_return_pct':   round(actual_return, 2),
         'actual_percentile':   round(actual_pct,    1),
         'sharpe_percentile':   round(sharpe_pct,    1),
@@ -193,4 +194,81 @@ def run_simulation(
             'p75':   _band(75),
             'p95':   _band(95),
         },
+    }
+
+
+# ── Skill test: random-timing permutation ──────────────────────────────────────
+# Why this exists (and why the bootstrap above is NOT a skill test):
+# The bootstrap resamples the strategy's *own* daily returns, so the actual
+# compound return and Sharpe sit at ~the 50th percentile of the resampled
+# distribution *by construction* (the resampled mean equals the sample mean).
+# That makes the fan chart a good picture of the *range of outcomes*, but it
+# cannot tell you whether the strategy has genuine skill — its percentile is
+# ~50 for almost any strategy. To actually ask "did the timing beat random?"
+# you need a null with real structure, which is what this test provides.
+
+
+def random_timing_test(
+    strategy_sharpe: float,
+    benchmark_returns,
+    strategy_returns,
+    n_simulations: int = 1000,
+) -> dict:
+    """
+    Permutation test: does the strategy's Sharpe beat *random market timing*?
+
+    The null model is a "monkey" trader that, on a random subset of days, is
+    long the market benchmark (SPY) and is otherwise in cash — sized so it is
+    invested on the same fraction of days as the real strategy (its exposure).
+    We build n_simulations such random-timing paths, compute each one's Sharpe
+    the same way the backtest does, and report the percentile rank of the
+    strategy's Sharpe in that distribution.
+
+        skill_percentile ≈ 50  →  no better than randomly timing the market
+        skill_percentile ≥ 95  →  timing beat ~95% of random schedules (p ≲ 0.05)
+
+    Honest limitation: the null trades the benchmark, not the strategy's exact
+    universe, so it blends "market-timing skill" with "asset selection". It is
+    a genuine, non-degenerate null (unlike the self-resample) — not a perfect
+    attribution. Returns {'enabled': False, ...} when inputs are too short.
+    """
+    bm = np.asarray(benchmark_returns, dtype=float)
+    sr = np.asarray(strategy_returns, dtype=float)
+    n  = len(bm)
+    if n < 20 or not np.isfinite(strategy_sharpe):
+        return {'enabled': False, 'reason': 'Need 20+ benchmark days for a skill test.'}
+
+    # Exposure proxy: fraction of days the strategy was actually invested.
+    # A fully-in-cash day has an exactly-zero portfolio return; any open
+    # position makes the day's return non-zero. Clamp away from 0 and 1.
+    if len(sr):
+        exposure = float(np.mean(np.abs(sr) > 1e-9))
+    else:
+        exposure = 0.5
+    exposure = min(max(exposure, 1.0 / n), 1.0)
+    k = max(1, min(n, int(round(exposure * n))))
+
+    rf_daily = 0.04 / 252
+
+    # Vectorised: each row picks k distinct in-market days via argsort of noise.
+    order   = np.random.random((n_simulations, n)).argsort(axis=1)
+    in_mkt  = order < k                                  # exactly k True per row
+    sim     = np.where(in_mkt, bm[None, :], 0.0)         # cash days earn 0
+
+    means = sim.mean(axis=1)
+    stds  = sim.std(axis=1)
+    sharpes = np.zeros(n_simulations)
+    np.divide((means - rf_daily) * np.sqrt(252), stds, out=sharpes, where=stds > 0)
+
+    pct = float(np.mean(sharpes <= strategy_sharpe) * 100)
+
+    return {
+        'enabled':            True,
+        'skill_percentile':   round(pct, 1),
+        'strategy_sharpe':    round(float(strategy_sharpe), 3),
+        'exposure_pct':       round(exposure * 100, 1),
+        'n_simulations':      n_simulations,
+        'null_sharpe_median': round(float(np.percentile(sharpes, 50)), 3),
+        'null_sharpe_p95':    round(float(np.percentile(sharpes, 95)), 3),
+        'is_significant':     bool(pct >= 95.0),
     }
