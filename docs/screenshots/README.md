@@ -1,17 +1,22 @@
 # Screenshots — capture checklist
 
-Drop PNGs here and they'll appear in the main README's **Screenshots** section
-(the `<img>` tags there are ready — just uncomment them once the files exist).
+Drop PNGs here and reference them from the main README's **Screenshots** section.
 
 Capture from the live demo ([alphaglyph.org](https://alphaglyph.org)) or a local
 run. Use a ~1440px-wide window, the dark theme, and crop out the browser chrome.
+Keep each image under ~500 KB.
 
-| Filename | What to capture | Why it sells the project |
+## Already in the README
+- ✅ `backtest.png` — equity curve vs SPY + "Watch it trade" explained trades
+- ✅ `scanner.png` — Signal Scanner watchlist stance table
+
+## Still to capture — **must be from the updated UI** (older shots are stale)
+| Filename | What to capture | Why / what changed |
 |---|---|---|
-| `verdict.png` | The **Strategy Validation Report** card (⚗ Research tab) showing the colour-coded verdict + the three tests (Monte Carlo / Deflated Sharpe / Fama-French) | This is the project's whole thesis in one image — the honesty layer no student project has |
-| `backtest.png` | The Backtest results: equity curve vs SPY + a couple of plain-English explained trades | Shows the core loop and the "every trade explained" differentiator |
-| `montecarlo.png` | The Monte Carlo **fan chart** with the P5–P95 bands and the percentile caption | Shows statistical rigour visually |
-| `optimizer.png` *(optional)* | The Markowitz efficient frontier + correlation heatmap (Tools tab) | Shows portfolio-theory depth |
+| `verdict.png` | ⚗ Research tab — the Strategy Validation Report card | The first test is now the **Skill Test vs random timing**, not "Monte Carlo percentile". Re-grab so it matches the shipped verdict. |
+| `montecarlo.png` | Monte Carlo tab — the P5–P95 fan chart | Now labelled an **outcome-spread** view, not a skill test. |
+| `optimizer.png` | Tools → Portfolio Optimizer — efficient frontier | Now shows the **naive-Markowitz caveat** under the chart; capture it so the caveat is visible. |
 
-Keep each image under ~500 KB (PNG, or run through an optimizer) so the README
-stays fast to load.
+A leaderboard shot (Backtest → "Compare all strategies") is also a great asset —
+just capture it right after running compare-all so the summary below matches the
+leaderboard (the stale-summary bug that could show a mismatched strategy is fixed).

@@ -150,11 +150,18 @@ Stops are intentionally wide and take-profit is largely disabled by design: the 
 
 The fastest way to see AlphaGlyph is the **[live demo → alphaglyph.org](https://alphaglyph.org)** — pick a strategy, hit run, and open the ⚗ Research tab for the verdict.
 
-<!-- Annotated screenshots go in docs/screenshots/ (see that folder's checklist).
-     Uncomment each line once the PNG exists:
-<p align="center"><img src="docs/screenshots/verdict.png"     alt="Strategy Validation Report — colour-coded verdict from three statistical tests" width="90%"></p>
-<p align="center"><img src="docs/screenshots/backtest.png"    alt="Backtest: equity curve vs SPY with plain-English explained trades"           width="90%"></p>
-<p align="center"><img src="docs/screenshots/montecarlo.png"  alt="Monte Carlo fan chart with P5–P95 equity bands"                              width="90%"></p>
+**Backtest — equity curve vs SPY with every trade explained in plain English:**
+
+<p align="center"><img src="docs/screenshots/backtest.png" alt="Backtest: MA Crossover equity curve beating SPY, with the day-by-day 'Watch it trade' replay and plain-English trade reasons" width="90%"></p>
+
+**Signal Scanner — every strategy's current stance on a watchlist (note the ML column sitting honestly near 55%, a coin flip):**
+
+<p align="center"><img src="docs/screenshots/scanner.png" alt="Signal Scanner: current MA/RSI/MACD/ML stance and consensus for a watchlist, with the regime banner" width="90%"></p>
+
+<!-- To add next (re-capture from the updated app so they match the current UI):
+<p align="center"><img src="docs/screenshots/verdict.png"    alt="Strategy Validation Report — verdict from the Skill Test + Deflated Sharpe + Fama-French" width="90%"></p>
+<p align="center"><img src="docs/screenshots/montecarlo.png" alt="Monte Carlo outcome-spread fan chart with P5–P95 equity bands"                          width="90%"></p>
+<p align="center"><img src="docs/screenshots/optimizer.png"  alt="Markowitz efficient frontier with the max-Sharpe and min-variance portfolios"          width="90%"></p>
 -->
 
 ---
