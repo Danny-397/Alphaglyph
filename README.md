@@ -158,10 +158,13 @@ The fastest way to see AlphaGlyph is the **[live demo → alphaglyph.org](https:
 
 <p align="center"><img src="docs/screenshots/scanner.png" alt="Signal Scanner: current MA/RSI/MACD/ML stance and consensus for a watchlist, with the regime banner" width="90%"></p>
 
+**Portfolio Optimizer — Markowitz efficient frontier, with the honest naive-mean caveat shown in the UI:**
+
+<p align="center"><img src="docs/screenshots/optimizer.png" alt="Markowitz efficient frontier with the max-Sharpe and min-variance portfolios, and the naive-Markowitz caveat" width="90%"></p>
+
 <!-- To add next (re-capture from the updated app so they match the current UI):
 <p align="center"><img src="docs/screenshots/verdict.png"    alt="Strategy Validation Report — verdict from the Skill Test + Deflated Sharpe + Fama-French" width="90%"></p>
 <p align="center"><img src="docs/screenshots/montecarlo.png" alt="Monte Carlo outcome-spread fan chart with P5–P95 equity bands"                          width="90%"></p>
-<p align="center"><img src="docs/screenshots/optimizer.png"  alt="Markowitz efficient frontier with the max-Sharpe and min-variance portfolios"          width="90%"></p>
 -->
 
 ---
