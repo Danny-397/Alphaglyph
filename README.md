@@ -150,9 +150,17 @@ Stops are intentionally wide and take-profit is largely disabled by design: the 
 
 The fastest way to see AlphaGlyph is the **[live demo → alphaglyph.org](https://alphaglyph.org)** — pick a strategy, hit run, and open the ⚗ Research tab for the verdict.
 
+**Strategy Validation Report — the whole point of the project: after the backtest, three independent tests ask whether the edge is real. The skill test vs random timing, Deflated Sharpe, and Fama-French alpha each pass or fail into one colour-coded verdict:**
+
+<p align="center"><img src="docs/screenshots/verdict.png" alt="Strategy Validation Report: skill test vs random timing, Deflated Sharpe, and Fama-French alpha combined into a PROMISING verdict, with the Skill Test detail card" width="90%"></p>
+
 **Backtest — equity curve vs SPY with every trade explained in plain English:**
 
 <p align="center"><img src="docs/screenshots/backtest.png" alt="Backtest: MA Crossover equity curve beating SPY, with the day-by-day 'Watch it trade' replay and plain-English trade reasons" width="90%"></p>
+
+**Monte Carlo — the outcome-spread fan chart (P5–P95), honestly labelled as a spread view rather than a skill test:**
+
+<p align="center"><img src="docs/screenshots/montecarlo.png" alt="Monte Carlo outcome-spread fan chart with P5–P95 equity bands and return/Sharpe distribution tables" width="90%"></p>
 
 **Signal Scanner — every strategy's current stance on a watchlist (note the ML column sitting honestly near 55%, a coin flip):**
 
@@ -161,11 +169,6 @@ The fastest way to see AlphaGlyph is the **[live demo → alphaglyph.org](https:
 **Portfolio Optimizer — Markowitz efficient frontier, with the honest naive-mean caveat shown in the UI:**
 
 <p align="center"><img src="docs/screenshots/optimizer.png" alt="Markowitz efficient frontier with the max-Sharpe and min-variance portfolios, and the naive-Markowitz caveat" width="90%"></p>
-
-<!-- To add next (re-capture from the updated app so they match the current UI):
-<p align="center"><img src="docs/screenshots/verdict.png"    alt="Strategy Validation Report — verdict from the Skill Test + Deflated Sharpe + Fama-French" width="90%"></p>
-<p align="center"><img src="docs/screenshots/montecarlo.png" alt="Monte Carlo outcome-spread fan chart with P5–P95 equity bands"                          width="90%"></p>
--->
 
 ---
 
