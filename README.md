@@ -1,8 +1,12 @@
 <p align="center">
-  <img src="docs/banner.svg" alt="AlphaGlyph — backtest a strategy, then find out if the edge is real" width="100%">
+  <a href="https://alphaglyph.org">
+    <img src="docs/hero.png" alt="AlphaGlyph — backtest any strategy, then find out if the edge is real. Live at alphaglyph.org" width="100%">
+  </a>
 </p>
 
-# ◈ AlphaGlyph — A Backtesting & Strategy-Validation Lab
+<p align="center"><em>The live landing page at <a href="https://alphaglyph.org">alphaglyph.org</a>.</em></p>
+
+# AlphaGlyph — A Backtesting & Strategy-Validation Lab
 
 **A backtesting & strategy-validation lab.** Run classical quantitative strategies, a patient "dip-buyer" value strategy, build-your-own-rule custom strategies, or a multi-modal machine-learning transformer on real historical prices with simulated capital — every trade explained in plain English — then do what most backtests don't: **check whether the edge is genuine skill or just luck**, with the same statistical tests institutional quant funds use (a random-timing permutation test, Deflated Sharpe, Fama-French). The backend is fully stateless, so the demo is free-tier-proof.
 
@@ -49,7 +53,7 @@ I started out wanting to build a trading bot that "beat the market." I got one t
 
 So I went looking for how professionals guard against it, and fell down the quantitative-finance rabbit hole — Lopez de Prado's *Advances in Financial Machine Learning*, the Deflated Sharpe Ratio, Fama-French factor attribution, walk-forward validation, purged splits. The hard part wasn't writing the strategies; it was building the tests that try to prove my own results are luck, and being honest when they succeed. The ML model lands at roughly a coin flip, and I chose to put that number in the README rather than bury it, because a project about statistical honesty that hides its worst result would be a lie.
 
-> *[Danny — drop one or two sentences here about your own path to this: the class, the market crash, the family member who trades, the first strategy you were sure would work. This is the part an admissions essay grows out of, and it should be in your voice, not mine.]*
+I came to this the way a lot of people do: I was convinced I could find a rule that beat the market, and for one glorious afternoon a backtest told me I had. Moving the start date a few months erased the edge completely — same code, same stock, opposite conclusion. What kept me on the project wasn't the strategies; it was that unsettling gap between the number on my screen and the truth, and the slow realization that the honest, genuinely hard engineering wasn't the prediction at all — it was building the instruments that could tell me when I was fooling myself. I'd rather ship a project that can prove me wrong than one that only ever agrees with me.
 
 What I take away from it: the interesting engineering in quant isn't the prediction — it's the **epistemics**. Knowing what you don't know, and building the instruments to measure it.
 
