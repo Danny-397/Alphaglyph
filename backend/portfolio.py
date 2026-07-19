@@ -86,11 +86,53 @@ def build_return_matrix(tickers: list[str],
 
 # ── Main entry point ──────────────────────────────────────────────────────────
 
+def ledoit_wolf_cov(returns: pd.DataFrame) -> tuple[np.ndarray, float]:
+    """
+    Ledoit-Wolf (2004) shrinkage of the sample covariance toward a scaled
+    identity — "Honey, I shrunk the sample covariance matrix".
+
+    The sample covariance is a noisy estimate: with N assets it has N(N+1)/2
+    free numbers estimated from limited data, so its extreme eigenvalues are
+    biased (too large and too small). That noise is exactly what a Markowitz
+    optimizer exploits, over-concentrating in whatever pair happened to look
+    least correlated. Ledoit-Wolf pulls the estimate toward a well-conditioned
+    target F = μI (μ = average variance) by the analytically optimal amount δ:
+
+        Σ_shrunk = δ·μI + (1 − δ)·S
+
+    δ ∈ [0, 1] is estimated from the data (no free knob): more noise → more
+    shrinkage. Returns (shrunk_cov_daily, δ).
+    """
+    Y = returns.values
+    Y = Y - Y.mean(axis=0)
+    T, p = Y.shape
+    S = (Y.T @ Y) / T                                   # sample cov (1/T)
+    m = np.trace(S) / p                                 # ⟨S, I⟩ = mean variance
+
+    # d² = ‖S − mI‖²  (normalised Frobenius, ⟨A,B⟩ = tr(AB')/p)
+    d2 = float(np.sum((S - m * np.eye(p)) ** 2) / p)
+    if d2 <= 0:
+        return S, 0.0
+
+    # b̄² = (1/T²) Σ_k ‖x_k x_kᵀ − S‖², expanded to a vectorised form.
+    sq = np.sum(Y ** 2, axis=1)                         # ‖x_k‖² per observation
+    sum_x4  = float(np.sum(sq ** 2))                    # Σ ‖x_k‖⁴
+    sum_xSx = float(np.einsum('ti,ij,tj->', Y, S, Y))  # Σ x_kᵀ S x_k
+    S_fro2  = float(np.sum(S ** 2))
+    b2bar = (sum_x4 - 2 * sum_xSx + T * S_fro2) / (T ** 2 * p)
+    b2 = min(b2bar, d2)                                 # bounded by d²
+
+    delta = float(max(0.0, min(1.0, b2 / d2)))
+    shrunk = delta * m * np.eye(p) + (1 - delta) * S
+    return shrunk, delta
+
+
 def compute_efficient_frontier(
     tickers: list[str],
     start_date: str,
     end_date: str,
     n_points: int = 60,
+    shrink: bool = False,
 ) -> dict:
     """
     Compute the efficient frontier for the given tickers and date range.
@@ -112,7 +154,10 @@ def compute_efficient_frontier(
     used = list(returns.columns)
     n    = len(used)
     mu   = returns.mean().values
-    cov  = returns.cov().values
+    if shrink:
+        cov, shrink_delta = ledoit_wolf_cov(returns)
+    else:
+        cov, shrink_delta = returns.cov().values, None
 
     # ── Max-Sharpe (tangency) portfolio ───────────────────────────────────────
     ms     = _minimize(lambda w, m, c: -_stats(w, m, c)[2], mu, cov)
@@ -155,8 +200,17 @@ def compute_efficient_frontier(
     # ── Annualised covariance matrix ──────────────────────────────────────────
     ann_cov = (cov * TRADING_DAYS).tolist()
 
+    # Concentration (Herfindahl) of the max-Sharpe weights — shrinkage should
+    # visibly reduce this, the whole practical point of the estimator.
+    hhi = float(np.sum(ms_w ** 2))
+
     return {
         'tickers': used,
+        'shrinkage': None if shrink_delta is None else {
+            'method': 'ledoit_wolf',
+            'delta':  round(shrink_delta, 4),
+            'hhi':    round(hhi, 4),
+        },
         'max_sharpe': {
             'weights':         {t: round(float(w), 4) for t, w in zip(used, ms_w)},
             'expected_return': round(ms_ret * 100, 2),

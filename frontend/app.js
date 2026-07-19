@@ -1112,6 +1112,7 @@ function initPortfolio() {
         start_date: el('opt-start').value,
         end_date:   el('opt-end').value,
         n_points:   60,
+        shrink:     el('opt-shrink').checked,
       }),
     })
 
@@ -1128,7 +1129,31 @@ function initPortfolio() {
     renderFrontierChart(data)
     renderWeights(data)
     renderCorrMatrix(data)
+    renderShrinkage(data)
     el('opt-results').hidden = false
+  }
+
+  // Show the Ledoit-Wolf shrinkage intensity + resulting concentration, so the
+  // effect of the toggle is legible rather than invisible.
+  function renderShrinkage(data) {
+    let box = el('opt-shrink-note')
+    const s = data.shrinkage
+    if (!s) { if (box) box.remove(); return }
+    if (!box) {
+      box = document.createElement('div')
+      box.id = 'opt-shrink-note'
+      box.className = 'card'
+      box.style.cssText = 'margin-bottom:20px;border-color:var(--green);'
+      const results = el('opt-results')
+      results.insertBefore(box, results.firstChild)
+    }
+    const pct = Math.round(s.delta * 100)
+    box.innerHTML = `<div class="section-header" style="color:var(--green);">Ledoit-Wolf shrinkage applied</div>
+      <p style="font-size:12.5px;line-height:1.65;margin:0;color:var(--text);">
+        Optimal shrinkage intensity <strong>δ = ${s.delta}</strong> — the covariance was pulled
+        <strong>${pct}%</strong> of the way toward the well-conditioned target, ${pct < 10 ? 'a light touch (the sample was already fairly stable)' : pct > 40 ? 'a heavy pull (the raw estimate was noisy)' : 'a moderate correction'}.
+        Max-Sharpe concentration (Herfindahl) is now <strong>${s.hhi}</strong> — lower means less over-concentration than naive Markowitz. Toggle the box off and re-run to compare.
+      </p>`
   }
 
   function renderFrontierChart(data) {
@@ -1331,7 +1356,368 @@ function initSignals() {
   scan()
 }
 
+// ── Predictor ────────────────────────────────────────────────────────────────
+// A single-ticker forward lean, blended from the ML price forecast, an earnings
+// (PEAD + growth) tilt, and news sentiment. Every number traces to a component
+// the user can see — the whole card is built to be inspectable, not magic.
+function initPredictor() {
+  const input = el('pred-input')
+  const run   = el('pred-run')
+  const errBox = el('pred-error')
+  const QUICK = ['NVDA', 'AAPL', 'MSFT', 'TSLA', 'AMZN', 'JPM']
+
+  const DIR = {
+    BULLISH: { cls: 'dir-bull',    text: 'LEANS BULLISH' },
+    BEARISH: { cls: 'dir-bear',    text: 'LEANS BEARISH' },
+    NEUTRAL: { cls: 'dir-neutral', text: 'ROUGHLY BALANCED' },
+  }
+
+  // A signed contribution bar for a score in [-1, +1], centred at zero.
+  function signedBar(score) {
+    const s = Math.max(-1, Math.min(1, Number(score) || 0))
+    const pct = Math.abs(s) * 50
+    const side = s >= 0 ? 'pos' : 'neg'
+    const left = s >= 0 ? 50 : 50 - pct
+    return `<div class="comp-bar"><span class="comp-bar-mid"></span>` +
+           `<span class="comp-bar-fill ${side}" style="left:${left}%;width:${pct}%;"></span></div>`
+  }
+
+  function renderQuick() {
+    el('pred-quick').innerHTML = QUICK.map(t =>
+      `<span class="ticker-chip" data-ticker="${t}">${t}</span>`).join('')
+    el('pred-quick').querySelectorAll('.ticker-chip').forEach(c =>
+      c.addEventListener('click', () => { input.value = c.dataset.ticker; predict() }))
+  }
+
+  function componentCard(c) {
+    if (!c.available) {
+      const why = c.reason ? ` — ${c.reason}` : ''
+      return `<div class="comp comp-off">
+        <div class="comp-head"><span class="comp-label">${c.label}</span>
+          <span class="comp-weight">unavailable${why}</span></div>
+      </div>`
+    }
+    const weight = c.weight != null ? `${Math.round(c.weight * 100)}% weight` : ''
+    const factors = (c.factors || []).map(f => `<li>${f}</li>`).join('')
+    return `<div class="comp">
+      <div class="comp-head"><span class="comp-label">${c.label}</span>
+        <span class="comp-weight">${weight}</span></div>
+      ${signedBar(c.score)}
+      <ul class="comp-factors">${factors}</ul>
+    </div>`
+  }
+
+  function rangeCard(d, horizon) {
+    if (!d) return ''
+    const lo = d.q10, hi = d.q90, mid = d.q50
+    const span = (hi - lo) || 1
+    const pos = v => Math.max(0, Math.min(100, ((v - lo) / span) * 100))
+    return `<div class="card" style="margin-bottom:16px;">
+      <div class="section-header">Modeled ${horizon}-day move (ML return distribution)</div>
+      <div class="pred-range">
+        <span class="pred-range-fill" style="left:${pos(d.q25)}%;width:${pos(d.q75) - pos(d.q25)}%;"></span>
+        <span class="pred-range-mid" style="left:${pos(mid)}%;"></span>
+      </div>
+      <div class="pred-range-labels">
+        <span>q10 ${fmtPct(lo, 1)}</span>
+        <span><strong>median ${fmtPct(mid, 1)}</strong></span>
+        <span>q90 ${fmtPct(hi, 1)}</span>
+      </div>
+      <p class="text-muted" style="font-size:11px;margin-top:10px;line-height:1.6;">
+        The shaded band is the interquartile range (q25–q75); the line is the median. A wide band means the model is
+        uncertain — the honest signal is the <em>range</em>, not a single number.
+      </p>
+    </div>`
+  }
+
+  function render(data) {
+    const box = el('pred-result')
+    box.hidden = false
+    if (!data || data.error) {
+      box.innerHTML = `<div class="card"><p class="text-muted">Couldn’t run a prediction right now — try again shortly.</p></div>`
+      return
+    }
+    if (!data.available) {
+      box.innerHTML = `<div class="card"><div class="section-header">No signal</div>
+        <p class="text-muted" style="font-size:13px;line-height:1.6;">${data.reason || 'No signal available for this ticker right now.'}
+        Free earnings and news data is thin for some tickers — try a large, liquid name (e.g. AAPL, MSFT, NVDA).</p></div>`
+      return
+    }
+
+    const p = data.prediction
+    const dir = DIR[p.direction] || DIR.NEUTRAL
+    const prob = Math.round(p.p_up * 100)
+    const fillLeft = p.p_up >= 0.5 ? 50 : prob
+    const fillW = Math.abs(prob - 50)
+    const fillSide = p.p_up >= 0.5 ? 'pos' : 'neg'
+
+    box.innerHTML = `
+      <div class="card pred-verdict" style="margin-bottom:16px;">
+        <div class="pred-verdict-head">
+          <div>
+            <div class="pred-ticker">${data.ticker}${data.price != null ? ` <span class="text-muted" style="font-weight:500;font-size:15px;">${fmt$(data.price)}</span>` : ''}</div>
+            <div class="pred-dir ${dir.cls}">${dir.text}</div>
+          </div>
+          <div class="pred-prob">
+            <div class="pred-prob-num ${fillSide}">${prob}%</div>
+            <div class="pred-prob-lbl">chance up · next ${data.horizon}d</div>
+          </div>
+        </div>
+        <div class="prob-track"><span class="prob-mid"></span>
+          <span class="prob-fill ${fillSide}" style="left:${fillLeft}%;width:${fillW}%;"></span></div>
+        <div class="pred-conf">Confidence: <strong>${p.confidence_label}</strong>
+          <span class="text-muted"> · ${p.agreement > 0.6 ? 'signals broadly agree' : p.agreement < 0.35 ? 'signals disagree — read cautiously' : 'signals are mixed'}</span></div>
+        <p class="pred-verdict-text">${p.verdict_text}</p>
+      </div>
+
+      ${rangeCard(data.distribution, data.horizon)}
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-header">How the signals blend</div>
+        <p class="text-muted" style="font-size:11.5px;margin:-4px 0 14px;line-height:1.6;">
+          Each channel emits a score from −1 (bearish) to +1 (bullish); the blend weights each by its confidence and how much a channel like it usually deserves. Bars point right for bullish, left for bearish.
+        </p>
+        ${(data.components || []).map(componentCard).join('')}
+      </div>
+
+      <p class="text-muted" style="font-size:11px;line-height:1.6;padding:0 2px;">⚠ ${data.disclaimer}</p>
+    `
+  }
+
+  async function predict() {
+    const sym = (input.value || '').trim().toUpperCase()
+    errBox.hidden = true
+    if (!sym) { errBox.textContent = 'Enter a ticker symbol.'; errBox.hidden = false; return }
+    if (!/^[A-Z][A-Z.\-]{0,7}$/.test(sym)) { errBox.textContent = '"' + sym + '" isn’t a valid ticker.'; errBox.hidden = false; return }
+    run.disabled = true; run.textContent = '…'
+    el('pred-loading').hidden = false
+    el('pred-result').hidden = true
+    const data = await api('/api/predict?ticker=' + encodeURIComponent(sym))
+    el('pred-loading').hidden = true
+    run.disabled = false; run.textContent = 'Predict'
+    render(data)
+  }
+
+  // ── Track record / calibration ─────────────────────────────────────────────
+  let calChart = null
+  function renderCalibration(data) {
+    const box = el('cal-result')
+    box.hidden = false
+    if (!data || !data.available) {
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'Track record unavailable right now.'} ${data && data.reason && data.reason.includes('not loaded') ? '' : 'Try again shortly.'}</p>`
+      return
+    }
+    const m = data.metrics
+    const bssTag = m.brier_skill > 0.02 ? ['positive', 'real skill']
+      : m.brier_skill < -0.02 ? ['negative', 'worse than base rate']
+      : ['', '≈ no skill (honest)']
+    const edge = ((m.accuracy - data.base_rate) * 100)
+
+    box.innerHTML = `
+      <div class="hero-row" style="margin-bottom:16px;">
+        <div class="hero-stat"><div class="hero-stat-value">${data.n_predictions.toLocaleString()}</div><div class="hero-stat-label">Out-of-sample predictions</div></div>
+        <div class="hero-stat"><div class="hero-stat-value ${bssTag[0]}">${fmtN(m.brier_skill, 3)}</div><div class="hero-stat-label">Brier skill · ${bssTag[1]}</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${Math.round(m.accuracy * 100)}%</div><div class="hero-stat-label">Hit rate vs ${Math.round(data.base_rate * 100)}% base (${edge >= 0 ? '+' : ''}${edge.toFixed(1)} pts)</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${m.model_test_auc ?? '—'}</div><div class="hero-stat-label">Model test AUC (0.5 = coin flip)</div></div>
+      </div>
+      <div class="chart-wrap" style="height:360px;"><canvas id="cal-chart"></canvas></div>
+      <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:12px;">
+        ${data.n_tickers} tickers · ${data.eval_start} → ${data.eval_end} · equal-count (quantile) bins.
+        ${data.note}
+      </p>`
+
+    const pts  = data.bins.map(b => ({ x: b.mean_pred, y: b.frac_up, n: b.count }))
+    const lo   = Math.min(...data.bins.map(b => Math.min(b.mean_pred, b.frac_up)))
+    const hi   = Math.max(...data.bins.map(b => Math.max(b.mean_pred, b.frac_up)))
+    const pad  = Math.max(0.02, (hi - lo) * 0.15)
+    const axLo = Math.max(0, lo - pad), axHi = Math.min(1, hi + pad)
+    const maxN = Math.max(...pts.map(p => p.n))
+
+    if (calChart) calChart.destroy()
+    calChart = new Chart(el('cal-chart'), {
+      type: 'scatter',
+      data: {
+        datasets: [
+          { label: 'Perfect calibration', type: 'line',
+            data: [{ x: axLo, y: axLo }, { x: axHi, y: axHi }],
+            borderColor: 'rgba(138,151,143,0.6)', borderDash: [6, 5], borderWidth: 1.5,
+            pointRadius: 0, fill: false },
+          { label: 'Predicted vs actual',
+            data: pts,
+            backgroundColor: 'rgba(63,185,80,0.75)', borderColor: '#3fb950', borderWidth: 1,
+            pointRadius: c => 4 + 8 * (c.raw.n / maxN), pointHoverRadius: c => 6 + 8 * (c.raw.n / maxN) },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { min: axLo, max: axHi, title: { display: true, text: 'Predicted P(up)', color: '#8a978f' },
+               ticks: { color: '#8a978f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          y: { min: axLo, max: axHi, title: { display: true, text: 'Actual frequency of up-moves', color: '#8a978f' },
+               ticks: { color: '#8a978f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+        },
+        plugins: {
+          legend: { labels: { color: '#8a978f', usePointStyle: true, filter: i => i.text !== 'Perfect calibration' } },
+          tooltip: { callbacks: { label: c => `pred ${Math.round(c.raw.x * 100)}% → actual ${Math.round(c.raw.y * 100)}% (n=${c.raw.n})` } },
+        },
+      },
+    })
+  }
+
+  const calBtn = el('cal-load')
+  let calLoaded = false
+  calBtn.addEventListener('click', async () => {
+    calBtn.disabled = true; calBtn.textContent = calLoaded ? 'Refreshing…' : 'Loading…'
+    el('cal-loading').hidden = false
+    el('cal-result').hidden = true
+    const data = await api('/api/predict/calibration')
+    el('cal-loading').hidden = true
+    calBtn.disabled = false; calBtn.textContent = 'Refresh'
+    calLoaded = true
+    renderCalibration(data)
+  })
+
+  run.addEventListener('click', predict)
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); predict() } })
+  renderQuick()
+}
+
+// ── Research Lab (PEAD event study + Data-Mining Lab) ────────────────────────
+function initResearch() {
+  let peadChart = null, dmChart = null
+
+  // ── PEAD event study ───────────────────────────────────────────────────────
+  const CURVE_COLOR = { beat: '#3fb950', inline: '#8a978f', miss: '#f85149' }
+
+  function renderPead(data) {
+    const box = el('pead-result'); box.hidden = false
+    if (!data || !data.available) {
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'Study unavailable right now.'} — the free earnings feed can be sparse; try again shortly.</p>`
+      return
+    }
+    const s = data.spread
+    const sigBadge = s.significant
+      ? '<span class="badge badge-buy">SIGNIFICANT</span>'
+      : '<span class="badge sig-hold">NOT SIGNIFICANT</span>'
+    box.innerHTML = `
+      <div class="hero-row" style="margin-bottom:16px;">
+        <div class="hero-stat"><div class="hero-stat-value">${data.n_events.toLocaleString()}</div><div class="hero-stat-label">Earnings events · ${data.n_tickers} tickers</div></div>
+        <div class="hero-stat"><div class="hero-stat-value ${s.beat_minus_miss_pct >= 0 ? 'positive' : 'negative'}">${fmtPct(s.beat_minus_miss_pct)}</div><div class="hero-stat-label">Beat − miss drift @ ${data.window}d</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${s.t_stat ?? '—'}</div><div class="hero-stat-label">t-stat (p ${s.p_value ?? '—'})</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${s.surprise_drift_corr ?? '—'}</div><div class="hero-stat-label">Surprise → drift corr</div></div>
+      </div>
+      <div style="margin-bottom:12px;">${sigBadge}</div>
+      <div class="chart-wrap" style="height:340px;"><canvas id="pead-chart"></canvas></div>
+      <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:12px;">${data.note}</p>`
+
+    const days = Array.from({ length: data.window }, (_, i) => i + 1)
+    if (peadChart) peadChart.destroy()
+    peadChart = new Chart(el('pead-chart'), {
+      type: 'line',
+      data: {
+        labels: days,
+        datasets: data.curves.map(c => ({
+          label: `${c.label} (n=${c.n}, x̄=${c.avg_surprise > 0 ? '+' : ''}${c.avg_surprise}%)`,
+          data: c.car, borderColor: CURVE_COLOR[c.key], backgroundColor: CURVE_COLOR[c.key],
+          borderWidth: 2, pointRadius: 0, tension: 0.15,
+        })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { title: { display: true, text: 'Trading days after report', color: '#8a978f' },
+               ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          y: { title: { display: true, text: 'Cumulative abnormal return (%)', color: '#8a978f' },
+               ticks: { color: '#8a978f', callback: v => v + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+        },
+        plugins: { legend: { labels: { color: '#c9d3cd', usePointStyle: true, boxWidth: 8 } } },
+      },
+    })
+  }
+
+  el('pead-run').addEventListener('click', async () => {
+    const btn = el('pead-run'); btn.disabled = true; btn.textContent = 'Running…'
+    el('pead-loading').hidden = false; el('pead-result').hidden = true
+    const data = await api('/api/research/pead')
+    el('pead-loading').hidden = true
+    btn.disabled = false; btn.textContent = 'Refresh'
+    renderPead(data)
+  })
+
+  // ── Data-Mining Lab ────────────────────────────────────────────────────────
+  const dmN = el('dm-n')
+  dmN.addEventListener('input', () => { el('dm-n-label').textContent = dmN.value })
+
+  function verdictTile(label, sig, value) {
+    const cls = sig ? 'negative' : 'positive'          // "significant" here is the BAD outcome
+    const tag = sig ? 'calls it significant ✗' : 'not significant ✓'
+    return `<div class="hero-stat"><div class="hero-stat-value ${cls}">${value ?? '—'}</div>
+      <div class="hero-stat-label">${label} — ${tag}</div></div>`
+  }
+
+  function renderDm(data) {
+    const box = el('dm-result'); box.hidden = false
+    if (!data || !data.available) {
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'Sweep failed'} — try another ticker.</p>`
+      return
+    }
+    box.innerHTML = `
+      <div class="hero-row" style="margin-bottom:16px;">
+        <div class="hero-stat"><div class="hero-stat-value">${data.best_sharpe}</div><div class="hero-stat-label">Best-of-${data.n_strategies} Sharpe (pure luck)</div></div>
+        ${verdictTile('Naive PSR', data.naive_significant, data.naive_psr)}
+        ${verdictTile('Deflated Sharpe', data.deflated_significant, data.deflated_sharpe)}
+        <div class="hero-stat"><div class="hero-stat-value">${data.expected_max_sharpe ?? '—'}</div><div class="hero-stat-label">Expected max from noise</div></div>
+      </div>
+      <div class="chart-wrap" style="height:300px;"><canvas id="dm-chart"></canvas></div>
+      <p style="font-size:13px;line-height:1.65;margin-top:14px;color:var(--text);"><strong>${data.verdict}</strong></p>
+      <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:8px;">${data.note}</p>`
+
+    const labels = data.histogram.map(h => h.x)
+    const counts = data.histogram.map(h => h.count)
+    const vline = (x, color, text) => ({
+      type: 'line', xMin: x, xMax: x, borderColor: color, borderWidth: 2, borderDash: [5, 4],
+      label: { display: true, content: text, color: color, position: 'start',
+               font: { size: 10 }, backgroundColor: 'rgba(13,17,15,0.85)' },
+    })
+    if (dmChart) dmChart.destroy()
+    dmChart = new Chart(el('dm-chart'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Random strategies', data: counts,
+              backgroundColor: 'rgba(138,151,143,0.55)', borderWidth: 0, barPercentage: 1, categoryPercentage: 1 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { type: 'linear', offset: false, title: { display: true, text: 'Backtested Sharpe ratio', color: '#8a978f' },
+               ticks: { color: '#8a978f', maxTicksLimit: 10 }, grid: { display: false } },
+          y: { title: { display: true, text: 'Count', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+        },
+        plugins: {
+          legend: { display: false },
+          annotation: { annotations: {
+            best: vline(data.best_sharpe, '#e3b341', `best ${data.best_sharpe}`),
+            emax: data.expected_max_sharpe != null ? vline(data.expected_max_sharpe, '#8a978f', `E[max] ${data.expected_max_sharpe}`) : {},
+          } },
+        },
+      },
+    })
+  }
+
+  el('dm-run').addEventListener('click', async () => {
+    const ticker = (el('dm-ticker').value || 'AAPL').trim().toUpperCase()
+    const err = el('dm-error'); err.hidden = true
+    if (!/^[A-Z][A-Z.\-]{0,7}$/.test(ticker)) { err.textContent = 'Enter a valid ticker.'; err.hidden = false; return }
+    const btn = el('dm-run'); btn.disabled = true; btn.textContent = 'Running…'
+    el('dm-loading').hidden = false; el('dm-result').hidden = true
+    const data = await api('/api/research/datamine', {
+      method: 'POST', body: JSON.stringify({ ticker, n_strategies: Number(dmN.value) }),
+    })
+    el('dm-loading').hidden = true
+    btn.disabled = false; btn.textContent = 'Run sweep'
+    renderDm(data)
+  })
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 const PAGE = document.body.dataset.page
 if (PAGE === 'backtest') initBacktest()
-if (PAGE === 'tools')    { initTabs(document.body); initSignals(); initPortfolio() }
+if (PAGE === 'tools')    { initTabs(document.body); initPredictor(); initSignals(); initPortfolio(); initResearch() }

@@ -1664,3 +1664,62 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer; font-size: 17px; line-height: 1; padding: 0 4px;
 }
 .rb-del:hover { color: var(--red); }
+
+/* ── Predictor tab ──────────────────────────────────────────────────────── */
+.pred-verdict-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 14px;
+}
+.pred-ticker { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.pred-dir {
+  font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+  letter-spacing: 0.06em; margin-top: 4px;
+}
+.pred-dir.dir-bull    { color: var(--green); }
+.pred-dir.dir-bear    { color: var(--red); }
+.pred-dir.dir-neutral { color: var(--yellow); }
+.pred-prob { text-align: right; flex-shrink: 0; }
+.pred-prob-num { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.pred-prob-num.pos { color: var(--green); }
+.pred-prob-num.neg { color: var(--red); }
+.pred-prob-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Probability track: 0–100% with a mid-line at 50%. */
+.prob-track {
+  position: relative; height: 10px; border-radius: 5px;
+  background: var(--surface2); border: 1px solid var(--border); overflow: hidden;
+}
+.prob-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border-lt); z-index: 2; }
+.prob-fill { position: absolute; top: 0; bottom: 0; z-index: 1; }
+.prob-fill.pos { background: var(--green); }
+.prob-fill.neg { background: var(--red); }
+.pred-conf { font-size: 12.5px; margin-top: 12px; }
+.pred-verdict-text { font-size: 13.5px; line-height: 1.65; color: var(--text); margin-top: 12px; }
+
+/* Modeled-move distribution bar. */
+.pred-range {
+  position: relative; height: 12px; border-radius: 6px;
+  background: var(--surface2); border: 1px solid var(--border); margin-bottom: 8px;
+}
+.pred-range-fill { position: absolute; top: 0; bottom: 0; background: var(--green-dim); border-radius: 6px; }
+.pred-range-mid  { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--green); }
+.pred-range-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* Component breakdown. */
+.comp { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.comp:last-child { border-bottom: none; }
+.comp.comp-off { opacity: 0.5; }
+.comp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.comp-label  { font-size: 13px; font-weight: 600; }
+.comp-weight { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+.comp-bar {
+  position: relative; height: 8px; border-radius: 4px;
+  background: var(--surface2); border: 1px solid var(--border); margin-bottom: 8px;
+}
+.comp-bar-mid  { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: var(--border-lt); z-index: 2; }
+.comp-bar-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; z-index: 1; }
+.comp-bar-fill.pos { background: var(--green); }
+.comp-bar-fill.neg { background: var(--red); }
+.comp-factors { list-style: none; margin: 0; padding: 0; }
+.comp-factors li { font-size: 12px; color: var(--muted); line-height: 1.6; padding-left: 14px; position: relative; }
+.comp-factors li::before { content: '·'; position: absolute; left: 4px; color: var(--border-lt); }

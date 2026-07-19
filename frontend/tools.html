@@ -38,16 +38,63 @@
 
     <div class="page-header">
       <h1>Tools</h1>
-      <p>Two utilities beyond backtesting: a live signal scanner for your watchlist, and a Markowitz portfolio optimizer. Educational, not financial advice.</p>
+      <p>Three utilities beyond backtesting: a multi-signal predictor, a live signal scanner for your watchlist, and a Markowitz portfolio optimizer. Educational, not financial advice.</p>
     </div>
 
     <div class="tab-list" style="margin-bottom:16px;">
-      <button class="tab-btn active" data-tab="tab-signals">Signal Scanner</button>
+      <button class="tab-btn active" data-tab="tab-predict">Predictor</button>
+      <button class="tab-btn" data-tab="tab-signals">Signal Scanner</button>
       <button class="tab-btn" data-tab="tab-portfolio">Portfolio Optimizer</button>
+      <button class="tab-btn" data-tab="tab-research">Research Lab</button>
+    </div>
+
+    <!-- ── PREDICTOR ────────────────────────────────────────────────────── -->
+    <div class="tab-panel active" id="tab-predict">
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-header">Predict a Stock</div>
+        <p class="text-muted" style="font-size:12.5px;margin:0 0 14px;line-height:1.65;">
+          A forward lean for the next few trading days, blended from three independent, individually-explained signals: the <strong>ML transformer's</strong> price forecast, <strong>post-earnings drift (PEAD)</strong> + EPS growth, and <strong>news sentiment</strong>. It's a transparent weighted average of channels you can inspect — not a black box, and not financial advice.
+        </p>
+        <div class="ticker-input-row">
+          <input type="text" id="pred-input" placeholder="Enter a ticker (e.g. NVDA) and press Enter" maxlength="8" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-primary" id="pred-run">Predict</button>
+        </div>
+        <div class="ticker-error" id="pred-error" hidden></div>
+        <div class="chip-grid" id="pred-quick" style="margin-top:12px;"></div>
+      </div>
+
+      <div id="pred-loading" hidden>
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <strong>Reading the signals <span class="dots"><span></span><span></span><span></span></span></strong>
+          <p>Forecasting price, weighing the last earnings report, and sampling news tone.</p>
+        </div>
+      </div>
+
+      <div id="pred-result" hidden></div>
+
+      <!-- Track record / calibration -->
+      <div class="card" style="margin-top:20px;">
+        <div class="section-header" style="display:flex;align-items:center;gap:10px;">
+          Track Record — is the forecaster honest?
+          <button class="btn btn-sm" id="cal-load" style="margin-left:auto;">Load track record</button>
+        </div>
+        <p class="text-muted" style="font-size:12px;line-height:1.65;margin:0;">
+          A prediction of "60% up" is only worth anything if the market actually rises ~60% of the time it's said. This is the same test AlphaGlyph runs on strategies, turned on the predictor itself — measured <strong>out-of-sample</strong>, on data the model never trained on. Points on the diagonal = perfectly calibrated.
+        </p>
+        <div id="cal-loading" hidden style="margin-top:14px;">
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Replaying years of forecasts <span class="dots"><span></span><span></span><span></span></span></strong>
+            <p>Recovering the model's probability and the realised outcome for every historical window.</p>
+          </div>
+        </div>
+        <div id="cal-result" hidden style="margin-top:16px;"></div>
+      </div>
     </div>
 
     <!-- ── SIGNAL SCANNER ───────────────────────────────────────────────── -->
-    <div class="tab-panel active" id="tab-signals">
+    <div class="tab-panel" id="tab-signals">
 
       <div class="card sig-regime" id="sig-regime" style="margin-bottom:16px;">
         <span class="regime-badge" id="sig-regime-badge">—</span>
@@ -119,6 +166,15 @@
             </div>
             <button class="btn btn-primary" id="opt-run-btn" style="flex-shrink:0;padding:9px 24px;">Optimize Portfolio</button>
           </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="opt-shrink" style="width:14px;height:14px;accent-color:var(--green);cursor:pointer;">
+              <span style="font-size:12px;font-weight:600;color:var(--green);">Ledoit-Wolf shrinkage (well-conditioned covariance)</span>
+            </label>
+            <p style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+              Pulls the noisy sample covariance toward a stable target by the analytically optimal amount — the professional fix for naive Markowitz over-concentration. Turn it on and watch the weights spread out.
+            </p>
+          </div>
           <div id="opt-error" class="error-banner" hidden></div>
         </div>
       </div>
@@ -168,6 +224,53 @@
           </p>
           <div class="table-wrap" id="corr-matrix"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ── RESEARCH LAB ─────────────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-research">
+
+      <!-- PEAD event study -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="section-header" style="display:flex;align-items:center;gap:10px;">
+          Post-Earnings Drift (PEAD) — an event study
+          <button class="btn btn-sm btn-primary" id="pead-run" style="margin-left:auto;">Run study</button>
+        </div>
+        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0;">
+          One of finance's most durable anomalies: after a company reports, its stock tends to keep drifting in the direction of the earnings surprise. This pools every earnings event across a basket of names and plots the average <strong>market-adjusted cumulative return</strong> in the 20 days after the report, split by surprise tercile — then tests whether the beat-minus-miss drift clears the noise. Honest by construction: if the free-data sample can't prove it, the verdict says so.
+        </p>
+        <div id="pead-loading" hidden style="margin-top:14px;">
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Pooling earnings events <span class="dots"><span></span><span></span><span></span></span></strong>
+            <p>Collecting reports and post-announcement returns across the basket.</p>
+          </div>
+        </div>
+        <div id="pead-result" hidden style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Data-mining lab -->
+      <div class="card">
+        <div class="section-header">Data-Mining Lab — how a backtest fools you</div>
+        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0 0 14px;">
+          Search enough strategies and the best one looks brilliant — by luck alone. This generates hundreds of <strong>purely random</strong> timing strategies (none has any edge), keeps the luckiest, and shows the trap: naive statistics call the winner significant, while the <strong>Deflated Sharpe Ratio</strong> — which knows how many were tried — deflates it back to noise.
+        </p>
+        <div class="form-row" style="align-items:flex-end;gap:12px;">
+          <div class="form-group" style="margin-bottom:0;flex:0 0 120px;">
+            <label class="form-label">Ticker</label>
+            <input type="text" id="dm-ticker" value="AAPL" maxlength="8" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px;">
+            <label class="form-label">Strategies searched: <span id="dm-n-label">300</span></label>
+            <input type="range" id="dm-n" min="20" max="2000" step="20" value="300" style="width:100%;">
+          </div>
+          <button class="btn btn-primary" id="dm-run" style="flex-shrink:0;padding:9px 24px;">Run sweep</button>
+        </div>
+        <div id="dm-error" class="error-banner" hidden style="margin-top:12px;"></div>
+        <div id="dm-loading" hidden style="margin-top:14px;">
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Backtesting the search <span class="dots"><span></span><span></span><span></span></span></strong></div>
+        </div>
+        <div id="dm-result" hidden style="margin-top:16px;"></div>
       </div>
     </div>
 

@@ -15,9 +15,13 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 import backtest as backtester
+import calibration as calib
+import datamining
 import features  # noqa: F401 — imported so startup errors surface early
 import ml_runtime
+import pead as pead_study
 import portfolio as portopt
+import predictor as predictor_engine
 import regime as reg
 import strategies
 
@@ -228,6 +232,83 @@ def scan():
     return jsonify({'scanned': out, 'count': len(out), 'ml_loaded': bool(ml_loaded)})
 
 
+@app.route('/api/predict')
+@limiter.limit('30 per minute')
+def predict():
+    """
+    Multi-signal Predictor for a single ticker: blends the ML transformer's
+    price forecast, an earnings (PEAD + growth) tilt, and GDELT news sentiment
+    into one explainable directional lean with per-component breakdown.
+
+    Sentiment (GDELT) and — when the ML model falls back — feature computation
+    can each take a few seconds, so this is capped tighter than /api/scan.
+    """
+    symbol = request.args.get('ticker', '').strip().upper()
+    if not symbol:
+        return jsonify({'error': 'ticker required'}), 400
+    if not symbol.replace('.', '').replace('-', '').isalnum() or len(symbol) > 8:
+        return jsonify({'error': 'invalid ticker'}), 400
+    try:
+        # 'unavailable' is a valid, expected state (thin free data), not an
+        # error — the frontend renders it as an honest "no signal" card.
+        return jsonify(predictor_engine.predict(symbol))
+    except Exception as exc:
+        logger.exception('predict failed for %s', symbol)
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/predict/calibration')
+@limiter.limit('6 per minute')
+def predict_calibration():
+    """
+    Out-of-sample reliability of the ML price forecaster: does "60% up" actually
+    happen ~60% of the time? Returns decile bins (predicted vs realised) plus
+    Brier / log-loss / Brier-skill scores. Heavy (multi-ticker inference over
+    years) but cached, so repeat loads are instant.
+    """
+    raw = request.args.get('tickers', '')
+    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or None
+    oos = request.args.get('oos', '1') != '0'
+    try:
+        return jsonify(calib.compute_calibration(tickers, oos_only=oos))
+    except Exception as exc:
+        logger.exception('calibration failed')
+        return jsonify({'available': False, 'reason': str(exc)}), 500
+
+
+@app.route('/api/research/pead')
+@limiter.limit('6 per minute')
+def research_pead():
+    """Pooled post-earnings-announcement-drift (PEAD) event study across a
+    basket: cumulative abnormal return by surprise tercile + a beat-minus-miss
+    t-test. Heavy but cached."""
+    raw = request.args.get('tickers', '')
+    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or None
+    try:
+        return jsonify(pead_study.compute_pead(tickers))
+    except Exception as exc:
+        logger.exception('pead study failed')
+        return jsonify({'available': False, 'reason': str(exc)}), 500
+
+
+@app.route('/api/research/datamine', methods=['POST'])
+@limiter.limit('10 per hour')
+def research_datamine():
+    """
+    Data-mining lab: sweep N strategy variants on one ticker, keep the best
+    in-sample Sharpe, then show the Deflated Sharpe Ratio deflate it back toward
+    reality — a live demonstration of multiple-testing / p-hacking.
+    """
+    data    = request.get_json() or {}
+    ticker  = (data.get('ticker') or 'AAPL').strip().upper()
+    n       = int(data.get('n_strategies', 200))
+    try:
+        return jsonify(datamining.run_sweep(ticker, n))
+    except Exception as exc:
+        logger.exception('datamine failed')
+        return jsonify({'available': False, 'reason': str(exc)}), 500
+
+
 @app.route('/api/ml/info')
 def ml_info():
     """ML transformer status: whether a trained model is deployed, its
@@ -398,11 +479,12 @@ def optimize_portfolio():
                           (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date   = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
     n_points   = int(data.get('n_points', 60))
+    shrink     = bool(data.get('shrink', False))
 
     if not tickers or len(tickers) < 2:
         return jsonify({'error': 'At least 2 tickers required'}), 400
 
-    result = portopt.compute_efficient_frontier(tickers, start_date, end_date, n_points)
+    result = portopt.compute_efficient_frontier(tickers, start_date, end_date, n_points, shrink=shrink)
     if 'error' in result:
         return jsonify(result), 422
     return jsonify(result)
