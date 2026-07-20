@@ -38,7 +38,7 @@
 
     <div class="page-header">
       <h1>Tools</h1>
-      <p>Three utilities beyond backtesting: a multi-signal predictor, a live signal scanner for your watchlist, and a Markowitz portfolio optimizer. Educational, not financial advice.</p>
+      <p>Four workbenches beyond backtesting: a multi-signal predictor with a live track record, a signal scanner for your watchlist, a Markowitz portfolio optimizer, and a research lab that stress-tests whether an edge is real. Educational, not financial advice.</p>
     </div>
 
     <div class="tab-list" style="margin-bottom:16px;">
@@ -90,6 +90,25 @@
           </div>
         </div>
         <div id="cal-result" hidden style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Live forward track record (append-only ledger) -->
+      <div class="card" style="margin-top:20px;">
+        <div class="section-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          Live Track Record — the forward test
+          <span class="badge sig-hold" style="font-weight:600;">APPEND-ONLY</span>
+          <button class="btn btn-sm" id="ledger-load" style="margin-left:auto;">Load ledger</button>
+        </div>
+        <p class="text-muted" style="font-size:12px;line-height:1.65;margin:0;">
+          Calibration above is measured on <em>historical</em> data the model didn't train on. This is stronger: every prediction you run here is <strong>logged the moment it's made</strong> — ticker, probability, price — and graded once its horizon elapses. Nothing is ever edited after the fact, so the hit rate below is a genuine <strong>out-of-sample forward record</strong> that accrues over time and can't be fitted in hindsight. Run a few predictions, then check back in a week.
+        </p>
+        <div id="ledger-loading" hidden style="margin-top:14px;">
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Reading the ledger <span class="dots"><span></span><span></span><span></span></span></strong>
+            <p>Grading any predictions whose horizon has now elapsed.</p>
+          </div>
+        </div>
+        <div id="ledger-result" hidden style="margin-top:16px;"></div>
       </div>
     </div>
 
@@ -271,6 +290,63 @@
             <strong>Backtesting the search <span class="dots"><span></span><span></span><span></span></span></strong></div>
         </div>
         <div id="dm-result" hidden style="margin-top:16px;"></div>
+      </div>
+
+      <!-- CPCV + PBO -->
+      <div class="card" style="margin-top:20px;">
+        <div class="section-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          Overfitting Probability (CPCV + PBO)
+          <div class="form-group" style="margin:0 0 0 auto;flex:0 0 130px;">
+            <input type="text" id="cpcv-ticker" value="SPY" maxlength="8" autocomplete="off" spellcheck="false" style="padding:7px 10px;">
+          </div>
+          <button class="btn btn-primary" id="cpcv-run" style="flex-shrink:0;padding:9px 20px;">Run CPCV</button>
+        </div>
+        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0;">
+          The Data-Mining Lab shows one strategy family fooling you; this quantifies it rigorously. It sweeps a real <strong>trend + mean-reversion hyperparameter grid</strong> on one ticker, then runs <strong>Combinatorially-Symmetric Cross-Validation</strong> (López de Prado) over hundreds of in-sample / out-of-sample splits to compute the <strong>Probability of Backtest Overfitting</strong> — how often the in-sample winner lands in the bottom half out-of-sample. A PBO near 50% means the selection told you nothing. It also purges/embargoes the seam between splits so serial correlation can't leak the edge across.
+        </p>
+        <div id="cpcv-error" class="error-banner" hidden style="margin-top:12px;"></div>
+        <div id="cpcv-loading" hidden style="margin-top:14px;">
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Cross-validating the grid <span class="dots"><span></span><span></span><span></span></span></strong>
+            <p>Fitting the champion on every combination of splits and ranking it out-of-sample.</p>
+          </div>
+        </div>
+        <div id="cpcv-result" hidden style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Cost-sensitivity sweep -->
+      <div class="card" style="margin-top:20px;">
+        <div class="section-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          Cost Sensitivity — where the edge dies
+          <button class="btn btn-primary" id="cost-run" style="margin-left:auto;flex-shrink:0;padding:9px 20px;">Run sweep</button>
+        </div>
+        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0 0 14px;">
+          A backtest's edge is only real if it survives frictions. This reruns one strategy across a grid of per-side transaction costs (0 → 100 bp) and plots the <strong>net-return decay</strong>, then solves for the <strong>break-even cost</strong> at which its edge over buy-and-hold vanishes. An edge that dies at 5 bp is a frictionless artefact; one that survives 50 bp is believable.
+        </p>
+        <div class="form-row" style="align-items:flex-end;gap:12px;">
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px;">
+            <label class="form-label">Strategy</label>
+            <select id="cost-strategy">
+              <option value="ma_crossover" selected>MA Crossover</option>
+              <option value="rsi">RSI Mean Reversion</option>
+              <option value="macd">MACD Momentum</option>
+              <option value="dip_buyer">Dip Buyer (52-Week Value)</option>
+              <option value="adaptive">Adaptive (Regime)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:0 0 130px;">
+            <label class="form-label">Ticker</label>
+            <input type="text" id="cost-ticker" value="AAPL" maxlength="8" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+        <div id="cost-error" class="error-banner" hidden style="margin-top:12px;"></div>
+        <div id="cost-loading" hidden style="margin-top:14px;">
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Sweeping cost levels <span class="dots"><span></span><span></span><span></span></span></strong>
+            <p>Rerunning the backtest at ten different friction levels.</p>
+          </div>
+        </div>
+        <div id="cost-result" hidden style="margin-top:16px;"></div>
       </div>
     </div>
 

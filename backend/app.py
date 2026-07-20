@@ -16,8 +16,11 @@ from dotenv import load_dotenv
 
 import backtest as backtester
 import calibration as calib
+import costsweep
+import cpcv
 import datamining
 import features  # noqa: F401 — imported so startup errors surface early
+import ledger
 import ml_runtime
 import pead as pead_study
 import portfolio as portopt
@@ -251,10 +254,37 @@ def predict():
     try:
         # 'unavailable' is a valid, expected state (thin free data), not an
         # error — the frontend renders it as an honest "no signal" card.
-        return jsonify(predictor_engine.predict(symbol))
+        result = predictor_engine.predict(symbol)
+        # Append the call to the forward track record (deduped to once/day/ticker).
+        # Best-effort: a ledger failure must never break the prediction itself.
+        try:
+            ledger.log_prediction(result)
+        except Exception:
+            logger.warning('ledger logging failed for %s', symbol, exc_info=True)
+        return jsonify(result)
     except Exception as exc:
         logger.exception('predict failed for %s', symbol)
         return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/predict/ledger')
+@limiter.limit('30 per minute')
+def predict_ledger():
+    """
+    Live forward track record: every Predictor call is logged at prediction time
+    and graded once its horizon elapses. Returns the recent rows plus a summary
+    (hit rate, Brier score, realized returns) — a genuine out-of-sample record
+    that can't be retro-fitted. Lazily grades matured rows on read.
+    """
+    try:
+        limit = min(int(request.args.get('limit', 50)), 200)
+    except (TypeError, ValueError):
+        limit = 50
+    try:
+        return jsonify(ledger.get_ledger(limit=limit))
+    except Exception as exc:
+        logger.exception('ledger read failed')
+        return jsonify({'available': False, 'reason': str(exc)}), 500
 
 
 @app.route('/api/predict/calibration')
@@ -306,6 +336,60 @@ def research_datamine():
         return jsonify(datamining.run_sweep(ticker, n))
     except Exception as exc:
         logger.exception('datamine failed')
+        return jsonify({'available': False, 'reason': str(exc)}), 500
+
+
+@app.route('/api/research/cpcv', methods=['POST'])
+@limiter.limit('10 per hour')
+def research_cpcv():
+    """
+    Combinatorial Purged Cross-Validation → Probability of Backtest Overfitting.
+    Runs a real trend/mean-reversion hyperparameter grid on one ticker, then uses
+    CSCV to measure how often the in-sample winner degrades out-of-sample. Heavy
+    (hundreds of IS/OOS splits) but cached.
+    """
+    data     = request.get_json() or {}
+    ticker   = (data.get('ticker') or 'SPY').strip().upper()
+    n_groups = int(data.get('n_groups', 10))
+    try:
+        return jsonify(cpcv.compute_cpcv(ticker, n_groups=n_groups))
+    except Exception as exc:
+        logger.exception('cpcv failed')
+        return jsonify({'available': False, 'reason': str(exc)}), 500
+
+
+@app.route('/api/research/cost-sensitivity', methods=['POST'])
+@limiter.limit('10 per hour')
+def research_cost_sensitivity():
+    """
+    Transaction-cost sensitivity sweep: rerun one strategy across a grid of
+    per-side cost levels and report the net-return / edge decay curve plus the
+    break-even cost at which the edge over buy-and-hold vanishes.
+    """
+    data           = request.get_json() or {}
+    strategy       = data.get('strategy', 'ma_crossover')
+    tickers        = [t.strip().upper() for t in (data.get('tickers') or [])
+                      if isinstance(t, str) and t.strip()]
+    start_date     = data.get('start_date',
+                              (datetime.now() - timedelta(days=365 * 3)).strftime('%Y-%m-%d'))
+    end_date       = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+    initial_capital = float(data.get('initial_capital', 100_000))
+    risk_tolerance = data.get('risk_tolerance', 'moderate')
+
+    if strategy not in VALID_STRATEGIES:
+        return jsonify({'available': False, 'reason': 'Invalid strategy'}), 400
+    if not tickers:
+        return jsonify({'available': False, 'reason': 'At least one ticker required'}), 400
+    if risk_tolerance not in ('conservative', 'moderate', 'aggressive'):
+        return jsonify({'available': False, 'reason': 'Invalid risk tolerance'}), 400
+
+    custom_rules = _sanitize_rules(data.get('custom_rules')) if strategy == 'custom' else None
+    try:
+        return jsonify(costsweep.run_cost_sweep(
+            strategy, tickers, start_date, end_date,
+            initial_capital, risk_tolerance, custom_rules))
+    except Exception as exc:
+        logger.exception('cost sweep failed')
         return jsonify({'available': False, 'reason': str(exc)}), 500
 
 

@@ -216,6 +216,59 @@ def _regime_breakdown(sell_trades: list[dict]) -> dict:
     return out
 
 
+def _regime_conditional(port_hist: list[dict], spy_curve: list[dict],
+                        regime_for) -> dict:
+    """
+    Time-based (not trade-based) performance split by market regime.
+
+    For every day the strategy was invested, tag the day with its regime and
+    accumulate the strategy's and the benchmark's returns *within* that regime.
+    This answers the honest question the trade breakdown can't: is the edge
+    spread across conditions, or is it just one lucky regime (e.g. a single
+    trending bull run) carrying the whole result?
+    """
+    if len(port_hist) < 5:
+        return {}
+
+    dates = [pd.Timestamp(p['date']) for p in port_hist]
+    pvals = np.array([p['value'] for p in port_hist], dtype=float)
+    pret  = np.diff(pvals) / pvals[:-1]
+
+    spy_map = ({pd.Timestamp(s['date']): float(s['value']) for s in spy_curve}
+               if spy_curve else {})
+
+    from collections import defaultdict
+    strat_by: dict[str, list] = defaultdict(list)
+    spy_by:   dict[str, list] = defaultdict(list)
+
+    for i in range(len(pret)):
+        rname = regime_for(dates[i])                 # regime known at the step's start
+        strat_by[rname].append(float(pret[i]))
+        d0, d1 = dates[i], dates[i + 1]
+        if d0 in spy_map and d1 in spy_map and spy_map[d0] > 0:
+            spy_by[rname].append(spy_map[d1] / spy_map[d0] - 1.0)
+
+    total_days = len(pret)
+    out = {}
+    for rname, rets in strat_by.items():
+        arr = np.array(rets, dtype=float)
+        cum_strat = float(np.prod(1 + arr) - 1) * 100
+        std = arr.std(ddof=1) if len(arr) > 2 else 0.0
+        sharpe = round(float(arr.mean() / std * np.sqrt(252)), 2) if std > 1e-12 else 0.0
+        spy_rets = np.array(spy_by.get(rname, []), dtype=float)
+        cum_spy = float(np.prod(1 + spy_rets) - 1) * 100 if spy_rets.size else None
+        out[rname] = {
+            'label':        reg.REGIME_LABELS.get(rname, rname),
+            'days':         len(arr),
+            'pct_of_time':  round(len(arr) / total_days * 100, 1) if total_days else 0,
+            'strat_return': round(cum_strat, 2),
+            'spy_return':   round(cum_spy, 2) if cum_spy is not None else None,
+            'excess':       round(cum_strat - cum_spy, 2) if cum_spy is not None else None,
+            'sharpe':       sharpe,
+        }
+    return out
+
+
 # ── Main engine ────────────────────────────────────────────────────────────────
 
 def run_backtest(
@@ -627,6 +680,7 @@ def run_backtest(
         'fama_french':        ff3_result,
         'markowitz_weights':  markowitz_weights if use_markowitz else None,
         'regime_breakdown':   _regime_breakdown(sell_trades),
+        'regime_conditional': _regime_conditional(port_hist, spy_curve, _regime_for),
         'equity_curve':     port_hist,
         'spy_curve':        spy_curve,
         'trades':           trades[-200:],

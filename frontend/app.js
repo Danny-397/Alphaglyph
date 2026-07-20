@@ -720,7 +720,7 @@ function initBacktest() {
 
     renderBtChart(data)
     renderSecondaryStats(m)
-    renderRegimeBreakdown(data.regime_breakdown || {})
+    renderRegimeBreakdown(data.regime_breakdown || {}, data.regime_conditional || {})
     renderMonteCarlo(data.monte_carlo, data.equity_curve)
     renderResearchTab(data)
     renderTradesTable(data.trades || [])
@@ -816,27 +816,59 @@ function initBacktest() {
     ].join('')
   }
 
-  function renderRegimeBreakdown(breakdown) {
+  function renderRegimeBreakdown(breakdown, conditional) {
     const box     = el('regime-breakdown')
     const entries = Object.entries(breakdown)
-    if (!entries.length) { box.innerHTML = ''; return }
-    box.innerHTML = `
-      <div class="section-header" style="margin-top:20px;">Performance by Market Regime</div>
-      <div class="table-wrap"><table class="data-table">
-        <thead><tr>
-          <th>Regime</th><th>Trades</th><th>Win Rate</th>
-          <th>Total P&L</th><th>Avg P&L</th><th>Best</th><th>Worst</th>
-        </tr></thead>
-        <tbody>${entries.map(([r, v]) => `<tr>
-          <td><span style="color:${REGIME_COLORS[r] || '#8a978f'};font-weight:700;">${v.label || r}</span></td>
-          <td>${v.trade_count}</td>
-          <td>${v.win_rate}%</td>
-          <td class="${clr(v.total_pnl)}">${fmt$(v.total_pnl)}</td>
-          <td class="${clr(v.avg_pnl)}">${fmt$(v.avg_pnl)}</td>
-          <td class="positive">${fmt$(v.best_trade)}</td>
-          <td class="negative">${fmt$(v.worst_trade)}</td>
-        </tr>`).join('')}</tbody>
-      </table></div>`
+    const cond    = Object.entries(conditional || {})
+      .sort((a, b) => (b[1].days || 0) - (a[1].days || 0))
+    if (!entries.length && !cond.length) { box.innerHTML = ''; return }
+
+    // Time-based conditional block: is the edge spread across conditions, or is
+    // it just one lucky regime carrying the whole result?
+    let condHtml = ''
+    if (cond.length) {
+      condHtml = `
+        <div class="section-header" style="margin-top:20px;">Edge by Regime — is it real, or just one condition?</div>
+        <p class="text-muted" style="font-size:12px;line-height:1.6;margin:-6px 0 12px;">
+          Splits every invested <em>day</em> by the market regime it fell in, and compares the strategy's compounded return to buy-and-hold (SPY) <strong>within</strong> that regime. A strategy whose whole edge lives in one regime is far more fragile than one that beats the benchmark across several.
+        </p>
+        <div class="table-wrap"><table class="data-table">
+          <thead><tr>
+            <th>Regime</th><th>% of Time</th><th>Strategy</th><th>SPY</th><th>Excess</th><th>Sharpe</th>
+          </tr></thead>
+          <tbody>${cond.map(([r, v]) => `<tr>
+            <td><span style="color:${REGIME_COLORS[r] || '#8a978f'};font-weight:700;">${v.label || r}</span></td>
+            <td>${v.pct_of_time}%</td>
+            <td class="${clr(v.strat_return)}">${fmtPct(v.strat_return)}</td>
+            <td>${v.spy_return == null ? '—' : fmtPct(v.spy_return)}</td>
+            <td class="${clr(v.excess)}">${v.excess == null ? '—' : fmtPct(v.excess)}</td>
+            <td>${fmtN(v.sharpe)}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`
+    }
+
+    let tradeHtml = ''
+    if (entries.length) {
+      tradeHtml = `
+        <div class="section-header" style="margin-top:20px;">Closed Trades by Market Regime</div>
+        <div class="table-wrap"><table class="data-table">
+          <thead><tr>
+            <th>Regime</th><th>Trades</th><th>Win Rate</th>
+            <th>Total P&L</th><th>Avg P&L</th><th>Best</th><th>Worst</th>
+          </tr></thead>
+          <tbody>${entries.map(([r, v]) => `<tr>
+            <td><span style="color:${REGIME_COLORS[r] || '#8a978f'};font-weight:700;">${v.label || r}</span></td>
+            <td>${v.trade_count}</td>
+            <td>${v.win_rate}%</td>
+            <td class="${clr(v.total_pnl)}">${fmt$(v.total_pnl)}</td>
+            <td class="${clr(v.avg_pnl)}">${fmt$(v.avg_pnl)}</td>
+            <td class="positive">${fmt$(v.best_trade)}</td>
+            <td class="negative">${fmt$(v.worst_trade)}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`
+    }
+
+    box.innerHTML = condHtml + tradeHtml
   }
 
   function renderMonteCarlo(mc, curve) {
@@ -1577,6 +1609,67 @@ function initPredictor() {
     renderCalibration(data)
   })
 
+  // ── Live forward ledger ─────────────────────────────────────────────────────
+  const LDIR = { BULLISH: 'positive', BEARISH: 'negative', NEUTRAL: '' }
+  function renderLedger(data) {
+    const box = el('ledger-result'); box.hidden = false
+    if (!data || !data.available) {
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'Ledger unavailable right now.'}</p>`
+      return
+    }
+    const rows = data.rows || []
+    const s = data.summary || {}
+    if (!rows.length) {
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;line-height:1.65;">
+        The ledger is empty. Run a prediction above — it gets logged here immediately and graded once its ${data.rows?.[0]?.horizon || 5}-day horizon passes. The forward track record builds from there.</p>`
+      return
+    }
+    const hitTag = s.hit_rate == null ? ['', 'awaiting first graded call']
+      : s.hit_rate > (s.base_up_rate ?? 50) ? ['positive', `vs ${s.base_up_rate}% base up-rate`]
+      : ['negative', `vs ${s.base_up_rate}% base up-rate`]
+    const bssTag = s.brier_skill == null ? '' : s.brier_skill > 0.02 ? 'positive' : s.brier_skill < -0.02 ? 'negative' : ''
+
+    const outcomeCell = r => {
+      if (r.status !== 'graded') return `<span class="text-muted">pending · due ${r.due_date}</span>`
+      if (r.correct == null) return `<span class="text-muted">${fmtPct(r.realized_pct, 1)} · n/a</span>`
+      const mark = r.correct ? '<span class="positive">✓</span>' : '<span class="negative">✗</span>'
+      return `<span class="${clr(r.realized_pct)}">${fmtPct(r.realized_pct, 1)}</span> ${mark}`
+    }
+
+    box.innerHTML = `
+      <div class="hero-row" style="margin-bottom:16px;">
+        <div class="hero-stat"><div class="hero-stat-value">${s.n_scored || 0}</div><div class="hero-stat-label">Graded directional calls (${data.n_pending || 0} pending)</div></div>
+        <div class="hero-stat"><div class="hero-stat-value ${hitTag[0]}">${s.hit_rate == null ? '—' : s.hit_rate + '%'}</div><div class="hero-stat-label">Forward hit rate · ${hitTag[1]}</div></div>
+        <div class="hero-stat"><div class="hero-stat-value ${bssTag}">${s.brier_skill == null ? '—' : fmtN(s.brier_skill, 3)}</div><div class="hero-stat-label">Brier skill (>0 = beats base rate)</div></div>
+        <div class="hero-stat"><div class="hero-stat-value ${clr(s.avg_realized_pct)}">${s.avg_realized_pct == null ? '—' : fmtPct(s.avg_realized_pct, 2)}</div><div class="hero-stat-label">Avg realized move / call</div></div>
+      </div>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Logged</th><th>Ticker</th><th>Call</th><th>P(up)</th><th>Entry</th><th>Outcome</th></tr></thead>
+        <tbody>${rows.map(r => `<tr>
+          <td class="text-muted" style="font-size:11px;">${r.created_date}</td>
+          <td><strong>${r.ticker}</strong></td>
+          <td><span class="${LDIR[r.direction] || ''}" style="font-weight:700;font-size:11px;">${r.direction}</span></td>
+          <td>${Math.round(r.p_up * 100)}%</td>
+          <td>${fmt$(r.price_at_pred)}</td>
+          <td>${outcomeCell(r)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:12px;">${data.note}</p>`
+  }
+
+  const ledgerBtn = el('ledger-load')
+  let ledgerLoaded = false
+  ledgerBtn.addEventListener('click', async () => {
+    ledgerBtn.disabled = true; ledgerBtn.textContent = ledgerLoaded ? 'Refreshing…' : 'Loading…'
+    el('ledger-loading').hidden = false
+    el('ledger-result').hidden = true
+    const data = await api('/api/predict/ledger')
+    el('ledger-loading').hidden = true
+    ledgerBtn.disabled = false; ledgerBtn.textContent = 'Refresh'
+    ledgerLoaded = true
+    renderLedger(data)
+  })
+
   run.addEventListener('click', predict)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); predict() } })
   renderQuick()
@@ -1714,6 +1807,165 @@ function initResearch() {
     el('dm-loading').hidden = true
     btn.disabled = false; btn.textContent = 'Run sweep'
     renderDm(data)
+  })
+
+  // ── CPCV + PBO ───────────────────────────────────────────────────────────────
+  let cpcvHist = null, cpcvScatter = null
+  function pboTone(pbo) { return pbo >= 0.5 ? 'negative' : pbo >= 0.25 ? '' : 'positive' }
+
+  function renderCpcv(data) {
+    const box = el('cpcv-result'); box.hidden = false
+    if (!data || !data.available) {
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'CPCV unavailable right now.'}</p>`
+      return
+    }
+    const d = data.degradation || {}
+    const retention = (d.median_is_sr && d.median_is_sr > 0)
+      ? Math.max(0, Math.min(100, (d.median_oos_sr / d.median_is_sr) * 100)) : 0
+    // Small IS/OOS grid diagram of the first few splits.
+    const grid = (data.splits_diagram || []).map(row =>
+      `<div class="cpcv-row">${row.map(c =>
+        `<span class="cpcv-cell ${c === 'IS' ? 'cpcv-is' : 'cpcv-oos'}">${c}</span>`).join('')}</div>`).join('')
+
+    box.innerHTML = `
+      <div class="hero-row" style="margin-bottom:16px;">
+        <div class="hero-stat"><div class="hero-stat-value ${pboTone(data.pbo)}">${Math.round(data.pbo * 100)}%</div><div class="hero-stat-label">Probability of Backtest Overfitting</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${retention.toFixed(0)}%</div><div class="hero-stat-label">Median IS Sharpe surviving OOS</div></div>
+        <div class="hero-stat"><div class="hero-stat-value ${data.prob_oos_loss > 0.4 ? 'negative' : ''}">${Math.round(data.prob_oos_loss * 100)}%</div><div class="hero-stat-label">Chosen strategy loses money OOS</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${data.n_strategies}×${data.n_combos}</div><div class="hero-stat-label">Variants × IS/OOS splits</div></div>
+      </div>
+      <div class="two-col" style="margin-bottom:16px;">
+        <div><div class="section-header" style="font-size:12px;">Overfit statistic λ (left of 0 = overfit)</div>
+          <div class="chart-wrap" style="height:260px;"><canvas id="cpcv-hist"></canvas></div></div>
+        <div><div class="section-header" style="font-size:12px;">In-sample vs out-of-sample Sharpe</div>
+          <div class="chart-wrap" style="height:260px;"><canvas id="cpcv-scatter"></canvas></div></div>
+      </div>
+      <div class="section-header" style="font-size:12px;">CPCV split structure (${data.n_groups} groups, embargo ${data.embargo}d) — first ${(data.splits_diagram || []).length} of ${data.n_combos}</div>
+      <div class="cpcv-grid" style="margin-bottom:14px;">${grid}</div>
+      <p style="font-size:13px;line-height:1.65;color:var(--text);"><strong>${data.verdict}</strong></p>
+      <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:8px;">${data.ticker} · ${data.n_rows} trading days after warm-up · CSCV (Bailey & López de Prado 2014). A trend/mean-reversion grid, not the site's headline strategies.</p>`
+
+    // λ histogram
+    const labels = data.logit_hist.map(h => h.x)
+    const counts = data.logit_hist.map(h => h.count)
+    const bars = data.logit_hist.map(h => h.x < 0 ? 'rgba(248,81,73,0.55)' : 'rgba(63,185,80,0.55)')
+    if (cpcvHist) cpcvHist.destroy()
+    cpcvHist = new Chart(el('cpcv-hist'), {
+      type: 'bar',
+      data: { labels, datasets: [{ data: counts, backgroundColor: bars, borderWidth: 0, barPercentage: 1, categoryPercentage: 1 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { type: 'linear', offset: false, title: { display: true, text: 'λ = logit(OOS rank)', color: '#8a978f' },
+               ticks: { color: '#8a978f', maxTicksLimit: 8 }, grid: { display: false } },
+          y: { title: { display: true, text: 'Splits', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+        },
+        plugins: {
+          legend: { display: false },
+          annotation: { annotations: { zero: {
+            type: 'line', xMin: 0, xMax: 0, borderColor: '#e3b341', borderWidth: 2, borderDash: [5, 4],
+            label: { display: true, content: 'overfit ◄ │ ► holds up', color: '#e3b341', position: 'end', font: { size: 10 }, backgroundColor: 'rgba(13,17,15,0.85)' } } } },
+        },
+      },
+    })
+
+    // IS vs OOS scatter with y=x and the regression line
+    const pts = data.scatter.map(p => ({ x: p.is, y: p.oos }))
+    const xs = pts.map(p => p.x)
+    const xLo = Math.min(...xs), xHi = Math.max(...xs)
+    const reg = [{ x: xLo, y: d.intercept + d.slope * xLo }, { x: xHi, y: d.intercept + d.slope * xHi }]
+    if (cpcvScatter) cpcvScatter.destroy()
+    cpcvScatter = new Chart(el('cpcv-scatter'), {
+      type: 'scatter',
+      data: { datasets: [
+        { label: 'y = x (no decay)', type: 'line', data: [{ x: xLo, y: xLo }, { x: xHi, y: xHi }],
+          borderColor: 'rgba(138,151,143,0.6)', borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false },
+        { label: 'IS→OOS fit', type: 'line', data: reg, borderColor: '#58a6ff', borderWidth: 2, pointRadius: 0, fill: false },
+        { label: 'Selected champion', data: pts, backgroundColor: 'rgba(63,185,80,0.55)', borderColor: '#3fb950', borderWidth: 1, pointRadius: 3 },
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { title: { display: true, text: 'In-sample Sharpe', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          y: { title: { display: true, text: 'Out-of-sample Sharpe', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+        },
+        plugins: { legend: { labels: { color: '#8a978f', usePointStyle: true, boxWidth: 8, filter: i => i.text !== 'y = x (no decay)' } } },
+      },
+    })
+  }
+
+  el('cpcv-run').addEventListener('click', async () => {
+    const ticker = (el('cpcv-ticker').value || 'SPY').trim().toUpperCase()
+    const err = el('cpcv-error'); err.hidden = true
+    if (!/^[A-Z][A-Z.\-]{0,7}$/.test(ticker)) { err.textContent = 'Enter a valid ticker.'; err.hidden = false; return }
+    const btn = el('cpcv-run'); btn.disabled = true; btn.textContent = 'Running…'
+    el('cpcv-loading').hidden = false; el('cpcv-result').hidden = true
+    const data = await api('/api/research/cpcv', { method: 'POST', body: JSON.stringify({ ticker }) })
+    el('cpcv-loading').hidden = true
+    btn.disabled = false; btn.textContent = 'Run CPCV'
+    renderCpcv(data)
+  })
+
+  // ── Cost-sensitivity sweep ─────────────────────────────────────────────────
+  let costChart = null
+  function renderCost(data) {
+    const box = el('cost-result'); box.hidden = false
+    if (!data || !data.available) {
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'Sweep unavailable right now.'}</p>`
+      return
+    }
+    const beBench = data.breakeven_bench_bps
+    const beTone = beBench == null ? '' : beBench <= 5 ? 'negative' : beBench <= 20 ? '' : 'positive'
+    box.innerHTML = `
+      <div class="hero-row" style="margin-bottom:16px;">
+        <div class="hero-stat"><div class="hero-stat-value ${beTone}">${beBench == null ? '>100' : beBench}${' '}bp</div><div class="hero-stat-label">Break-even vs buy-and-hold (per side)</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${data.breakeven_zero_bps == null ? '>100' : data.breakeven_zero_bps} bp</div><div class="hero-stat-label">Break-even vs zero return</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${fmtPct(data.benchmark_return)}</div><div class="hero-stat-label">Buy-and-hold (SPY) return</div></div>
+      </div>
+      <div class="chart-wrap" style="height:320px;"><canvas id="cost-chart"></canvas></div>
+      <p style="font-size:13px;line-height:1.65;margin-top:14px;color:var(--text);"><strong>${data.verdict}</strong></p>
+      <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:8px;">Real-world large-cap costs run ~3–10 bp/side. Each point reruns the full backtest at that friction level.</p>`
+
+    const pts = data.points
+    const labels = pts.map(p => p.cost_bps)
+    const anns = {}
+    if (beBench != null) anns.beB = { type: 'line', xMin: beBench, xMax: beBench, borderColor: '#e3b341', borderWidth: 2, borderDash: [5, 4],
+      label: { display: true, content: `edge dies @ ${beBench}bp`, color: '#e3b341', position: 'start', font: { size: 10 }, backgroundColor: 'rgba(13,17,15,0.85)' } }
+    if (costChart) costChart.destroy()
+    costChart = new Chart(el('cost-chart'), {
+      type: 'line',
+      data: { labels, datasets: [
+        { label: 'Strategy net return', data: pts.map(p => p.net_return), borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.08)', borderWidth: 2, fill: true, tension: 0.2, pointRadius: 3 },
+        { label: 'Buy & hold (SPY)', data: pts.map(() => data.benchmark_return), borderColor: '#e3b341', borderWidth: 1.5, borderDash: [5, 4], fill: false, pointRadius: 0 },
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { title: { display: true, text: 'Transaction cost per side (basis points)', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { display: false } },
+          y: { title: { display: true, text: 'Total return (%)', color: '#8a978f' }, ticks: { color: '#8a978f', callback: v => v + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+        },
+        plugins: {
+          legend: { labels: { color: '#8a978f', usePointStyle: true, boxWidth: 10 } },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${fmtPct(c.parsed.y)}` } },
+          annotation: { annotations: anns },
+        },
+      },
+    })
+  }
+
+  el('cost-run').addEventListener('click', async () => {
+    const ticker = (el('cost-ticker').value || 'AAPL').trim().toUpperCase()
+    const err = el('cost-error'); err.hidden = true
+    if (!/^[A-Z][A-Z.\-]{0,7}$/.test(ticker)) { err.textContent = 'Enter a valid ticker.'; err.hidden = false; return }
+    const btn = el('cost-run'); btn.disabled = true; btn.textContent = 'Running…'
+    el('cost-loading').hidden = false; el('cost-result').hidden = true
+    const data = await api('/api/research/cost-sensitivity', {
+      method: 'POST', body: JSON.stringify({ strategy: el('cost-strategy').value, tickers: [ticker] }),
+    })
+    el('cost-loading').hidden = true
+    btn.disabled = false; btn.textContent = 'Run sweep'
+    renderCost(data)
   })
 }
 

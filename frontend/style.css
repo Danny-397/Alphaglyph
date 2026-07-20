@@ -1723,3 +1723,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .comp-factors { list-style: none; margin: 0; padding: 0; }
 .comp-factors li { font-size: 12px; color: var(--muted); line-height: 1.6; padding-left: 14px; position: relative; }
 .comp-factors li::before { content: '·'; position: absolute; left: 4px; color: var(--border-lt); }
+
+/* ── CPCV split-structure diagram ─────────────────────────────────────────── */
+.cpcv-grid { display: flex; flex-direction: column; gap: 3px; }
+.cpcv-row  { display: flex; gap: 3px; }
+.cpcv-cell {
+  flex: 1; min-width: 0; text-align: center;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  padding: 4px 0; border-radius: 3px; letter-spacing: .5px;
+}
+.cpcv-cell.cpcv-is  { background: var(--blue-dim); color: var(--blue); }
+.cpcv-cell.cpcv-oos { background: rgba(227,179,65,0.14); color: #e3b341; }
