@@ -85,15 +85,23 @@ figure below is live output you can reproduce from the app or the API.
 ### Overfitting probability (CPCV → PBO)
 
 A real trend + mean-reversion **hyperparameter grid** (42 variants) is cross-validated
-on SPY using Combinatorially-Symmetric Cross-Validation (Bailey & López de Prado, 2014),
-with the seam between splits purged/embargoed so serial correlation can't leak the edge:
+on SPY using Combinatorially-Symmetric Cross-Validation (Bailey, Borwein, López de Prado
+& Zhu, 2017), with the seam between splits purged/embargoed so serial correlation can't
+leak the edge:
 
 | Metric | Result | Reading |
 |---|---|---|
-| Probability of Backtest Overfitting | **63%** | The in-sample winner lands in the bottom half OOS more often than not |
-| Median in-sample Sharpe surviving OOS | **~38%** | Most of the "edge" evaporates the moment you leave the fitting window |
-| Chosen strategy loses money OOS | **~1%** | It doesn't blow up — it just isn't special |
+| Probability of Backtest Overfitting | **72%** | The in-sample winner lands in the bottom half OOS more often than not |
+| Median in-sample Sharpe surviving OOS | **~52%** | Roughly half the "edge" evaporates the moment you leave the fitting window |
+| IS→OOS degradation slope | **−0.59** | Inverted: looking better in-sample predicted doing *worse* out-of-sample |
+| Chosen strategy loses money OOS | **~5%** | It doesn't blow up — selection just fails to find the good ones |
 | Grid size × CV splits | **42 × 252** | A genuine search, exactly the situation PBO was built to police |
+
+**Run 2026-08-01.** These figures move: CPCV runs against a rolling window, so PBO is a
+property of the window, not a constant. An earlier run reported 63% / ~38%. Quoting any
+single PBO as fixed is the exact error the metric exists to catch — see
+[docs/technical-report.md](docs/technical-report.md) for both runs and why the drift
+matters.
 
 *Takeaway: on a broad-market index, hyperparameter search is essentially picking
 noise. The tool says so out loud — reproduce via `POST /api/research/cpcv`.*
@@ -215,7 +223,7 @@ benchmark**, and a **client-side animated replay** of every explained trade.
 
 | Typical student trading project | AlphaGlyph |
 |---|---|
-| "My Sharpe is 1.4" | "My Sharpe is 1.4, the Deflated Sharpe gives 91% it's real after 5 strategies, and the **PBO says the search that found it overfits 63% of the time**" |
+| "My Sharpe is 1.4" | "My Sharpe is 1.4, the Deflated Sharpe gives 91% it's real after 5 strategies, and the **PBO says the search that found it overfits 72% of the time**" |
 | Backtest and stop | After the backtest: skill test, DSR, Fama-French, CPCV/PBO, and a cost-sensitivity sweep |
 | Return metric only | Fama-French alpha decomposition — skill vs. passive factor exposure |
 | One blended Sharpe | **Regime-conditional** performance — is the edge real, or just one lucky regime? |
