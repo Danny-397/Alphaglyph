@@ -3,7 +3,8 @@ Statistical validation tools for strategy evaluation.
 
 1. Probabilistic Sharpe Ratio (PSR)
    P(SR_true > SR*) corrected for non-normality (skewness, fat tails) and
-   finite sample size.  Source: Lopez de Prado (2014), "The Deflated Sharpe Ratio."
+   finite sample size.  Source: Bailey & Lopez de Prado (2014), "The Deflated
+   Sharpe Ratio", J. Portfolio Management 40(5):94-107.
 
 2. Deflated Sharpe Ratio (DSR)
    PSR where SR* is the expected maximum Sharpe across N independent strategy
@@ -73,7 +74,7 @@ def probabilistic_sharpe_ratio(daily_returns: np.ndarray,
       - Fat-tailed distributions (excess kurtosis)
       - Finite sample size (small samples give noisy SR estimates)
 
-    Formula (Lopez de Prado 2014, eq. 1):
+    Formula (Bailey & Lopez de Prado 2014, eq. 1):
         PSR(SR*) = Φ[(SR_hat - SR*) √(T−1) / √(1 − γ₃·SR_hat + (γ₄−1)/4·SR_hat²)]
 
     All Sharpe values are in per-period (daily) units internally.

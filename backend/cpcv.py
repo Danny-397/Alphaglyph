@@ -7,8 +7,9 @@ you search a grid of strategy variants and keep the best one, its in-sample
 Sharpe is an upward-biased estimate — you selected on noise. PBO quantifies
 exactly how bad that bias is.
 
-Method (Bailey, Borwein, López de Prado & Zhu, 2014 — "The Probability of
-Backtest Overfitting"), via Combinatorially-Symmetric Cross-Validation (CSCV):
+Method (Bailey, Borwein, López de Prado & Zhu, "The Probability of Backtest
+Overfitting", J. Computational Finance 20(4):39-70, 2017; SSRN preprint 2014),
+via Combinatorially-Symmetric Cross-Validation (CSCV):
 
   1. Build a matrix M (T periods × N strategy variants) of per-period returns.
   2. Split the T rows into S contiguous groups (S even). Purge/embargo a few

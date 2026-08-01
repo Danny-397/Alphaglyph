@@ -13,8 +13,8 @@ side:
     Naive PSR (pretends the winner was the only thing you tried)
         → often says "significant". This is the trap.
 
-    Deflated Sharpe Ratio (knows you tried N and corrects for it, López de Prado
-    2014) → almost always says "not significant".
+    Deflated Sharpe Ratio (knows you tried N and corrects for it, Bailey &
+    López de Prado 2014) → almost always says "not significant".
 
 The gap between those two numbers is the whole lesson: a great backtested Sharpe
 is meaningless without knowing how many were tried to find it. The expected
