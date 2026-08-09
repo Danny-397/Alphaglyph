@@ -74,7 +74,8 @@ def test_ledger_grades_matured_call(monkeypatch, _isolated_ledger):
     led.log_prediction(_prediction(price=100.0))
     conn = __import__('database').get_connection()
     conn.execute("UPDATE predictions SET due_date = '2020-01-06'")
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
     # Price rose 5% by the due date → a bullish call should grade correct.
     idx = pd.date_range('2020-01-06', periods=10, freq='B')
@@ -97,7 +98,8 @@ def test_ledger_summary_excludes_neutral(monkeypatch, _isolated_ledger):
     led.log_prediction(_prediction(ticker='NEU', direction='NEUTRAL', p_up=0.5))
     conn = __import__('database').get_connection()
     conn.execute("UPDATE predictions SET due_date = '2020-01-06'")
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     idx = pd.date_range('2020-01-06', periods=5, freq='B')
     df = pd.DataFrame({'Close': [101, 102, 103, 104, 105]}, index=idx)
     monkeypatch.setattr(led.feat, 'fetch_ohlcv', lambda t, period='6mo': df)
