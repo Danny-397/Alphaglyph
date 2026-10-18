@@ -47,7 +47,7 @@ added as new blocks without redesigning anything.
 2. Run, cell by cell:
 
 ```python
-!git clone https://github.com/Danny-397/alphaglyph.git
+!git clone https://github.com/Danny-397/Alphaglyph.git
 %cd alphaglyph
 !pip -q install -r ml/requirements-train.txt
 
