@@ -13,10 +13,25 @@ name: Keep bot warm
 # NOTE: GitHub cron is best-effort (it can lag a few minutes and is paused after
 # 60 days of zero repo activity). For rock-solid uptime also point a dedicated
 # free pinger (https://cron-job.org or UptimeRobot) at the same /health URL.
+#
+# WHY THIS ONLY RUNS ON WEEKDAY MARKET HOURS
+# Render's 750 free instance-hours are per WORKSPACE per month, shared by every
+# free service on the account -- and when they run out Render suspends ALL of
+# them, not just the one that spent them. Pinging around the clock keeps this
+# one service awake ~720 h/month, which is essentially the entire allowance and
+# leaves nothing for the other backends.
+#
+# Nothing is lost by narrowing it: the bot trades US equities and risk.py
+# refuses to trade when the market is shut (is_market_open(), 09:30-16:00
+# America/New_York, weekdays), so an off-hours ping woke the instance only to
+# decline. The window below is 13:00-21:59 UTC, which covers 09:30-16:00 ET in
+# both EDT and EST, and costs ~190 h/month instead of ~720.
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # every 10 minutes (GitHub's minimum granularity is 5)
+    # Every 10 min, weekdays, through the US market session (UTC; covers both
+    # EDT and EST). GitHub's minimum cron granularity is 5 minutes.
+    - cron: '*/10 13-21 * * 1-5'
   workflow_dispatch:          # allow manual "Run workflow" from the Actions tab
 
 # Don't pile up overlapping pings if a run is slow (cold starts take ~50s).
