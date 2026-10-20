@@ -5,7 +5,8 @@ All endpoints return JSON.  The frontend polls these on a 10-second interval.
 
 import logging
 import os
-from datetime import datetime, timedelta
+import re
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -40,12 +41,24 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
-# CORS: in production, replace the origins list with your Vercel URL to lock
-# down which frontends can call this API.
-# e.g. CORS(app, origins=['https://your-project.vercel.app'])
-# For local development, allow all origins.
-_cors_origins = os.getenv('CORS_ORIGINS', '*')
-CORS(app, origins=_cors_origins)
+# CORS. This used to default to "*", so with CORS_ORIGINS unset any site on
+# the internet could call the API from a visitor's browser. The default is now
+# the real frontends; CORS_ORIGINS still overrides, as a comma-separated list.
+#
+# Origins are matched exactly and carry no trailing slash -- the browser sends
+# "https://alphaglyph.org", so a configured "https://alphaglyph.org/" would
+# never match and every request would fail with "Failed to fetch".
+_configured_origins = [
+    o.strip().rstrip('/') for o in os.getenv('CORS_ORIGINS', '').split(',') if o.strip()
+]
+_default_origins = [
+    'https://alphaglyph.org',
+    'https://www.alphaglyph.org',
+    re.compile(r'^https://[A-Za-z0-9-]+\.vercel\.app$'),  # production + preview deploys
+    re.compile(r'^http://localhost:\d+$'),                 # local dev
+    re.compile(r'^http://127\.0\.0\.1:\d+$'),
+]
+CORS(app, origins=_configured_origins + _default_origins)
 
 
 def _client_ip() -> str:
@@ -584,7 +597,7 @@ def health():
     # The API is fully stateless — no bot, no database to report on.
     return jsonify({
         'status': 'ok',
-        'ts':     datetime.utcnow().isoformat(),
+        'ts':     datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         'ml':     'loaded' if ml_runtime.get_info().get('loaded') else 'unavailable',
     })
 
