@@ -1,7 +1,7 @@
 import os
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -166,7 +166,7 @@ def log_trade(ticker, action, shares, price, strategy,
            (timestamp, ticker, action, shares, price, strategy,
             order_id, entry_price, pnl, pnl_pct, regime)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-        (datetime.utcnow().isoformat(), ticker, action, shares, price,
+        (datetime.now(timezone.utc).replace(tzinfo=None).isoformat(), ticker, action, shares, price,
          strategy, order_id, entry_price, pnl, pnl_pct, regime)
     )
     conn.commit()
@@ -177,7 +177,7 @@ def log_portfolio_snapshot(portfolio_value, cash, equity, strategy):
     conn = get_connection()
     conn.execute(
         'INSERT INTO portfolio_snapshots (timestamp, portfolio_value, cash, equity, strategy) VALUES (?, ?, ?, ?, ?)',
-        (datetime.utcnow().isoformat(), portfolio_value, cash, equity, strategy)
+        (datetime.now(timezone.utc).replace(tzinfo=None).isoformat(), portfolio_value, cash, equity, strategy)
     )
     conn.commit()
     conn.close()

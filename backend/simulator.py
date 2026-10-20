@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 import database as db
@@ -207,7 +207,7 @@ def submit_buy(ticker: str, shares: float, price: float) -> SimOrder:
         conn.execute(
             'INSERT INTO sim_positions (ticker, shares, entry_price, opened_at) '
             'VALUES (?, ?, ?, ?)',
-            (ticker, shares, price, datetime.utcnow().isoformat()),
+            (ticker, shares, price, datetime.now(timezone.utc).replace(tzinfo=None).isoformat()),
         )
 
     conn.execute('UPDATE sim_account SET cash = ? WHERE id = 1', (cash - cost,))

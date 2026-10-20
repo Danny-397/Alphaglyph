@@ -245,7 +245,7 @@ def compute_cpcv(ticker: str, n_groups: int = 10, embargo: int = 5,
         'verdict':        _verdict(pbo, float(np.median(x)) if x.size else 0.0,
                                    float(np.median(y)) if y.size else 0.0,
                                    prob_oos_loss),
-        'generated_at':   pd.Timestamp.utcnow().isoformat(),
+        'generated_at':   pd.Timestamp.now(tz='UTC').tz_localize(None).isoformat(),
     }
     _CACHE[key] = (time.time(), result)
     return result
