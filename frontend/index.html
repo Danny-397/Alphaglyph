@@ -315,7 +315,12 @@
   <script>
     try {
       var base = window.RENDER_URL || ''
-      if (base) fetch(base + '/health', { mode: 'no-cors', cache: 'no-store' }).catch(function () {})
+      // No mode:'no-cors' here. It was cancelling the request during page load
+      // (net::ERR_ABORTED) so the backend was never actually pinged -- the one
+      // thing this script exists to do. It isn't needed either: /health sends
+      // access-control-allow-origin for this site, so an ordinary CORS fetch
+      // succeeds and we get a real response instead of an opaque one.
+      if (base) fetch(base + '/health', { cache: 'no-store' }).catch(function () {})
     } catch (e) { /* never let a warm-up ping break the page */ }
   </script>
 
