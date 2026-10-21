@@ -16,8 +16,14 @@ services:
 
     # The API is fully stateless — no database and no persistent disk needed.
     # Every endpoint is a pure market computation; the bots run in the browser.
-    # The app self-pings RENDER_EXTERNAL_URL (set automatically) to stay warm on
-    # the free tier. No brokerage API keys are ever required.
+    # No brokerage API keys are ever required.
+    #
+    # The app self-pings RENDER_EXTERNAL_URL (set automatically) to stay warm,
+    # but only on weekdays 09:00–16:30 ET. Render's 750 free instance-hours are
+    # per WORKSPACE, shared with the QuantumSafe, Tradeski and RL-Trader
+    # backends, and running out suspends every one of them — an unwindowed ping
+    # costs ~730 h/month on its own. Set KEEPALIVE_ALWAYS=1 to ping around the
+    # clock, which only makes sense on a paid instance.
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"            # pandas/numpy/scipy ship wheels for 3.11;

@@ -8,6 +8,8 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 
+import pytz
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -98,6 +100,28 @@ def ratelimit_handler(exc):
     }), 429
 
 
+#: Self-ping window, in America/New_York. 09:00 gives the instance a warm-up
+#: margin before the 09:30 open (a cold start is ~50s); 16:30 covers the close.
+KEEPALIVE_START_MIN = 9 * 60
+KEEPALIVE_END_MIN = 16 * 60 + 30
+
+
+def _within_keepalive_window(now=None) -> bool:
+    """True on weekdays inside the self-ping window.
+
+    Set KEEPALIVE_ALWAYS=1 to ping around the clock -- only sensible on a paid
+    instance, where hours are not metered.
+    """
+    if os.getenv('KEEPALIVE_ALWAYS', '').strip().lower() in ('1', 'true', 'yes'):
+        return True
+    if now is None:
+        now = datetime.now(pytz.timezone('America/New_York'))
+    if now.weekday() >= 5:
+        return False
+    minutes = now.hour * 60 + now.minute
+    return KEEPALIVE_START_MIN <= minutes < KEEPALIVE_END_MIN
+
+
 def _start_keepalive():
     """
     Keep the Render free instance awake by pinging its own public URL on a timer.
@@ -107,6 +131,20 @@ def _start_keepalive():
     traffic, so it resets the idle timer — keeping the site warm (fast ML
     forecasts, charts, backtests) with no external uptime service. (GitHub
     Actions cron is too throttled to rely on: scheduled runs can lag by hours.)
+
+    WHY THE PING IS WINDOWED
+    Render's 750 free instance-hours are per WORKSPACE per month, shared by
+    every free service on the account, and when they run out Render suspends
+    ALL of them. Pinging around the clock holds this one service awake ~730
+    h/month, which is the entire allowance -- it leaves nothing for the
+    QuantumSafe, Tradeski and RL-Trader backends and has already taken them
+    down together once. The market-hours window costs ~165 h/month instead.
+
+    Nothing is lost by narrowing it: the bot trades US equities and risk.py
+    declines to trade when the market is shut, so an off-hours ping woke the
+    instance only to decline. Outside the window the service sleeps and the
+    first visitor pays one ~50s cold start, which the frontend already covers
+    with a "waking the backend" pill.
 
     Active only in production, where Render sets RENDER_EXTERNAL_URL.
     """
@@ -127,13 +165,20 @@ def _start_keepalive():
         import requests
         while True:
             time.sleep(interval)
+            if not _within_keepalive_window():
+                continue
             try:
                 requests.get(target, timeout=20)
             except Exception as exc:
                 logger.warning('keepalive ping failed: %s', exc)
 
     threading.Thread(target=loop, daemon=True, name='keepalive').start()
-    logger.info('Self-keepalive enabled → %s every %ds', target, interval)
+    logger.info(
+        'Self-keepalive enabled → %s every %ds, weekdays %02d:%02d–%02d:%02d ET',
+        target, interval,
+        KEEPALIVE_START_MIN // 60, KEEPALIVE_START_MIN % 60,
+        KEEPALIVE_END_MIN // 60, KEEPALIVE_END_MIN % 60,
+    )
 
 
 _start_keepalive()

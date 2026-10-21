@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-169%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="169 tests passing">
+  <img src="https://img.shields.io/badge/tests-186%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="186 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CPCV%20%2B%20PBO-3fb950?style=flat-square" alt="CPCV + PBO">
@@ -390,7 +390,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           169 tests, fully offline
+│   └── tests/           186 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
