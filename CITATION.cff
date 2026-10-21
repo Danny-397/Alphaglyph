@@ -1,0 +1,39 @@
+# Lets GitHub show a "Cite this repository" button and gives the project a
+# stable, machine-readable citation. It is also what Zenodo reads when a release
+# is archived to mint a DOI.
+#
+# The name matches paper/rl_trader.tex and the other CITATION.cff files in these
+# projects. The site uses "Dan" as a display byline, which is a separate thing
+# from a citation name.
+cff-version: 1.2.0
+title: "AlphaGlyph — a backtesting laboratory that measures its own credibility"
+message: "If you use this software or its findings, please cite it as below."
+type: software
+authors:
+  - given-names: Daniel
+    family-names: Lichtenberger
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/Danny-397/Alphaglyph"
+url: "https://alphaglyph.org"
+abstract: >-
+  AlphaGlyph is a strategy backtester built around the tests that try to
+  disprove a result rather than confirm it: a random-timing permutation test,
+  the Deflated Sharpe Ratio, Fama-French factor attribution, a transaction-cost
+  sensitivity sweep, combinatorially-purged cross-validation, and an
+  append-only forward track record that grades predictions after the fact.
+  Applied to its own 42-variant hyperparameter grid it reports a 72%
+  probability of backtest overfitting, with a median of roughly half the
+  in-sample Sharpe surviving out of sample and an inverted in-sample to
+  out-of-sample degradation slope. An earlier run of the identical procedure on
+  a different rolling window returned 63%, and that instability is reported as
+  a finding: a single probability-of-overfitting figure quoted as a constant is
+  the exact error the metric exists to catch.
+keywords:
+  - backtesting
+  - probability of backtest overfitting
+  - deflated sharpe ratio
+  - combinatorially purged cross-validation
+  - quantitative finance
+  - reproducibility
+license: MIT
+date-released: "2026-10-20"
