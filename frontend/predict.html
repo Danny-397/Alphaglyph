@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaGlyph — Predictor</title>
+  <meta name="theme-color" content="#0b0c0c">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="predict">
+
+  <!-- ── Navigation ─────────────────────────────────────────────────────── -->
+  <nav class="navbar" aria-label="Main">
+    <a class="nav-brand" href="index.html" aria-label="AlphaGlyph home">
+      <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
+      </svg>
+      <span class="nav-brand-name">AlphaGlyph</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Overview</a>
+      <a href="backtest.html" class="nav-link">Backtest</a>
+      <a href="predict.html" class="nav-link active" aria-current="page">Predictor</a>
+      <a href="screener.html" class="nav-link">Screener</a>
+      <a href="portfolio.html" class="nav-link">Portfolio</a>
+      <a href="research.html" class="nav-link">Research</a>
+    </div>
+    <span class="nav-badge" title="Simulated capital on real historical prices">Paper trading</span>
+  </nav>
+
+  <!-- ── Main ───────────────────────────────────────────────────────────── -->
+  <main class="page-wrap" data-page="predict">
+
+    <header class="page-header">
+      <h1>Predictor</h1>
+      <p>A directional lean for the next few trading days, blended from three signals you can inspect — plus the public record of how often that lean has been right. Educational, not financial advice.</p>
+    </header>
+
+
+    <section class="card" style="margin-bottom:16px;">
+      <h2 class="section-header">Predict a stock</h2>
+      <p class="card-desc">
+        A lean for the next few trading days, blended from three signals you can inspect: the <strong>ML transformer's</strong> price forecast, <strong>post-earnings drift</strong> with EPS growth, and <strong>news sentiment</strong>.
+      </p>
+      <div class="ticker-input-row">
+        <label class="sr-only" for="pred-input">Ticker</label>
+        <input type="text" id="pred-input" placeholder="Enter a ticker, e.g. NVDA" maxlength="8" autocomplete="off" spellcheck="false">
+        <button type="button" class="btn btn-primary" id="pred-run">Predict</button>
+      </div>
+      <div class="ticker-error" id="pred-error" hidden></div>
+      <div class="chip-grid" id="pred-quick"></div>
+    </section>
+
+    <div id="pred-loading" hidden>
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <strong>Reading the signals</strong>
+        <p>Forecasting price, weighing the last earnings report, and sampling news tone.</p>
+      </div>
+    </div>
+
+    <div id="pred-result" hidden></div>
+
+    <!-- Track record / calibration -->
+    <section class="card mt-4">
+      <div class="section-header">
+        Track record
+        <button type="button" class="btn btn-sm" id="cal-load">Load track record</button>
+      </div>
+      <p class="card-desc">
+        A "60% up" call is only worth something if the market rises about 60% of the time it's made. This replays the predictor <strong>out of sample</strong>, on data the model never trained on. Points on the diagonal are perfectly calibrated.
+      </p>
+      <div id="cal-loading" hidden>
+        <div class="loading-state"><div class="spinner"></div>
+          <strong>Replaying years of forecasts</strong>
+          <p>Recovering the model's probability and the realised outcome for every historical window.</p>
+        </div>
+      </div>
+      <div id="cal-result" hidden class="mt-4"></div>
+    </section>
+
+    <!-- Live forward track record (append-only ledger) -->
+    <section class="card mt-4">
+      <div class="section-header">
+        Live forward test
+        <span class="badge sig-hold">Append-only</span>
+        <button type="button" class="btn btn-sm" id="ledger-load">Load ledger</button>
+      </div>
+      <p class="card-desc">
+        Every prediction made here is <strong>logged the moment it's made</strong> (ticker, probability, price) and graded once its horizon passes. Nothing is edited afterwards, so the hit rate is a genuine forward record that can't be fitted in hindsight.
+      </p>
+      <div id="ledger-loading" hidden>
+        <div class="loading-state"><div class="spinner"></div>
+          <strong>Reading the ledger</strong>
+          <p>Grading any predictions whose horizon has now elapsed.</p>
+        </div>
+      </div>
+      <div id="ledger-result" hidden class="mt-4"></div>
+    </section>
+
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

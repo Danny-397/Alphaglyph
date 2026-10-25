@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaGlyph — Portfolio optimizer</title>
+  <meta name="theme-color" content="#0b0c0c">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="portfolio">
+
+  <!-- ── Navigation ─────────────────────────────────────────────────────── -->
+  <nav class="navbar" aria-label="Main">
+    <a class="nav-brand" href="index.html" aria-label="AlphaGlyph home">
+      <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
+      </svg>
+      <span class="nav-brand-name">AlphaGlyph</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Overview</a>
+      <a href="backtest.html" class="nav-link">Backtest</a>
+      <a href="predict.html" class="nav-link">Predictor</a>
+      <a href="screener.html" class="nav-link">Screener</a>
+      <a href="portfolio.html" class="nav-link active" aria-current="page">Portfolio</a>
+      <a href="research.html" class="nav-link">Research</a>
+    </div>
+    <span class="nav-badge" title="Simulated capital on real historical prices">Paper trading</span>
+  </nav>
+
+  <!-- ── Main ───────────────────────────────────────────────────────────── -->
+  <main class="page-wrap" data-page="portfolio">
+
+    <header class="page-header">
+      <h1>Portfolio optimizer</h1>
+      <p>Build the efficient frontier from historical returns, read off the max-Sharpe and minimum-variance weights, and watch Ledoit-Wolf shrinkage pull a naive Markowitz allocation back from over-concentration.</p>
+    </header>
+
+
+    <section class="card" style="margin-bottom:16px;">
+      <h2 class="section-header">Optimize a portfolio</h2>
+      <div class="form-group">
+        <span class="form-label">Tickers <span class="text-muted" style="font-weight:400;">· click to toggle</span></span>
+        <div class="chip-grid" id="opt-tickers">
+          <div class="ticker-chip selected" data-ticker="AAPL">AAPL</div>
+          <div class="ticker-chip selected" data-ticker="MSFT">MSFT</div>
+          <div class="ticker-chip selected" data-ticker="NVDA">NVDA</div>
+          <div class="ticker-chip selected" data-ticker="GOOGL">GOOGL</div>
+          <div class="ticker-chip selected" data-ticker="TSLA">TSLA</div>
+          <div class="ticker-chip selected" data-ticker="JPM">JPM</div>
+          <div class="ticker-chip selected" data-ticker="SPY">SPY</div>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:18px;">
+        <div class="form-group">
+          <label class="form-label" for="opt-start">Start</label>
+          <input type="date" id="opt-start">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="opt-end">End</label>
+          <input type="date" id="opt-end">
+        </div>
+        <button type="button" class="btn btn-primary" id="opt-run-btn">Optimize</button>
+      </div>
+      <label class="check">
+        <input type="checkbox" id="opt-shrink">
+        <span class="check-title">Ledoit-Wolf shrinkage</span>
+        <span class="check-desc">Pulls the noisy sample covariance toward a stable target by the optimal amount, the standard fix for naive Markowitz over-concentration. Turn it on and watch the weights spread out.</span>
+      </label>
+      <div id="opt-error" class="error-banner mt-4" hidden></div>
+    </section>
+
+    <div id="opt-loading" hidden>
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <strong>Running optimization</strong>
+        <p>Computing the efficient frontier and Markowitz weights.</p>
+      </div>
+    </div>
+
+    <div id="opt-results" hidden>
+      <div class="two-col" style="margin-bottom:16px;">
+        <section class="card">
+          <h3 class="section-header">Efficient frontier</h3>
+          <div class="chart-wrap" style="height:380px;"><canvas id="frontier-chart"></canvas></div>
+          <p class="fine">
+            Each point is a sampled portfolio; the curve is the minimum volatility for each return level.
+            <strong style="color:var(--yellow);">★</strong> max-Sharpe (tangency) · <strong style="color:var(--text);">◆</strong> min-variance.
+          </p>
+          <p class="fine">
+            <strong>Expected returns are historical means.</strong> Naive Markowitz is very sensitive to them, so it
+            over-concentrates in whatever ran hardest. Treat the weights as illustrative; desks temper this with
+            shrinkage or Black-Litterman.
+          </p>
+        </section>
+        <div>
+          <section class="card" style="margin-bottom:16px;">
+            <h3 class="section-header"><span style="color:var(--yellow);">★</span> Max-Sharpe portfolio</h3>
+            <div id="max-sharpe-stats" style="margin-bottom:16px;"></div>
+            <div id="max-sharpe-weights"></div>
+          </section>
+          <section class="card">
+            <h3 class="section-header">◆ Min-variance portfolio</h3>
+            <div id="min-var-stats" style="margin-bottom:16px;"></div>
+            <div id="min-var-weights"></div>
+          </section>
+        </div>
+      </div>
+      <section class="card">
+        <h3 class="section-header">Correlation matrix</h3>
+        <p class="card-desc">Pairwise Pearson correlation of daily returns. Green is positive, red is negative.</p>
+        <div class="table-wrap" id="corr-matrix"></div>
+      </section>
+    </div>
+
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

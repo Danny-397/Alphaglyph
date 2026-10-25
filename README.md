@@ -394,7 +394,8 @@ alphaglyph/
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
-│   ├── index.html · backtest.html · tools.html
+│   ├── index.html · backtest.html · predict.html
+│   ├── screener.html · portfolio.html · research.html
 │   └── landing.css · style.css · config.js · app.js
 ├── .github/workflows/   ci.yml · keepwarm.yml
 └── render.yaml · .flake8 · .env.example · README.md

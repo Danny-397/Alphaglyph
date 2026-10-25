@@ -116,7 +116,18 @@ strong { font-weight: 600; }
 .nav-brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
 .nav-brand-sub  { display: none; }
 
-.nav-links { display: flex; gap: 2px; flex: 1; justify-content: center; }
+/* Six destinations instead of three, so the strip has to be able to scroll
+   rather than shove the brand and the badge off the bar at narrow widths. The
+   auto margins on the end links centre the group while it fits and collapse to
+   zero once it overflows -- `justify-content: center` would instead push the
+   first link past the scroll origin, where it cannot be reached. */
+.nav-links {
+  display: flex; gap: 2px; flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
+}
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links > :first-child { margin-inline-start: auto; }
+.nav-links > :last-child  { margin-inline-end: auto; }
 .nav-link {
   padding: 6px 12px;
   border-radius: var(--radius-sm);
@@ -954,8 +965,6 @@ input[type="range"] { width: 100%; accent-color: var(--green); height: 36px; cur
 @media (max-width: 640px) {
   .navbar     { padding: 0 16px; gap: var(--s3); }
   .nav-badge  { display: none; }
-  .nav-links  { justify-content: flex-end; overflow-x: auto; scrollbar-width: none; }
-  .nav-links::-webkit-scrollbar { display: none; }
   .nav-link   { padding: 6px 10px; }
   .tab-list   { display: flex; }
   .tab-btn    { flex: 1 0 auto; }

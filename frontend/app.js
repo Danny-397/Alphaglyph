@@ -214,18 +214,24 @@ function weightBars(weights) {
       </div>`).join('')
 }
 
-Chart.defaults.color       = '#9ba49f'
-Chart.defaults.borderColor = 'rgba(255,255,255,0.08)'
-Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif"
-Chart.defaults.font.size   = 11
-Chart.defaults.plugins.legend.labels.boxWidth  = 10
-Chart.defaults.plugins.legend.labels.boxHeight = 10
-Chart.defaults.plugins.legend.labels.usePointStyle = true
-Object.assign(Chart.defaults.plugins.tooltip, {
-  backgroundColor: 'rgba(32,36,35,0.96)', borderColor: 'rgba(255,255,255,0.14)', borderWidth: 1,
-  titleColor: '#f1f3f2', bodyColor: '#c9d0cc', padding: 10, cornerRadius: 8,
-  titleFont: { weight: '600' }, displayColors: true, boxPadding: 4,
-})
+// Chart.js is loaded only by the pages that actually draw something, so the
+// screener -- which has no chart on it -- must not run head-first into these
+// globals. An unguarded reference here threw at module scope and took the whole
+// of app.js down with it, which on that page meant the watchlist never wired up.
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.color       = '#9ba49f'
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.08)'
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif"
+  Chart.defaults.font.size   = 11
+  Chart.defaults.plugins.legend.labels.boxWidth  = 10
+  Chart.defaults.plugins.legend.labels.boxHeight = 10
+  Chart.defaults.plugins.legend.labels.usePointStyle = true
+  Object.assign(Chart.defaults.plugins.tooltip, {
+    backgroundColor: 'rgba(32,36,35,0.96)', borderColor: 'rgba(255,255,255,0.14)', borderWidth: 1,
+    titleColor: '#f1f3f2', bodyColor: '#c9d0cc', padding: 10, cornerRadius: 8,
+    titleFont: { weight: '600' }, displayColors: true, boxPadding: 4,
+  })
+}
 
 function destroyChart(c) { if (c) { try { c.destroy() } catch (_) {} } return null }
 
@@ -1987,6 +1993,13 @@ function initResearch() {
 }
 
 // ── Router ──────────────────────────────────────────────────────────────────
+// One page per area, so a visitor lands on the thing they came for instead of
+// hunting for it inside a tab strip. Only the current page's init runs; each
+// one wires up elements that exist nowhere else, so running the wrong one
+// would throw on the first missing node.
 const PAGE = document.body.dataset.page
-if (PAGE === 'backtest') initBacktest()
-if (PAGE === 'tools')    { initTabs(document.body); initPredictor(); initSignals(); initPortfolio(); initResearch() }
+if (PAGE === 'backtest')  initBacktest()
+if (PAGE === 'predict')   initPredictor()
+if (PAGE === 'screener')  initSignals()
+if (PAGE === 'portfolio') initPortfolio()
+if (PAGE === 'research')  { initTabs(document.body); initResearch() }

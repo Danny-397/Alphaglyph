@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaGlyph — Research lab</title>
+  <meta name="theme-color" content="#0b0c0c">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body data-page="research">
+
+  <!-- ── Navigation ─────────────────────────────────────────────────────── -->
+  <nav class="navbar" aria-label="Main">
+    <a class="nav-brand" href="index.html" aria-label="AlphaGlyph home">
+      <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
+      </svg>
+      <span class="nav-brand-name">AlphaGlyph</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Overview</a>
+      <a href="backtest.html" class="nav-link">Backtest</a>
+      <a href="predict.html" class="nav-link">Predictor</a>
+      <a href="screener.html" class="nav-link">Screener</a>
+      <a href="portfolio.html" class="nav-link">Portfolio</a>
+      <a href="research.html" class="nav-link active" aria-current="page">Research</a>
+    </div>
+    <span class="nav-badge" title="Simulated capital on real historical prices">Paper trading</span>
+  </nav>
+
+  <!-- ── Main ───────────────────────────────────────────────────────────── -->
+  <main class="page-wrap" data-page="research">
+
+    <header class="page-header">
+      <h1>Research lab</h1>
+      <p>Tests that ask whether an edge is <em>real</em>, not how large it looks: a published anomaly measured from scratch, the two ways a search inflates a backtest, and the cost level at which an edge dies.</p>
+    </header>
+
+    <div class="tab-list" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="rtab-pead">Earnings drift</button>
+      <button type="button" class="tab-btn" data-tab="rtab-overfit">Overfitting</button>
+      <button type="button" class="tab-btn" data-tab="rtab-costs">Trading costs</button>
+    </div>
+
+    <!-- ── EARNINGS DRIFT ───────────────────────────────────────────────── -->
+    <div class="tab-panel active" id="rtab-pead">
+      <!-- PEAD event study -->
+      <section class="card">
+        <div class="section-header">
+          Post-earnings drift
+          <button type="button" class="btn btn-sm btn-primary" id="pead-run">Run study</button>
+        </div>
+        <p class="card-desc">
+          After a company reports, its stock tends to keep drifting in the direction of the surprise. This pools every earnings event across a basket of names, plots the average <strong>market-adjusted return</strong> over the next 20 days by surprise tercile, and tests whether the beat-minus-miss drift clears the noise. If the free data can't prove it, the verdict says so.
+        </p>
+        <div id="pead-loading" hidden>
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Pooling earnings events</strong>
+            <p>Collecting reports and post-announcement returns across the basket.</p>
+          </div>
+        </div>
+        <div id="pead-result" hidden class="mt-4"></div>
+      </section>
+    </div>
+
+    <!-- ── OVERFITTING ──────────────────────────────────────────────────── -->
+    <div class="tab-panel" id="rtab-overfit">
+      <!-- Data-mining lab -->
+      <section class="card">
+        <h2 class="section-header">How a backtest fools you</h2>
+        <p class="card-desc">
+          Search enough strategies and the best one looks brilliant by luck alone. This generates hundreds of <strong>purely random</strong> timing strategies, keeps the luckiest, and shows the trap: naive statistics call it significant, while the <strong>Deflated Sharpe Ratio</strong>, which knows how many were tried, deflates it back to noise.
+        </p>
+        <div class="form-row">
+          <div class="form-group narrow">
+            <label class="form-label" for="dm-ticker">Ticker</label>
+            <input type="text" id="dm-ticker" value="AAPL" maxlength="8" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="form-group" style="min-width:180px;">
+            <label class="form-label" for="dm-n">Strategies searched: <span id="dm-n-label">300</span></label>
+            <input type="range" id="dm-n" min="20" max="2000" step="20" value="300">
+          </div>
+          <button type="button" class="btn btn-primary" id="dm-run">Run sweep</button>
+        </div>
+        <div id="dm-error" class="error-banner mt-4" hidden></div>
+        <div id="dm-loading" hidden>
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Backtesting the search</strong></div>
+        </div>
+        <div id="dm-result" hidden class="mt-4"></div>
+      </section>
+
+      <!-- CPCV + PBO -->
+      <section class="card">
+        <h2 class="section-header">Probability of backtest overfitting</h2>
+        <p class="card-desc">
+          Sweeps a real <strong>trend and mean-reversion grid</strong> on one ticker, then runs combinatorially symmetric cross-validation (López de Prado) over hundreds of in-sample / out-of-sample splits to measure how often the in-sample winner lands in the bottom half out of sample. Near 50% means the selection told you nothing. Splits are purged and embargoed so serial correlation can't leak across the seam.
+        </p>
+        <div class="form-row">
+          <div class="form-group narrow">
+            <label class="form-label" for="cpcv-ticker">Ticker</label>
+            <input type="text" id="cpcv-ticker" value="SPY" maxlength="8" autocomplete="off" spellcheck="false">
+          </div>
+          <button type="button" class="btn btn-primary" id="cpcv-run">Run CPCV</button>
+        </div>
+        <div id="cpcv-error" class="error-banner mt-4" hidden></div>
+        <div id="cpcv-loading" hidden>
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Cross-validating the grid</strong>
+            <p>Fitting the champion on every combination of splits and ranking it out of sample.</p>
+          </div>
+        </div>
+        <div id="cpcv-result" hidden class="mt-4"></div>
+      </section>
+    </div>
+
+    <!-- ── TRADING COSTS ────────────────────────────────────────────────── -->
+    <div class="tab-panel" id="rtab-costs">
+      <!-- Cost-sensitivity sweep -->
+      <section class="card">
+        <h2 class="section-header">Where the edge dies</h2>
+        <p class="card-desc">
+          An edge is only real if it survives frictions. This reruns one strategy across per-side costs from 0 to 100 bp, plots the <strong>net-return decay</strong>, and solves for the <strong>break-even cost</strong> where its edge over buy-and-hold vanishes. An edge that dies at 5 bp is an artefact; one that survives 50 bp is believable.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cost-strategy">Strategy</label>
+            <select id="cost-strategy">
+              <option value="ma_crossover" selected>MA Crossover</option>
+              <option value="rsi">RSI Mean Reversion</option>
+              <option value="macd">MACD Momentum</option>
+              <option value="dip_buyer">Dip Buyer (52-Week Value)</option>
+              <option value="adaptive">Adaptive (Regime)</option>
+            </select>
+          </div>
+          <div class="form-group narrow">
+            <label class="form-label" for="cost-ticker">Ticker</label>
+            <input type="text" id="cost-ticker" value="AAPL" maxlength="8" autocomplete="off" spellcheck="false">
+          </div>
+          <button type="button" class="btn btn-primary" id="cost-run">Run sweep</button>
+        </div>
+        <div id="cost-error" class="error-banner mt-4" hidden></div>
+        <div id="cost-loading" hidden>
+          <div class="loading-state"><div class="spinner"></div>
+            <strong>Sweeping cost levels</strong>
+            <p>Rerunning the backtest at ten different friction levels.</p>
+          </div>
+        </div>
+        <div id="cost-result" hidden class="mt-4"></div>
+      </section>
+    </div>
+
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
