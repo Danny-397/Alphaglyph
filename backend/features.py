@@ -52,6 +52,14 @@ logger = logging.getLogger(__name__)
 # number of calls — a re-run of the same backtest serves entirely from cache.
 _CACHE: dict = {}
 _CACHE_TTL = 900          # 15 minutes
+# Multi-year daily histories (the research studies, calibration, PEAD) only gain
+# a bar a day, and each warm-up or study re-requests the same 5-year series for
+# a dozen-plus tickers. Holding them longer keeps those runs inside Tiingo's
+# free hourly quota; when it runs out, every ticker falls through to yfinance's
+# retry/backoff (blocked from Render anyway) and a study takes minutes.
+# Short periods keep 15 minutes so current prices stay fresh.
+_LONG_CACHE_TTL = 6 * 3600
+_LONG_PERIODS = ('2y', '5y', '10y', 'max')
 _MAX_ATTEMPTS = 3         # retries on transient rate-limit errors
 
 # Approximate calendar days per yfinance period string (for the Stooq fallback,
@@ -216,7 +224,8 @@ def _download(ticker: str, period: str, interval: str,
     """
     key = (ticker, period, interval, start, end)
     hit = _CACHE.get(key)
-    if hit and (time.time() - hit[0]) < _CACHE_TTL:
+    ttl = _LONG_CACHE_TTL if (interval == '1d' and period in _LONG_PERIODS and not end) else _CACHE_TTL
+    if hit and (time.time() - hit[0]) < ttl:
         return hit[1].copy()
 
     statuses = []

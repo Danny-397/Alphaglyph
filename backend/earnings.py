@@ -98,7 +98,8 @@ def _fetch_earnings_frame(ticker: str) -> pd.DataFrame | None:
     IPs, including Render's, which left the PEAD study at 0 events and the
     Predictor without its earnings channel in production while both worked
     from a home connection. When the live call comes back empty, fall back to
-    earnings_snapshot.json, refreshed by refresh_earnings_snapshot.py.
+    earnings_snapshot.json, refreshed from a home connection with
+    refresh_earnings_snapshot.py.
     """
     frame = _fetch_live_frame(ticker)
     if frame is not None:
