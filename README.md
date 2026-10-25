@@ -360,7 +360,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (169
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (186
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -418,7 +418,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 169 passing
+cd backend && pytest -q                    # 186 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)
