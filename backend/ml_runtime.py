@@ -48,6 +48,7 @@ _lock     = threading.Lock()
 _session  = None          # onnxruntime.InferenceSession (lazy)
 _meta     = None          # parsed ml_model_meta.json
 _load_err = None          # remembered failure so we don't retry every cycle
+_INFER_CHUNK = 128        # windows per inference call; bounds peak memory
 
 # Short cache for the interactive ML Insights panel — predictions only change on
 # new daily bars, so this keeps the panel snappy without re-running inference on
@@ -122,7 +123,16 @@ def predict_batch(X: np.ndarray) -> dict | None:
         return None
     try:
         input_name = _session.get_inputs()[0].name
-        dir_logit, quantiles, vol = _session.run(None, {input_name: X.astype(np.float32)})
+        X = X.astype(np.float32, copy=False)
+        # Run in fixed-size chunks. Activation memory scales with batch size,
+        # and ONNX Runtime's arena keeps its high-water mark: one 1,200-window
+        # batch (five years of one ticker, as the calibration replay sends)
+        # pushed the process past Render's 512 MB limit and got it killed.
+        outs = [_session.run(None, {input_name: X[i:i + _INFER_CHUNK]})
+                for i in range(0, len(X), _INFER_CHUNK)]
+        dir_logit = np.concatenate([o[0] for o in outs])
+        quantiles = np.concatenate([o[1] for o in outs])
+        vol       = np.concatenate([o[2] for o in outs])
         return {
             'p_up':      1.0 / (1.0 + np.exp(-dir_logit.reshape(-1))),
             'quantiles': quantiles,
