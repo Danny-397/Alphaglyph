@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AlphaGlyph — Tools</title>
+  <meta name="theme-color" content="#0b0c0c">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -15,59 +16,59 @@
 <body data-page="tools">
 
   <!-- ── Navigation ─────────────────────────────────────────────────────── -->
-  <nav class="navbar">
-    <div class="nav-brand">
+  <nav class="navbar" aria-label="Main">
+    <a class="nav-brand" href="index.html" aria-label="AlphaGlyph home">
       <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
         <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
         <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
       </svg>
       <span class="nav-brand-name">AlphaGlyph</span>
-      <span class="nav-brand-sub">Strategy Validation Lab</span>
-    </div>
+    </a>
     <div class="nav-links">
-      <a href="index.html"    class="nav-link">Home</a>
+      <a href="index.html"    class="nav-link">Overview</a>
       <a href="backtest.html" class="nav-link">Backtest</a>
-      <a href="tools.html"    class="nav-link active">Tools</a>
+      <a href="tools.html"    class="nav-link active" aria-current="page">Tools</a>
     </div>
-    <span class="nav-badge">PAPER TRADING</span>
+    <span class="nav-badge" title="Simulated capital on real historical prices">Paper trading</span>
   </nav>
 
   <!-- ── Main ───────────────────────────────────────────────────────────── -->
   <main class="page-wrap" data-page="tools">
 
-    <div class="page-header">
+    <header class="page-header">
       <h1>Tools</h1>
-      <p>Four workbenches beyond backtesting: a multi-signal predictor with a live track record, a signal scanner for your watchlist, a Markowitz portfolio optimizer, and a research lab that stress-tests whether an edge is real. Educational, not financial advice.</p>
-    </div>
+      <p>A predictor with a public track record, a watchlist scanner, a portfolio optimizer, and a lab that stress-tests whether an edge is real. Educational, not financial advice.</p>
+    </header>
 
-    <div class="tab-list" style="margin-bottom:16px;">
-      <button class="tab-btn active" data-tab="tab-predict">Predictor</button>
-      <button class="tab-btn" data-tab="tab-signals">Signal Scanner</button>
-      <button class="tab-btn" data-tab="tab-portfolio">Portfolio Optimizer</button>
-      <button class="tab-btn" data-tab="tab-research">Research Lab</button>
+    <div class="tab-list" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="tab-predict">Predictor</button>
+      <button type="button" class="tab-btn" data-tab="tab-signals">Signal scanner</button>
+      <button type="button" class="tab-btn" data-tab="tab-portfolio">Portfolio optimizer</button>
+      <button type="button" class="tab-btn" data-tab="tab-research">Research lab</button>
     </div>
 
     <!-- ── PREDICTOR ────────────────────────────────────────────────────── -->
     <div class="tab-panel active" id="tab-predict">
 
-      <div class="card" style="margin-bottom:16px;">
-        <div class="section-header">Predict a Stock</div>
-        <p class="text-muted" style="font-size:12.5px;margin:0 0 14px;line-height:1.65;">
-          A forward lean for the next few trading days, blended from three independent, individually-explained signals: the <strong>ML transformer's</strong> price forecast, <strong>post-earnings drift (PEAD)</strong> + EPS growth, and <strong>news sentiment</strong>. It's a transparent weighted average of channels you can inspect — not a black box, and not financial advice.
+      <section class="card" style="margin-bottom:16px;">
+        <h2 class="section-header">Predict a stock</h2>
+        <p class="card-desc">
+          A lean for the next few trading days, blended from three signals you can inspect: the <strong>ML transformer's</strong> price forecast, <strong>post-earnings drift</strong> with EPS growth, and <strong>news sentiment</strong>.
         </p>
         <div class="ticker-input-row">
-          <input type="text" id="pred-input" placeholder="Enter a ticker (e.g. NVDA) and press Enter" maxlength="8" autocomplete="off" spellcheck="false">
+          <label class="sr-only" for="pred-input">Ticker</label>
+          <input type="text" id="pred-input" placeholder="Enter a ticker, e.g. NVDA" maxlength="8" autocomplete="off" spellcheck="false">
           <button type="button" class="btn btn-primary" id="pred-run">Predict</button>
         </div>
         <div class="ticker-error" id="pred-error" hidden></div>
-        <div class="chip-grid" id="pred-quick" style="margin-top:12px;"></div>
-      </div>
+        <div class="chip-grid" id="pred-quick"></div>
+      </section>
 
       <div id="pred-loading" hidden>
         <div class="loading-state">
           <div class="spinner"></div>
-          <strong>Reading the signals <span class="dots"><span></span><span></span><span></span></span></strong>
+          <strong>Reading the signals</strong>
           <p>Forecasting price, weighing the last earnings report, and sampling news tone.</p>
         </div>
       </div>
@@ -75,174 +76,163 @@
       <div id="pred-result" hidden></div>
 
       <!-- Track record / calibration -->
-      <div class="card" style="margin-top:20px;">
-        <div class="section-header" style="display:flex;align-items:center;gap:10px;">
-          Track Record — is the forecaster honest?
-          <button class="btn btn-sm" id="cal-load" style="margin-left:auto;">Load track record</button>
+      <section class="card mt-4">
+        <div class="section-header">
+          Track record
+          <button type="button" class="btn btn-sm" id="cal-load">Load track record</button>
         </div>
-        <p class="text-muted" style="font-size:12px;line-height:1.65;margin:0;">
-          A prediction of "60% up" is only worth anything if the market actually rises ~60% of the time it's said. This is the same test AlphaGlyph runs on strategies, turned on the predictor itself — measured <strong>out-of-sample</strong>, on data the model never trained on. Points on the diagonal = perfectly calibrated.
+        <p class="card-desc">
+          A "60% up" call is only worth something if the market rises about 60% of the time it's made. This replays the predictor <strong>out of sample</strong>, on data the model never trained on. Points on the diagonal are perfectly calibrated.
         </p>
-        <div id="cal-loading" hidden style="margin-top:14px;">
+        <div id="cal-loading" hidden>
           <div class="loading-state"><div class="spinner"></div>
-            <strong>Replaying years of forecasts <span class="dots"><span></span><span></span><span></span></span></strong>
+            <strong>Replaying years of forecasts</strong>
             <p>Recovering the model's probability and the realised outcome for every historical window.</p>
           </div>
         </div>
-        <div id="cal-result" hidden style="margin-top:16px;"></div>
-      </div>
+        <div id="cal-result" hidden class="mt-4"></div>
+      </section>
 
       <!-- Live forward track record (append-only ledger) -->
-      <div class="card" style="margin-top:20px;">
-        <div class="section-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          Live Track Record — the forward test
-          <span class="badge sig-hold" style="font-weight:600;">APPEND-ONLY</span>
-          <button class="btn btn-sm" id="ledger-load" style="margin-left:auto;">Load ledger</button>
+      <section class="card mt-4">
+        <div class="section-header">
+          Live forward test
+          <span class="badge sig-hold">Append-only</span>
+          <button type="button" class="btn btn-sm" id="ledger-load">Load ledger</button>
         </div>
-        <p class="text-muted" style="font-size:12px;line-height:1.65;margin:0;">
-          Calibration above is measured on <em>historical</em> data the model didn't train on. This is stronger: every prediction you run here is <strong>logged the moment it's made</strong> — ticker, probability, price — and graded once its horizon elapses. Nothing is ever edited after the fact, so the hit rate below is a genuine <strong>out-of-sample forward record</strong> that accrues over time and can't be fitted in hindsight. Run a few predictions, then check back in a week.
+        <p class="card-desc">
+          Every prediction made here is <strong>logged the moment it's made</strong> (ticker, probability, price) and graded once its horizon passes. Nothing is edited afterwards, so the hit rate is a genuine forward record that can't be fitted in hindsight.
         </p>
-        <div id="ledger-loading" hidden style="margin-top:14px;">
+        <div id="ledger-loading" hidden>
           <div class="loading-state"><div class="spinner"></div>
-            <strong>Reading the ledger <span class="dots"><span></span><span></span><span></span></span></strong>
+            <strong>Reading the ledger</strong>
             <p>Grading any predictions whose horizon has now elapsed.</p>
           </div>
         </div>
-        <div id="ledger-result" hidden style="margin-top:16px;"></div>
-      </div>
+        <div id="ledger-result" hidden class="mt-4"></div>
+      </section>
     </div>
 
     <!-- ── SIGNAL SCANNER ───────────────────────────────────────────────── -->
     <div class="tab-panel" id="tab-signals">
 
-      <div class="card sig-regime" id="sig-regime" style="margin-bottom:16px;">
+      <section class="card sig-regime" id="sig-regime" style="margin-bottom:16px;">
         <span class="regime-badge" id="sig-regime-badge">—</span>
-        <span id="sig-regime-desc" style="font-size:13px;color:var(--muted);">Reading the market…</span>
-      </div>
+        <span id="sig-regime-desc" class="sig-regime-desc">Reading the market…</span>
+      </section>
 
-      <div class="card" style="margin-bottom:16px;">
-        <div class="section-header" style="display:flex;align-items:center;gap:10px;">
-          Your Watchlist
-          <button class="btn btn-sm" id="sig-scan" style="margin-left:auto;">↻ Rescan</button>
+      <section class="card" style="margin-bottom:16px;">
+        <div class="section-header">
+          Watchlist
+          <button type="button" class="btn btn-sm" id="sig-scan">Rescan</button>
         </div>
         <div class="ticker-input-row">
-          <input type="text" id="sig-ticker-input" placeholder="Add a ticker (e.g. AMZN) and press Enter" maxlength="8" autocomplete="off" spellcheck="false">
-          <button type="button" class="btn btn-sm" id="sig-ticker-add">Add</button>
+          <label class="sr-only" for="sig-ticker-input">Add a ticker</label>
+          <input type="text" id="sig-ticker-input" placeholder="Add a ticker, e.g. AMZN" maxlength="8" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn" id="sig-ticker-add">Add</button>
         </div>
         <div class="ticker-error" id="sig-ticker-error" hidden></div>
-        <div class="chip-grid" id="sig-tickers" style="margin-top:10px;"></div>
-      </div>
+        <div class="chip-grid" id="sig-tickers"></div>
+      </section>
 
-      <div class="card">
-        <div class="section-header" style="display:flex;align-items:center;gap:8px;">
-          Current Signals
-          <span id="sig-updated" style="margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:11px;"></span>
+      <section class="card">
+        <div class="section-header">
+          Current signals
+          <span id="sig-updated" class="text-muted" style="margin-left:auto;font-size:12px;font-weight:400;"></span>
         </div>
         <div class="table-wrap">
           <table class="data-table sig-table">
             <thead>
               <tr>
-                <th>Ticker</th><th>Price</th><th>MA Crossover</th><th>RSI</th><th>MACD</th><th>ML Transformer</th><th>Consensus</th>
+                <th>Ticker</th><th>Price</th><th>MA crossover</th><th>RSI</th><th>MACD</th><th>ML transformer</th><th>Consensus</th>
               </tr>
             </thead>
             <tbody id="sig-tbody">
-              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Scanning your watchlist <span class="dots"><span></span><span></span><span></span></span></td></tr>
+              <tr><td colspan="7" class="empty-cell">Scanning your watchlist <span class="dots"><span></span><span></span><span></span></span></td></tr>
             </tbody>
           </table>
         </div>
-        <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5;">
-          Each strategy's <strong>current stance</strong> on the latest close. The ML cell shows the transformer's signal and its probability of an up-move. Educational, not advice.
-        </p>
-      </div>
+        <p class="fine">Each strategy's current stance on the latest close. The ML column shows the transformer's signal and its probability of an up-move.</p>
+      </section>
     </div>
 
     <!-- ── PORTFOLIO OPTIMIZER ──────────────────────────────────────────── -->
     <div class="tab-panel" id="tab-portfolio">
 
-      <div class="card" style="margin-bottom:20px;">
-        <div class="section-header">Configure Optimization</div>
-        <div style="display:flex;flex-direction:column;gap:16px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Tickers (click to toggle)</label>
-            <div class="chip-grid" id="opt-tickers">
-              <div class="ticker-chip selected" data-ticker="AAPL">AAPL</div>
-              <div class="ticker-chip selected" data-ticker="MSFT">MSFT</div>
-              <div class="ticker-chip selected" data-ticker="NVDA">NVDA</div>
-              <div class="ticker-chip selected" data-ticker="GOOGL">GOOGL</div>
-              <div class="ticker-chip selected" data-ticker="TSLA">TSLA</div>
-              <div class="ticker-chip selected" data-ticker="JPM">JPM</div>
-              <div class="ticker-chip selected" data-ticker="SPY">SPY</div>
-            </div>
+      <section class="card" style="margin-bottom:16px;">
+        <h2 class="section-header">Optimize a portfolio</h2>
+        <div class="form-group">
+          <span class="form-label">Tickers <span class="text-muted" style="font-weight:400;">· click to toggle</span></span>
+          <div class="chip-grid" id="opt-tickers">
+            <div class="ticker-chip selected" data-ticker="AAPL">AAPL</div>
+            <div class="ticker-chip selected" data-ticker="MSFT">MSFT</div>
+            <div class="ticker-chip selected" data-ticker="NVDA">NVDA</div>
+            <div class="ticker-chip selected" data-ticker="GOOGL">GOOGL</div>
+            <div class="ticker-chip selected" data-ticker="TSLA">TSLA</div>
+            <div class="ticker-chip selected" data-ticker="JPM">JPM</div>
+            <div class="ticker-chip selected" data-ticker="SPY">SPY</div>
           </div>
-          <div class="form-row" style="align-items:flex-end;">
-            <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
-              <label class="form-label">Start Date</label>
-              <input type="date" id="opt-start">
-            </div>
-            <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
-              <label class="form-label">End Date</label>
-              <input type="date" id="opt-end">
-            </div>
-            <button class="btn btn-primary" id="opt-run-btn" style="flex-shrink:0;padding:9px 24px;">Optimize Portfolio</button>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox" id="opt-shrink" style="width:14px;height:14px;accent-color:var(--green);cursor:pointer;">
-              <span style="font-size:12px;font-weight:600;color:var(--green);">Ledoit-Wolf shrinkage (well-conditioned covariance)</span>
-            </label>
-            <p style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
-              Pulls the noisy sample covariance toward a stable target by the analytically optimal amount — the professional fix for naive Markowitz over-concentration. Turn it on and watch the weights spread out.
-            </p>
-          </div>
-          <div id="opt-error" class="error-banner" hidden></div>
         </div>
-      </div>
+        <div class="form-row" style="margin-bottom:18px;">
+          <div class="form-group">
+            <label class="form-label" for="opt-start">Start</label>
+            <input type="date" id="opt-start">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="opt-end">End</label>
+            <input type="date" id="opt-end">
+          </div>
+          <button type="button" class="btn btn-primary" id="opt-run-btn">Optimize</button>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="opt-shrink">
+          <span class="check-title">Ledoit-Wolf shrinkage</span>
+          <span class="check-desc">Pulls the noisy sample covariance toward a stable target by the optimal amount, the standard fix for naive Markowitz over-concentration. Turn it on and watch the weights spread out.</span>
+        </label>
+        <div id="opt-error" class="error-banner mt-4" hidden></div>
+      </section>
 
       <div id="opt-loading" hidden>
         <div class="loading-state">
           <div class="spinner"></div>
-          <strong>Running optimization <span class="dots"><span></span><span></span><span></span></span></strong>
-          <p>Computing efficient frontier and Markowitz weights.</p>
+          <strong>Running optimization</strong>
+          <p>Computing the efficient frontier and Markowitz weights.</p>
         </div>
       </div>
 
       <div id="opt-results" hidden>
-        <div class="two-col" style="margin-bottom:20px;">
-          <div class="card">
-            <div class="section-header">Efficient Frontier</div>
-            <div class="chart-wrap" style="height:400px;"><canvas id="frontier-chart"></canvas></div>
-            <p class="text-muted" style="margin-top:12px;font-size:12px;line-height:1.6;">
-              Each point is a sampled portfolio. The curve is the efficient frontier — minimum volatility for each return level.
-              <strong style="color:var(--yellow);">★</strong> = max-Sharpe (tangency). <strong style="color:var(--text);">◆</strong> = min-variance.
+        <div class="two-col" style="margin-bottom:16px;">
+          <section class="card">
+            <h3 class="section-header">Efficient frontier</h3>
+            <div class="chart-wrap" style="height:380px;"><canvas id="frontier-chart"></canvas></div>
+            <p class="fine">
+              Each point is a sampled portfolio; the curve is the minimum volatility for each return level.
+              <strong style="color:var(--yellow);">★</strong> max-Sharpe (tangency) · <strong style="color:var(--text);">◆</strong> min-variance.
             </p>
-            <p class="text-muted" style="margin-top:10px;font-size:11px;line-height:1.6;border-top:1px solid var(--border);padding-top:10px;">
-              ⚠ <strong>Expected returns are historical means.</strong> Naive Markowitz is
-              extremely sensitive to this estimate, so it tends to over-concentrate in
-              whatever happened to run hardest and project unrealistically high "expected"
-              returns. Treat the weights as illustrative, not advice — professional desks
-              use shrinkage (Ledoit-Wolf) or Black-Litterman to temper this. Educational only.
+            <p class="fine">
+              <strong>Expected returns are historical means.</strong> Naive Markowitz is very sensitive to them, so it
+              over-concentrates in whatever ran hardest. Treat the weights as illustrative; desks temper this with
+              shrinkage or Black-Litterman.
             </p>
-          </div>
+          </section>
           <div>
-            <div class="card" style="margin-bottom:16px;">
-              <div class="section-header" style="color:var(--yellow);">★ Max-Sharpe Portfolio</div>
+            <section class="card" style="margin-bottom:16px;">
+              <h3 class="section-header"><span style="color:var(--yellow);">★</span> Max-Sharpe portfolio</h3>
               <div id="max-sharpe-stats" style="margin-bottom:16px;"></div>
               <div id="max-sharpe-weights"></div>
-            </div>
-            <div class="card">
-              <div class="section-header">◆ Min-Variance Portfolio</div>
+            </section>
+            <section class="card">
+              <h3 class="section-header">◆ Min-variance portfolio</h3>
               <div id="min-var-stats" style="margin-bottom:16px;"></div>
               <div id="min-var-weights"></div>
-            </div>
+            </section>
           </div>
         </div>
-        <div class="card">
-          <div class="section-header">Correlation Matrix</div>
-          <p class="text-muted" style="font-size:12px;margin-bottom:16px;">
-            Pairwise Pearson correlation of daily returns. Deep green = high positive correlation, deep red = negative.
-          </p>
+        <section class="card">
+          <h3 class="section-header">Correlation matrix</h3>
+          <p class="card-desc">Pairwise Pearson correlation of daily returns. Green is positive, red is negative.</p>
           <div class="table-wrap" id="corr-matrix"></div>
-        </div>
+        </section>
       </div>
     </div>
 
@@ -250,82 +240,80 @@
     <div class="tab-panel" id="tab-research">
 
       <!-- PEAD event study -->
-      <div class="card" style="margin-bottom:20px;">
-        <div class="section-header" style="display:flex;align-items:center;gap:10px;">
-          Post-Earnings Drift (PEAD) — an event study
-          <button class="btn btn-sm btn-primary" id="pead-run" style="margin-left:auto;">Run study</button>
+      <section class="card">
+        <div class="section-header">
+          Post-earnings drift
+          <button type="button" class="btn btn-sm btn-primary" id="pead-run">Run study</button>
         </div>
-        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0;">
-          One of finance's most durable anomalies: after a company reports, its stock tends to keep drifting in the direction of the earnings surprise. This pools every earnings event across a basket of names and plots the average <strong>market-adjusted cumulative return</strong> in the 20 days after the report, split by surprise tercile — then tests whether the beat-minus-miss drift clears the noise. Honest by construction: if the free-data sample can't prove it, the verdict says so.
+        <p class="card-desc">
+          After a company reports, its stock tends to keep drifting in the direction of the surprise. This pools every earnings event across a basket of names, plots the average <strong>market-adjusted return</strong> over the next 20 days by surprise tercile, and tests whether the beat-minus-miss drift clears the noise. If the free data can't prove it, the verdict says so.
         </p>
-        <div id="pead-loading" hidden style="margin-top:14px;">
+        <div id="pead-loading" hidden>
           <div class="loading-state"><div class="spinner"></div>
-            <strong>Pooling earnings events <span class="dots"><span></span><span></span><span></span></span></strong>
+            <strong>Pooling earnings events</strong>
             <p>Collecting reports and post-announcement returns across the basket.</p>
           </div>
         </div>
-        <div id="pead-result" hidden style="margin-top:16px;"></div>
-      </div>
+        <div id="pead-result" hidden class="mt-4"></div>
+      </section>
 
       <!-- Data-mining lab -->
-      <div class="card">
-        <div class="section-header">Data-Mining Lab — how a backtest fools you</div>
-        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0 0 14px;">
-          Search enough strategies and the best one looks brilliant — by luck alone. This generates hundreds of <strong>purely random</strong> timing strategies (none has any edge), keeps the luckiest, and shows the trap: naive statistics call the winner significant, while the <strong>Deflated Sharpe Ratio</strong> — which knows how many were tried — deflates it back to noise.
+      <section class="card">
+        <h2 class="section-header">How a backtest fools you</h2>
+        <p class="card-desc">
+          Search enough strategies and the best one looks brilliant by luck alone. This generates hundreds of <strong>purely random</strong> timing strategies, keeps the luckiest, and shows the trap: naive statistics call it significant, while the <strong>Deflated Sharpe Ratio</strong>, which knows how many were tried, deflates it back to noise.
         </p>
-        <div class="form-row" style="align-items:flex-end;gap:12px;">
-          <div class="form-group" style="margin-bottom:0;flex:0 0 120px;">
-            <label class="form-label">Ticker</label>
+        <div class="form-row">
+          <div class="form-group narrow">
+            <label class="form-label" for="dm-ticker">Ticker</label>
             <input type="text" id="dm-ticker" value="AAPL" maxlength="8" autocomplete="off" spellcheck="false">
           </div>
-          <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px;">
-            <label class="form-label">Strategies searched: <span id="dm-n-label">300</span></label>
-            <input type="range" id="dm-n" min="20" max="2000" step="20" value="300" style="width:100%;">
+          <div class="form-group" style="min-width:180px;">
+            <label class="form-label" for="dm-n">Strategies searched: <span id="dm-n-label">300</span></label>
+            <input type="range" id="dm-n" min="20" max="2000" step="20" value="300">
           </div>
-          <button class="btn btn-primary" id="dm-run" style="flex-shrink:0;padding:9px 24px;">Run sweep</button>
+          <button type="button" class="btn btn-primary" id="dm-run">Run sweep</button>
         </div>
-        <div id="dm-error" class="error-banner" hidden style="margin-top:12px;"></div>
-        <div id="dm-loading" hidden style="margin-top:14px;">
+        <div id="dm-error" class="error-banner mt-4" hidden></div>
+        <div id="dm-loading" hidden>
           <div class="loading-state"><div class="spinner"></div>
-            <strong>Backtesting the search <span class="dots"><span></span><span></span><span></span></span></strong></div>
+            <strong>Backtesting the search</strong></div>
         </div>
-        <div id="dm-result" hidden style="margin-top:16px;"></div>
-      </div>
+        <div id="dm-result" hidden class="mt-4"></div>
+      </section>
 
       <!-- CPCV + PBO -->
-      <div class="card" style="margin-top:20px;">
-        <div class="section-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          Overfitting Probability (CPCV + PBO)
-          <div class="form-group" style="margin:0 0 0 auto;flex:0 0 130px;">
-            <input type="text" id="cpcv-ticker" value="SPY" maxlength="8" autocomplete="off" spellcheck="false" style="padding:7px 10px;">
-          </div>
-          <button class="btn btn-primary" id="cpcv-run" style="flex-shrink:0;padding:9px 20px;">Run CPCV</button>
-        </div>
-        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0;">
-          The Data-Mining Lab shows one strategy family fooling you; this quantifies it rigorously. It sweeps a real <strong>trend + mean-reversion hyperparameter grid</strong> on one ticker, then runs <strong>Combinatorially-Symmetric Cross-Validation</strong> (López de Prado) over hundreds of in-sample / out-of-sample splits to compute the <strong>Probability of Backtest Overfitting</strong> — how often the in-sample winner lands in the bottom half out-of-sample. A PBO near 50% means the selection told you nothing. It also purges/embargoes the seam between splits so serial correlation can't leak the edge across.
+      <section class="card">
+        <h2 class="section-header">Probability of backtest overfitting</h2>
+        <p class="card-desc">
+          Sweeps a real <strong>trend and mean-reversion grid</strong> on one ticker, then runs combinatorially symmetric cross-validation (López de Prado) over hundreds of in-sample / out-of-sample splits to measure how often the in-sample winner lands in the bottom half out of sample. Near 50% means the selection told you nothing. Splits are purged and embargoed so serial correlation can't leak across the seam.
         </p>
-        <div id="cpcv-error" class="error-banner" hidden style="margin-top:12px;"></div>
-        <div id="cpcv-loading" hidden style="margin-top:14px;">
+        <div class="form-row">
+          <div class="form-group narrow">
+            <label class="form-label" for="cpcv-ticker">Ticker</label>
+            <input type="text" id="cpcv-ticker" value="SPY" maxlength="8" autocomplete="off" spellcheck="false">
+          </div>
+          <button type="button" class="btn btn-primary" id="cpcv-run">Run CPCV</button>
+        </div>
+        <div id="cpcv-error" class="error-banner mt-4" hidden></div>
+        <div id="cpcv-loading" hidden>
           <div class="loading-state"><div class="spinner"></div>
-            <strong>Cross-validating the grid <span class="dots"><span></span><span></span><span></span></span></strong>
-            <p>Fitting the champion on every combination of splits and ranking it out-of-sample.</p>
+            <strong>Cross-validating the grid</strong>
+            <p>Fitting the champion on every combination of splits and ranking it out of sample.</p>
           </div>
         </div>
-        <div id="cpcv-result" hidden style="margin-top:16px;"></div>
-      </div>
+        <div id="cpcv-result" hidden class="mt-4"></div>
+      </section>
 
       <!-- Cost-sensitivity sweep -->
-      <div class="card" style="margin-top:20px;">
-        <div class="section-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          Cost Sensitivity — where the edge dies
-          <button class="btn btn-primary" id="cost-run" style="margin-left:auto;flex-shrink:0;padding:9px 20px;">Run sweep</button>
-        </div>
-        <p class="text-muted" style="font-size:12.5px;line-height:1.65;margin:0 0 14px;">
-          A backtest's edge is only real if it survives frictions. This reruns one strategy across a grid of per-side transaction costs (0 → 100 bp) and plots the <strong>net-return decay</strong>, then solves for the <strong>break-even cost</strong> at which its edge over buy-and-hold vanishes. An edge that dies at 5 bp is a frictionless artefact; one that survives 50 bp is believable.
+      <section class="card">
+        <h2 class="section-header">Where the edge dies</h2>
+        <p class="card-desc">
+          An edge is only real if it survives frictions. This reruns one strategy across per-side costs from 0 to 100 bp, plots the <strong>net-return decay</strong>, and solves for the <strong>break-even cost</strong> where its edge over buy-and-hold vanishes. An edge that dies at 5 bp is an artefact; one that survives 50 bp is believable.
         </p>
-        <div class="form-row" style="align-items:flex-end;gap:12px;">
-          <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px;">
-            <label class="form-label">Strategy</label>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cost-strategy">Strategy</label>
             <select id="cost-strategy">
               <option value="ma_crossover" selected>MA Crossover</option>
               <option value="rsi">RSI Mean Reversion</option>
@@ -334,20 +322,21 @@
               <option value="adaptive">Adaptive (Regime)</option>
             </select>
           </div>
-          <div class="form-group" style="margin-bottom:0;flex:0 0 130px;">
-            <label class="form-label">Ticker</label>
+          <div class="form-group narrow">
+            <label class="form-label" for="cost-ticker">Ticker</label>
             <input type="text" id="cost-ticker" value="AAPL" maxlength="8" autocomplete="off" spellcheck="false">
           </div>
+          <button type="button" class="btn btn-primary" id="cost-run">Run sweep</button>
         </div>
-        <div id="cost-error" class="error-banner" hidden style="margin-top:12px;"></div>
-        <div id="cost-loading" hidden style="margin-top:14px;">
+        <div id="cost-error" class="error-banner mt-4" hidden></div>
+        <div id="cost-loading" hidden>
           <div class="loading-state"><div class="spinner"></div>
-            <strong>Sweeping cost levels <span class="dots"><span></span><span></span><span></span></span></strong>
+            <strong>Sweeping cost levels</strong>
             <p>Rerunning the backtest at ten different friction levels.</p>
           </div>
         </div>
-        <div id="cost-result" hidden style="margin-top:16px;"></div>
-      </div>
+        <div id="cost-result" hidden class="mt-4"></div>
+      </section>
     </div>
 
   </main>

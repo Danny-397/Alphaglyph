@@ -24,171 +24,151 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <meta name="theme-color" content="#0b0c0c">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="landing.css">
 </head>
 <body>
 
   <!-- ── Navbar ─────────────────────────────────────────────────────────── -->
-  <nav class="lp-nav">
+  <nav class="lp-nav" aria-label="Main">
     <div class="lp-nav-inner">
-      <a href="index.html" class="lp-brand">
+      <a href="index.html" class="lp-brand" aria-label="AlphaGlyph home">
         <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
           <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
           <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
         </svg>
         <span class="lp-brand-mark">AlphaGlyph</span>
-        <span class="lp-brand-sub">Strategy Validation Lab</span>
       </a>
       <div class="lp-nav-links">
         <a href="#how"        class="lp-nav-link">How it works</a>
         <a href="#validation" class="lp-nav-link">Validation</a>
         <a href="tools.html"  class="lp-nav-link">Tools</a>
         <a href="https://github.com/Danny-397/Alphaglyph" class="lp-nav-link" target="_blank" rel="noopener">Source</a>
-        <a href="backtest.html" class="btn btn-primary btn-sm lp-nav-link">Open the Backtester →</a>
       </div>
+      <a href="backtest.html" class="btn btn-primary btn-sm lp-nav-cta">Open the Backtester</a>
     </div>
   </nav>
 
-  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
-  <header class="hero">
-    <div class="container hero-grid">
-      <div>
-        <span class="hero-eyebrow">Backtesting · Statistical validation · Real prices, never real money</span>
-        <h1>Backtest any strategy — and find out if the edge is <span class="accent">real</span>.</h1>
+  <main>
+    <!-- ── Hero ─────────────────────────────────────────────────────────── -->
+    <header class="hero">
+      <div class="container hero-inner">
+        <p class="eyebrow">Backtesting and statistical validation</p>
+        <h1>Backtest any strategy. <br>Then find out if the edge is <span class="accent">real</span>.</h1>
         <p class="hero-sub">
           AlphaGlyph runs quant and machine-learning strategies on real historical prices with simulated
-          capital, then does what most backtests don't: it checks whether the result is <strong>genuine skill
-          or just luck</strong>, using the same statistical tests quant funds use. Six strategies, a no-code
-          rule builder, an ML transformer — and an honest verdict on every run.
+          capital, then checks whether the result is skill or luck, using the tests quant funds use.
         </p>
         <div class="hero-cta">
-          <a href="backtest.html" class="btn btn-primary">Open the Backtester →</a>
-          <a href="tools.html" class="btn btn-ghost">Explore the tools</a>
+          <a href="backtest.html" class="btn btn-primary btn-lg">Open the Backtester</a>
+          <a href="tools.html" class="btn btn-quiet btn-lg">Explore the tools <span aria-hidden="true">›</span></a>
         </div>
-        <p class="hero-note">No code · No account · No real money · Every trade explained in plain English</p>
+        <p class="hero-note">No account. No real money. Every trade explained in plain English.</p>
       </div>
 
-      <!-- Hero visual: the actual differentiator — the validation verdict -->
-      <div class="verdict">
-        <div class="verdict-top">Strategy Validation Report <span class="verdict-tag">Example</span></div>
-        <div class="verdict-headline">
-          <span class="tick">✓</span> Statistically Significant
-        </div>
-        <div class="verdict-row">
-          <span class="ck">✓</span>
-          <span><span class="lbl">Monte Carlo —</span> <span class="val">92nd percentile</span> of 1,000 resampled paths</span>
-        </div>
-        <div class="verdict-row">
-          <span class="ck">✓</span>
-          <span><span class="lbl">Deflated Sharpe —</span> <span class="val">96.4% confidence</span> the edge is real</span>
-        </div>
-        <div class="verdict-row">
-          <span class="ck">✓</span>
-          <span><span class="lbl">Fama-French —</span> <span class="val">+6.8%/yr alpha</span> (|t| = 2.31, significant)</span>
-        </div>
-        <p class="verdict-note">What a passing verdict looks like. Most strategies don't get one: on AlphaGlyph's own
-          42-variant grid, the in-sample winner is more likely than not to land in the bottom half out of sample.
-          <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">See the report →</a></p>
-      </div>
-    </div>
-  </header>
-
-  <!-- ── Stat strip ─────────────────────────────────────────────────────── -->
-  <section class="stats">
-    <div class="stats-inner">
-      <div class="stat"><div class="stat-num">6</div><div class="stat-lbl">Strategies + custom rules</div></div>
-      <div class="stat"><div class="stat-num">1,000</div><div class="stat-lbl">Monte Carlo paths</div></div>
-      <div class="stat"><div class="stat-num">3</div><div class="stat-lbl">Validation tests</div></div>
-      <div class="stat"><div class="stat-num">186</div><div class="stat-lbl">Passing tests</div></div>
-      <div class="stat"><div class="stat-num">$0</div><div class="stat-lbl">Real money at risk</div></div>
-    </div>
-  </section>
-
-  <!-- ── How it works ───────────────────────────────────────────────────── -->
-  <section class="section" id="how">
-    <div class="container">
-      <div class="section-head">
-        <div class="section-tag">How it works</div>
-        <h2>Run a strategy. See the trades. Get an honest verdict.</h2>
-        <p>The whole flow is one page — the Backtester — with everything explained, not hidden behind a number.</p>
-      </div>
-
-      <div class="features">
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+      <!-- The product, not a mockup of it: the verdict every run ends with -->
+      <div class="container">
+        <figure class="verdict" aria-label="Example validation report">
+          <div class="verdict-top">
+            <span>Strategy validation report</span>
+            <span class="verdict-tag">Example</span>
           </div>
-          <h3>1 · Pick a strategy &amp; run it</h3>
-          <p>Choose from six strategies (or build your own buy/sell rules from indicators), pick stocks and a date range, and simulate it day-by-day on real prices with transaction costs.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <div class="verdict-headline">
+            <span class="tick" aria-hidden="true">✓</span> Statistically significant
           </div>
-          <h3>2 · See every trade explained</h3>
-          <p>The equity curve, each trade with a plain-English reason (what it saw, the regime, why it acted), and an optional animated replay of the whole run.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          </div>
-          <h3>3 · Is it real, or luck?</h3>
-          <p>Monte Carlo, Deflated Sharpe, and Fama-French synthesise into one verdict: <em>Statistically Significant</em>, <em>Promising</em>, or <em>Inconclusive</em>.</p>
-        </div>
-      </div>
-
-      <div class="hero-cta" style="justify-content:center;margin-top:34px;">
-        <a href="backtest.html" class="btn btn-primary">Open the Backtester →</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Differentiator: validation ─────────────────────────────────────── -->
-  <section class="section section-alt" id="validation">
-    <div class="container split">
-      <div>
-        <div class="section-tag">Why it's different</div>
-        <h2 style="font-size:clamp(1.7rem,3vw,2.3rem);font-weight:700;letter-spacing:-0.02em;line-height:1.14;">
-          Most backtests stop at a Sharpe ratio. This one asks if it's real.
-        </h2>
-        <p style="color:var(--muted);margin-top:14px;">
-          Any strategy can look good on historical data by chance. AlphaGlyph runs three
-          independent statistical tests and synthesises them into a single verdict.
-        </p>
-        <ul class="split-list">
-          <li>
-            <span class="n">01</span>
-            <div>
-              <h4>Resample reality</h4>
-              <p>1,000 bootstrap paths build a distribution — your result either stands out or it doesn't.</p>
+          <div class="verdict-rows">
+            <div class="verdict-row">
+              <span class="lbl">Monte Carlo</span>
+              <span class="val">92nd percentile</span>
+              <span class="ctx">of 1,000 resampled paths</span>
             </div>
+            <div class="verdict-row">
+              <span class="lbl">Deflated Sharpe</span>
+              <span class="val">96.4%</span>
+              <span class="ctx">confidence the edge is real</span>
+            </div>
+            <div class="verdict-row">
+              <span class="lbl">Fama-French</span>
+              <span class="val">+6.8% / yr alpha</span>
+              <span class="ctx">|t| = 2.31, significant</span>
+            </div>
+          </div>
+          <figcaption class="verdict-note">What a passing verdict looks like. Most strategies don't get one: on AlphaGlyph's own
+            42-variant grid, the in-sample winner is more likely than not to land in the bottom half out of sample.
+            <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Read the report</a></figcaption>
+        </figure>
+      </div>
+    </header>
+
+    <!-- ── Figures ──────────────────────────────────────────────────────── -->
+    <section class="figures" aria-label="At a glance">
+      <div class="container figures-inner">
+        <div class="figure"><span class="figure-num">6</span><span class="figure-lbl">strategies, plus a custom rule builder</span></div>
+        <div class="figure"><span class="figure-num">1,000</span><span class="figure-lbl">Monte Carlo paths per run</span></div>
+        <div class="figure"><span class="figure-num">3</span><span class="figure-lbl">independent validation tests</span></div>
+        <div class="figure"><span class="figure-num">186</span><span class="figure-lbl">automated tests in CI</span></div>
+      </div>
+    </section>
+
+    <!-- ── How it works ─────────────────────────────────────────────────── -->
+    <section class="section" id="how">
+      <div class="container">
+        <div class="section-head">
+          <h2>Run a strategy. See the trades. <br>Get an honest verdict.</h2>
+          <p>The whole flow lives on one page, the Backtester, with every step explained.</p>
+        </div>
+
+        <ol class="steps">
+          <li class="step">
+            <span class="step-n">1</span>
+            <h3>Pick a strategy and run it</h3>
+            <p>Choose one of six strategies or build your own buy and sell rules. Pick stocks and dates, and it simulates day by day on real prices, with transaction costs.</p>
           </li>
-          <li>
-            <span class="n">02</span>
-            <div>
+          <li class="step">
+            <span class="step-n">2</span>
+            <h3>See every trade explained</h3>
+            <p>The equity curve against the S&amp;P 500, each trade with a plain-English reason, and an optional animated replay of the whole run.</p>
+          </li>
+          <li class="step">
+            <span class="step-n">3</span>
+            <h3>Learn if it's real</h3>
+            <p>Three statistical tests combine into one verdict: <em>significant</em>, <em>promising</em>, or <em>inconclusive</em>.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ── Validation ───────────────────────────────────────────────────── -->
+    <section class="section section-alt" id="validation">
+      <div class="container split">
+        <div>
+          <div class="section-head section-head-left">
+            <h2>Most backtests stop at a Sharpe ratio. This one asks if it's real.</h2>
+            <p>Any strategy can look good on historical data by chance. AlphaGlyph runs three
+              independent tests and combines them into a single verdict.</p>
+          </div>
+          <ul class="split-list">
+            <li>
+              <h4>Resample reality</h4>
+              <p>1,000 bootstrap paths build a distribution. Your result either stands out or it doesn't.</p>
+            </li>
+            <li>
               <h4>Correct for luck</h4>
               <p>The Deflated Sharpe Ratio penalises testing many strategies, the way good science corrects for multiple comparisons.</p>
-            </div>
-          </li>
-          <li>
-            <span class="n">03</span>
-            <div>
+            </li>
+            <li>
               <h4>Isolate true skill</h4>
-              <p>Factor decomposition strips out market, size, and value exposure to reveal whether any genuine alpha remains.</p>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <div class="code-panel">
-        <div class="code-bar">
-          <span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span>
-          <span class="code-title">stats.py — deflated_sharpe_ratio()</span>
+              <p>Factor decomposition strips out market, size, and value exposure to show whether any genuine alpha remains.</p>
+            </li>
+          </ul>
         </div>
-        <pre class="code-body"><span class="c"># Probability the Sharpe is real after</span>
+
+        <div class="code-panel">
+          <div class="code-bar">stats.py</div>
+          <pre class="code-body"><span class="c"># Probability the Sharpe is real after</span>
 <span class="c"># testing N strategies on noisy data</span>
 <span class="k">def</span> deflated_sharpe_ratio(returns, n_strategies):
     sr   = annualized_sharpe(returns)
@@ -199,115 +179,96 @@
     sr_star = expected_max_sharpe(n_strategies)
 
     <span class="k">return</span> psr(sr, sr_star, skew, kurt)
-    <span class="c"># → 0.964  ✓ significant</span></pre>
+    <span class="c"># → 0.964  significant</span></pre>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ── Features ───────────────────────────────────────────────────────── -->
-  <section class="section" id="features">
-    <div class="container">
-      <div class="section-head">
-        <div class="section-tag">Under the hood</div>
-        <h2>A real quantitative toolkit — built from first principles.</h2>
-        <p>Every indicator, model, and statistical method is implemented from scratch — no black-box TA libraries.</p>
-      </div>
+    <!-- ── Toolkit ──────────────────────────────────────────────────────── -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <h2>A quantitative toolkit, built from first principles.</h2>
+          <p>Every indicator, model, and statistical method is implemented from scratch. No black-box TA libraries.</p>
+        </div>
 
-      <div class="features">
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>
+        <div class="features">
+          <div class="feature">
+            <h3>Six strategies and a rule builder</h3>
+            <p>MA Crossover, RSI, MACD, a patient Dip Buyer, an ML transformer, and a no-code builder for your own buy and sell rules.</p>
           </div>
-          <h3>Six strategies + a custom rule builder</h3>
-          <p>MA Crossover, RSI, MACD, a patient Dip Buyer, an ML transformer — and a no-code builder to define your own buy/sell rules from indicators.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M12 11l-6 6M12 11l6 6"/></svg>
+          <div class="feature">
+            <h3>An ML transformer, evaluated honestly</h3>
+            <p>Trained on a chronological 60/20/20 split, with backtests run strictly out of sample. The win is the rigour, not a magic edge.</p>
           </div>
-          <h3>An ML transformer — evaluated honestly</h3>
-          <p>A multi-modal transformer trained with a chronological 60/20/20 split; backtests run strictly out-of-sample. The win is the rigour, not a magic edge.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v6h-6"/></svg>
+          <div class="feature">
+            <h3>Adaptive regime detection</h3>
+            <p>ADX, Bollinger Band width, and realized volatility sort the market into four regimes, and the adaptive strategy switches to match.</p>
           </div>
-          <h3>Adaptive regime detection</h3>
-          <p>ADX, Bollinger Band Width, and realized volatility classify the market into four regimes; the adaptive strategy switches to match.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <div class="feature">
+            <h3>Trailing stops and Kelly sizing</h3>
+            <p>Wide trailing stops let winners run, and the Kelly criterion sizes positions by historical edge. No look-ahead, and it's tested.</p>
           </div>
-          <h3>Trailing stops &amp; Kelly sizing</h3>
-          <p>Wide trailing stops let winners run; the Kelly Criterion sizes positions by the historical edge, not a fixed percentage. No look-ahead — and it's tested.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor"/></svg>
+          <div class="feature">
+            <h3>Walk-forward and real costs</h3>
+            <p>Grade only on a held-out final 30%, with commission and slippage charged on every buy and sell.</p>
           </div>
-          <h3>Leaderboard &amp; optimizer</h3>
-          <p>Rank every strategy on the same data, and compute the Markowitz efficient frontier (max-Sharpe and min-variance portfolios) in the Tools tab.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+          <div class="feature">
+            <h3>Leaderboard and optimizer</h3>
+            <p>Rank every strategy on the same data, and compute the Markowitz efficient frontier in Tools.</p>
           </div>
-          <h3>Honest by design</h3>
-          <p>Monte Carlo, Deflated Sharpe (López de Prado), and Fama-French attribution tell you whether an edge is genuine — or just luck.</p>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ── CTA ────────────────────────────────────────────────────────────── -->
-  <section class="cta">
-    <div class="container">
-      <h2>Backtest a strategy now.</h2>
-      <p>Pick a strategy and a few stocks, run it on real history in seconds, and see whether the edge holds up — no account required.</p>
-      <div class="cta-btns">
-        <a href="backtest.html" class="btn btn-primary">Open the Backtester →</a>
-        <a href="tools.html" class="btn btn-ghost">Explore the tools</a>
+    <!-- ── CTA ──────────────────────────────────────────────────────────── -->
+    <section class="cta">
+      <div class="container">
+        <h2>Backtest a strategy now.</h2>
+        <p>Run it on real history in seconds and see whether the edge holds up.</p>
+        <div class="cta-btns">
+          <a href="backtest.html" class="btn btn-primary btn-lg">Open the Backtester</a>
+          <a href="tools.html" class="btn btn-quiet btn-lg">Explore the tools <span aria-hidden="true">›</span></a>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </main>
 
   <!-- ── Footer ─────────────────────────────────────────────────────────── -->
   <footer class="lp-footer">
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <span style="display:inline-flex;align-items:center;gap:8px;">
+          <a href="index.html" class="lp-brand">
             <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
               <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
               <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
             </svg>
             <span class="lp-brand-mark">AlphaGlyph</span>
-          </span>
-          <p class="footer-tagline">A backtesting &amp; strategy-validation lab — run any strategy on real history, and find out whether its edge is genuine or just luck.</p>
+          </a>
+          <p class="footer-tagline">A backtesting and strategy-validation lab.</p>
         </div>
         <div class="footer-links">
           <div class="footer-col">
             <h5>App</h5>
             <a href="backtest.html">Backtester</a>
-            <a href="tools.html">Tools (Signals · Optimizer)</a>
+            <a href="tools.html">Tools</a>
           </div>
           <div class="footer-col">
             <h5>Project</h5>
-            <a href="https://github.com/Danny-397/Alphaglyph" target="_blank" rel="noopener">Source Code</a>
-            <a href="#how">How it works</a>
-            <a href="#validation">Validation</a>
+            <a href="https://github.com/Danny-397/Alphaglyph" target="_blank" rel="noopener">Source code</a>
+            <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Technical report</a>
+            <a href="https://danny-397.github.io/">More projects</a>
           </div>
         </div>
       </div>
-      <div class="disclaimer">
-        <strong>Disclaimer —</strong> AlphaGlyph is an educational project. It backtests strategies at
-        real market prices with simulated cash.
-        <strong>No real money is ever involved and nothing here is financial advice.</strong>
-        Past backtested performance does not guarantee future results.
-        <br>© 2026 AlphaGlyph · Built by <a href="https://danny-397.github.io/">Dan Lichtenberger</a> · <a href="https://danny-397.github.io/">more projects →</a>
-      </div>
+      <p class="disclaimer">
+        AlphaGlyph is an educational project. It backtests strategies at real market prices with simulated cash.
+        No real money is ever involved, and nothing here is financial advice. Past backtested performance does
+        not guarantee future results.
+      </p>
+      <p class="disclaimer">© 2026 AlphaGlyph · Built by <a href="https://danny-397.github.io/">Dan Lichtenberger</a></p>
     </div>
   </footer>
 
