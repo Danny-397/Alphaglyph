@@ -45,7 +45,7 @@ async function enableMlOption(selectEl) {
 
 const REGIME_COLORS = {
   TRENDING_UP:     '#3fb950',
-  TRENDING_DOWN:   '#f85149',
+  TRENDING_DOWN:   '#ff6b61',
   RANGING:         '#e3b341',
   HIGH_VOLATILITY: '#e3913b',
 }
@@ -214,10 +214,18 @@ function weightBars(weights) {
       </div>`).join('')
 }
 
-Chart.defaults.color       = '#8a978f'
-Chart.defaults.borderColor = '#2a352f'
-Chart.defaults.font.family = "'JetBrains Mono', monospace"
+Chart.defaults.color       = '#9ba49f'
+Chart.defaults.borderColor = 'rgba(255,255,255,0.08)'
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif"
 Chart.defaults.font.size   = 11
+Chart.defaults.plugins.legend.labels.boxWidth  = 10
+Chart.defaults.plugins.legend.labels.boxHeight = 10
+Chart.defaults.plugins.legend.labels.usePointStyle = true
+Object.assign(Chart.defaults.plugins.tooltip, {
+  backgroundColor: 'rgba(32,36,35,0.96)', borderColor: 'rgba(255,255,255,0.14)', borderWidth: 1,
+  titleColor: '#f1f3f2', bodyColor: '#c9d0cc', padding: 10, cornerRadius: 8,
+  titleFont: { weight: '600' }, displayColors: true, boxPadding: 4,
+})
 
 function destroyChart(c) { if (c) { try { c.destroy() } catch (_) {} } return null }
 
@@ -225,9 +233,13 @@ function initTabs(root) {
   root.querySelectorAll('.tab-list').forEach(list => {
     const btns   = list.querySelectorAll('.tab-btn')
     const card   = list.closest('.card') || list.parentElement
+    list.setAttribute('role', 'tablist')
     btns.forEach(btn => {
+      btn.setAttribute('role', 'tab')
+      btn.setAttribute('aria-selected', btn.classList.contains('active') ? 'true' : 'false')
       btn.addEventListener('click', () => {
-        btns.forEach(b => b.classList.remove('active'))
+        btns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false') })
+        btn.setAttribute('aria-selected', 'true')
         card.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
         btn.classList.add('active')
         const target = el(btn.dataset.tab)
@@ -324,9 +336,13 @@ function initBacktest() {
     clearInterval(replayTimer); replayTimer = null
     replayChart = destroyChart(replayChart)
     const feed = el('bt-replay-feed')
-    if (feed) feed.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">Press Play to replay the run.</div>'
+    if (feed) feed.innerHTML = '<div class="feed-empty">Press Play to replay the run.</div>'
     const btn = el('bt-replay-btn')
     if (btn) btn.textContent = '▶ Play'
+    // The chart stays collapsed until a replay starts, so an unplayed replay
+    // isn't a large empty box in the middle of the results.
+    const card = el('bt-playback')
+    if (card) card.classList.remove('is-playing')
   }
 
   function pushReplayTrade(t) {
@@ -355,6 +371,7 @@ function initBacktest() {
     const trades = (d.trades || []).slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
     let cursor = 0, tp = 0
     el('bt-replay-feed').innerHTML = ''
+    el('bt-playback').classList.add('is-playing')
     replayChart = destroyChart(replayChart)
     replayChart = new Chart(el('bt-replay-chart').getContext('2d'), {
       type: 'line',
@@ -365,7 +382,7 @@ function initBacktest() {
       options: {
         responsive: true, maintainAspectRatio: false, animation: false,
         plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } } },
-        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } }, y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } } },
+        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } }, y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } } },
       },
     })
     el('bt-replay-btn').textContent = '⏸ Pause'
@@ -608,7 +625,7 @@ function initBacktest() {
       return {
         label: r.label,
         data: labels.map(d => (m[d] != null ? m[d] : null)),
-        borderColor: CMP_COLORS[r.strategy] || '#8a978f',
+        borderColor: CMP_COLORS[r.strategy] || '#9ba49f',
         borderWidth: 2, fill: false, tension: 0.2, pointRadius: 0, spanGaps: true,
       }
     })
@@ -631,7 +648,7 @@ function initBacktest() {
         },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0 } },
-          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+          y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
         },
       },
     })
@@ -795,7 +812,7 @@ function initBacktest() {
         },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0 } },
-          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+          y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
         },
       },
     })
@@ -828,7 +845,7 @@ function initBacktest() {
     let condHtml = ''
     if (cond.length) {
       condHtml = `
-        <div class="section-header" style="margin-top:20px;">Edge by Regime — is it real, or just one condition?</div>
+        <div class="section-header" style="margin-top:28px;">Edge by market regime</div>
         <p class="text-muted" style="font-size:12px;line-height:1.6;margin:-6px 0 12px;">
           Splits every invested <em>day</em> by the market regime it fell in, and compares the strategy's compounded return to buy-and-hold (SPY) <strong>within</strong> that regime. A strategy whose whole edge lives in one regime is far more fragile than one that beats the benchmark across several.
         </p>
@@ -837,7 +854,7 @@ function initBacktest() {
             <th>Regime</th><th>% of Time</th><th>Strategy</th><th>SPY</th><th>Excess</th><th>Sharpe</th>
           </tr></thead>
           <tbody>${cond.map(([r, v]) => `<tr>
-            <td><span style="color:${REGIME_COLORS[r] || '#8a978f'};font-weight:700;">${v.label || r}</span></td>
+            <td><span style="color:${REGIME_COLORS[r] || '#9ba49f'};font-weight:700;">${v.label || r}</span></td>
             <td>${v.pct_of_time}%</td>
             <td class="${clr(v.strat_return)}">${fmtPct(v.strat_return)}</td>
             <td>${v.spy_return == null ? '—' : fmtPct(v.spy_return)}</td>
@@ -850,14 +867,14 @@ function initBacktest() {
     let tradeHtml = ''
     if (entries.length) {
       tradeHtml = `
-        <div class="section-header" style="margin-top:20px;">Closed Trades by Market Regime</div>
+        <div class="section-header" style="margin-top:28px;">Closed trades by market regime</div>
         <div class="table-wrap"><table class="data-table">
           <thead><tr>
             <th>Regime</th><th>Trades</th><th>Win Rate</th>
             <th>Total P&L</th><th>Avg P&L</th><th>Best</th><th>Worst</th>
           </tr></thead>
           <tbody>${entries.map(([r, v]) => `<tr>
-            <td><span style="color:${REGIME_COLORS[r] || '#8a978f'};font-weight:700;">${v.label || r}</span></td>
+            <td><span style="color:${REGIME_COLORS[r] || '#9ba49f'};font-weight:700;">${v.label || r}</span></td>
             <td>${v.trade_count}</td>
             <td>${v.win_rate}%</td>
             <td class="${clr(v.total_pnl)}">${fmt$(v.total_pnl)}</td>
@@ -905,7 +922,7 @@ function initBacktest() {
         },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0 } },
-          y: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+          y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
         },
       },
     })
@@ -914,7 +931,7 @@ function initBacktest() {
     const sd = mc.sharpe_distribution
     box.innerHTML = `
       <div class="card">
-        <div class="section-header">Return Distribution</div>
+        <div class="section-header">Return distribution</div>
         <table class="data-table"><thead><tr><th>Percentile</th><th>Return</th></tr></thead>
         <tbody>
           ${[['P5', rd.p5],['P25', rd.p25],['P50 (Median)', rd.p50],['P75', rd.p75],['P95', rd.p95],['Actual', mc.actual_return_pct]]
@@ -931,7 +948,7 @@ function initBacktest() {
         </p>
       </div>
       <div class="card">
-        <div class="section-header">Sharpe Distribution</div>
+        <div class="section-header">Sharpe distribution</div>
         <table class="data-table"><thead><tr><th>Percentile</th><th>Sharpe</th></tr></thead>
         <tbody>
           ${[['P5', sd.p5],['P25', sd.p25],['P50 (Median)', sd.p50],['P75', sd.p75],['P95', sd.p95]]
@@ -955,9 +972,9 @@ function initBacktest() {
 
     const passes   = [test1, test2, test3].filter(Boolean).length
     let vClass, vText
-    if (passes === 3) { vClass = 'verdict-significant';  vText = '✓  STATISTICALLY SIGNIFICANT' }
-    else if (passes >= 1) { vClass = 'verdict-promising'; vText = '~  PROMISING — NEEDS MORE DATA' }
-    else               { vClass = 'verdict-inconclusive'; vText = '✗  INCONCLUSIVE — MAY BE NOISE' }
+    if (passes === 3) { vClass = 'verdict-significant';  vText = 'Statistically significant' }
+    else if (passes >= 1) { vClass = 'verdict-promising'; vText = 'Promising, but needs more data' }
+    else               { vClass = 'verdict-inconclusive'; vText = 'Inconclusive. This may be noise' }
 
     const testRow = (pass, html) => `
       <div class="verdict-test ${pass ? 'pass' : 'fail'}">
@@ -967,7 +984,7 @@ function initBacktest() {
 
     el('validation-report').innerHTML = `
       <div class="verdict-card ${vClass}">
-        <div class="verdict-label">Strategy Validation Report</div>
+        <div class="verdict-label">Strategy validation report</div>
         <div class="verdict-main">${vText}</div>
         <div class="verdict-tests">
           ${testRow(test1, skill.enabled
@@ -991,7 +1008,7 @@ function initBacktest() {
 
     el('research-detail-grid').innerHTML = `
       <div class="card">
-        <div class="section-header">Skill Test — vs Random Timing</div>
+        <div class="section-header">Skill test vs. random timing</div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
           Compares the strategy's Sharpe to <strong>1,000 "monkey" traders</strong> that
           go long the market on random days, matched to the strategy's own market
@@ -1013,7 +1030,7 @@ function initBacktest() {
           : '<p style="color:var(--muted);font-size:13px;">Needs a benchmark series (SPY) over the backtest window.</p>'}
       </div>
       <div class="card">
-        <div class="section-header">Deflated Sharpe Ratio</div>
+        <div class="section-header">Deflated Sharpe ratio</div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
           PSR corrects the Sharpe ratio for <strong>fat tails and skewness</strong>.
           DSR additionally corrects for <strong>multiple testing</strong> — if you tried N strategies and picked the best, the bar is higher.
@@ -1027,14 +1044,14 @@ function initBacktest() {
           </div>` : ''}
       </div>
       <div class="card">
-        <div class="section-header">Fama-French 3-Factor Attribution</div>
+        <div class="section-header">Fama-French 3-factor attribution</div>
         ${ff3.enabled ? `
           <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
             Decomposes returns into known <strong>market</strong>, <strong>size (SMB)</strong>, and <strong>value (HML)</strong> risk premia.
             Alpha is what remains — skill that a passive factor ETF cannot replicate.
           </p>
           <div style="margin-bottom:14px;">
-            <div style="font-size:26px;font-family:var(--font-mono);font-weight:700;color:${ff3.alpha_annual >= 0 ? 'var(--green)' : 'var(--red)'};">
+            <div style="font-size:28px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;color:${ff3.alpha_annual >= 0 ? 'var(--green)' : 'var(--red)'};">
               ${fmtPct(ff3.alpha_annual, 2)}/yr
             </div>
             <div style="font-size:11px;color:var(--muted);margin-top:3px;">
@@ -1067,7 +1084,7 @@ function initBacktest() {
             indexAxis: 'y', responsive: true,
             plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' β = ' + fmtN(c.parsed.x, 4) } } },
             scales: {
-              x: { grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => v.toFixed(2) } },
+              x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v.toFixed(2) } },
               y: { grid: { display: false } },
             },
           },
@@ -1079,7 +1096,7 @@ function initBacktest() {
     if (mw && Object.keys(mw).length) {
       el('markowitz-section').innerHTML = `
         <div class="card" style="margin-top:16px;">
-          <div class="section-header">Markowitz Position Sizing Used</div>
+          <div class="section-header">Markowitz position sizing</div>
           <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
             Position sizes were capped by the mean-variance optimal allocation — allocating more capital to assets with the best risk/return profile.
           </p>
@@ -1094,7 +1111,7 @@ function initBacktest() {
     const tbody = el('trades-tbody')
     const sells = trades.filter(t => t.action === 'SELL')
     if (!sells.length) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">No closed trades in this period</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-cell">No closed trades in this period</td></tr>`
       return
     }
     tbody.innerHTML = sells.slice(0, 200).map(t => `
@@ -1219,7 +1236,7 @@ function initPortfolio() {
           {
             label: 'Individual Assets',
             data:  Object.entries(assets).map(([t, a]) => ({ x: a.volatility, y: a.expected_return, label: t })),
-            borderColor: '#8a978f', backgroundColor: 'rgba(138,151,143,0.5)',
+            borderColor: '#9ba49f', backgroundColor: 'rgba(138,151,143,0.5)',
             pointRadius: 5, pointHoverRadius: 7,
           },
         ],
@@ -1235,8 +1252,8 @@ function initPortfolio() {
           }}},
         },
         scales: {
-          x: { title: { display: true, text: 'Annualised Volatility (%)', color: '#8a978f' }, grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
-          y: { title: { display: true, text: 'Annualised Return (%)',    color: '#8a978f' }, grid: { color: 'rgba(36,48,42,0.55)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
+          x: { title: { display: true, text: 'Annualised Volatility (%)', color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
+          y: { title: { display: true, text: 'Annualised Return (%)',    color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
         },
       },
     })
@@ -1354,10 +1371,10 @@ function initSignals() {
 
   async function scan() {
     const tbody = el('sig-tbody')
-    if (!tickers.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Add a ticker to scan.</td></tr>'; return }
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Scanning <span class="dots"><span></span><span></span><span></span></span></td></tr>`
+    if (!tickers.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Add a ticker to scan.</td></tr>'; return }
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">Scanning <span class="dots"><span></span><span></span><span></span></span></td></tr>`
     const data = await api('/api/scan?tickers=' + encodeURIComponent(tickers.join(',')))
-    if (!data || !data.scanned) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Couldn’t scan right now — try Rescan.</td></tr>'; return }
+    if (!data || !data.scanned) { tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Couldn’t scan right now — try Rescan.</td></tr>'; return }
 
     tbody.innerHTML = data.scanned.map(row => {
       const s = row.signals || {}
@@ -1583,13 +1600,13 @@ function initPredictor() {
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { min: axLo, max: axHi, title: { display: true, text: 'Predicted P(up)', color: '#8a978f' },
-               ticks: { color: '#8a978f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
-          y: { min: axLo, max: axHi, title: { display: true, text: 'Actual frequency of up-moves', color: '#8a978f' },
-               ticks: { color: '#8a978f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          x: { min: axLo, max: axHi, title: { display: true, text: 'Predicted P(up)', color: '#9ba49f' },
+               ticks: { color: '#9ba49f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { min: axLo, max: axHi, title: { display: true, text: 'Actual frequency of up-moves', color: '#9ba49f' },
+               ticks: { color: '#9ba49f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
-          legend: { labels: { color: '#8a978f', usePointStyle: true, filter: i => i.text !== 'Perfect calibration' } },
+          legend: { labels: { color: '#9ba49f', usePointStyle: true, filter: i => i.text !== 'Perfect calibration' } },
           tooltip: { callbacks: { label: c => `pred ${Math.round(c.raw.x * 100)}% → actual ${Math.round(c.raw.y * 100)}% (n=${c.raw.n})` } },
         },
       },
@@ -1680,7 +1697,7 @@ function initResearch() {
   let peadChart = null, dmChart = null
 
   // ── PEAD event study ───────────────────────────────────────────────────────
-  const CURVE_COLOR = { beat: '#3fb950', inline: '#8a978f', miss: '#f85149' }
+  const CURVE_COLOR = { beat: '#3fb950', inline: '#9ba49f', miss: '#ff6b61' }
 
   function renderPead(data) {
     const box = el('pead-result'); box.hidden = false
@@ -1718,10 +1735,10 @@ function initResearch() {
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { title: { display: true, text: 'Trading days after report', color: '#8a978f' },
-               ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
-          y: { title: { display: true, text: 'Cumulative abnormal return (%)', color: '#8a978f' },
-               ticks: { color: '#8a978f', callback: v => v + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          x: { title: { display: true, text: 'Trading days after report', color: '#9ba49f' },
+               ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { title: { display: true, text: 'Cumulative abnormal return (%)', color: '#9ba49f' },
+               ticks: { color: '#9ba49f', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: { legend: { labels: { color: '#c9d3cd', usePointStyle: true, boxWidth: 8 } } },
       },
@@ -1770,7 +1787,7 @@ function initResearch() {
     const vline = (x, color, text) => ({
       type: 'line', xMin: x, xMax: x, borderColor: color, borderWidth: 2, borderDash: [5, 4],
       label: { display: true, content: text, color: color, position: 'start',
-               font: { size: 10 }, backgroundColor: 'rgba(13,17,15,0.85)' },
+               font: { size: 10 }, backgroundColor: 'rgba(32,36,35,0.92)' },
     })
     if (dmChart) dmChart.destroy()
     dmChart = new Chart(el('dm-chart'), {
@@ -1780,15 +1797,15 @@ function initResearch() {
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { type: 'linear', offset: false, title: { display: true, text: 'Backtested Sharpe ratio', color: '#8a978f' },
-               ticks: { color: '#8a978f', maxTicksLimit: 10 }, grid: { display: false } },
-          y: { title: { display: true, text: 'Count', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          x: { type: 'linear', offset: false, title: { display: true, text: 'Backtested Sharpe ratio', color: '#9ba49f' },
+               ticks: { color: '#9ba49f', maxTicksLimit: 10 }, grid: { display: false } },
+          y: { title: { display: true, text: 'Count', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
           legend: { display: false },
           annotation: { annotations: {
             best: vline(data.best_sharpe, '#e3b341', `best ${data.best_sharpe}`),
-            emax: data.expected_max_sharpe != null ? vline(data.expected_max_sharpe, '#8a978f', `E[max] ${data.expected_max_sharpe}`) : {},
+            emax: data.expected_max_sharpe != null ? vline(data.expected_max_sharpe, '#9ba49f', `E[max] ${data.expected_max_sharpe}`) : {},
           } },
         },
       },
@@ -1835,12 +1852,12 @@ function initResearch() {
         <div class="hero-stat"><div class="hero-stat-value">${data.n_strategies}×${data.n_combos}</div><div class="hero-stat-label">Variants × IS/OOS splits</div></div>
       </div>
       <div class="two-col" style="margin-bottom:16px;">
-        <div><div class="section-header" style="font-size:12px;">Overfit statistic λ (left of 0 = overfit)</div>
+        <div><div class="section-header" style="font-size:13px;">Overfit statistic λ (left of 0 = overfit)</div>
           <div class="chart-wrap" style="height:260px;"><canvas id="cpcv-hist"></canvas></div></div>
-        <div><div class="section-header" style="font-size:12px;">In-sample vs out-of-sample Sharpe</div>
+        <div><div class="section-header" style="font-size:13px;">In-sample vs out-of-sample Sharpe</div>
           <div class="chart-wrap" style="height:260px;"><canvas id="cpcv-scatter"></canvas></div></div>
       </div>
-      <div class="section-header" style="font-size:12px;">CPCV split structure (${data.n_groups} groups, embargo ${data.embargo}d) — first ${(data.splits_diagram || []).length} of ${data.n_combos}</div>
+      <div class="section-header" style="font-size:13px;">CPCV split structure (${data.n_groups} groups, embargo ${data.embargo}d) — first ${(data.splits_diagram || []).length} of ${data.n_combos}</div>
       <div class="cpcv-grid" style="margin-bottom:14px;">${grid}</div>
       <p style="font-size:13px;line-height:1.65;color:var(--text);"><strong>${data.verdict}</strong></p>
       <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:8px;">${data.ticker} · ${data.n_rows} trading days after warm-up · CSCV (Bailey & López de Prado 2014). A trend/mean-reversion grid, not the site's headline strategies.</p>`
@@ -1856,15 +1873,15 @@ function initResearch() {
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { type: 'linear', offset: false, title: { display: true, text: 'λ = logit(OOS rank)', color: '#8a978f' },
-               ticks: { color: '#8a978f', maxTicksLimit: 8 }, grid: { display: false } },
-          y: { title: { display: true, text: 'Splits', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          x: { type: 'linear', offset: false, title: { display: true, text: 'λ = logit(OOS rank)', color: '#9ba49f' },
+               ticks: { color: '#9ba49f', maxTicksLimit: 8 }, grid: { display: false } },
+          y: { title: { display: true, text: 'Splits', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
           legend: { display: false },
           annotation: { annotations: { zero: {
             type: 'line', xMin: 0, xMax: 0, borderColor: '#e3b341', borderWidth: 2, borderDash: [5, 4],
-            label: { display: true, content: 'overfit ◄ │ ► holds up', color: '#e3b341', position: 'end', font: { size: 10 }, backgroundColor: 'rgba(13,17,15,0.85)' } } } },
+            label: { display: true, content: 'overfit ◄ │ ► holds up', color: '#e3b341', position: 'end', font: { size: 10 }, backgroundColor: 'rgba(32,36,35,0.92)' } } } },
         },
       },
     })
@@ -1886,10 +1903,10 @@ function initResearch() {
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { title: { display: true, text: 'In-sample Sharpe', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
-          y: { title: { display: true, text: 'Out-of-sample Sharpe', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          x: { title: { display: true, text: 'In-sample Sharpe', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { title: { display: true, text: 'Out-of-sample Sharpe', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
-        plugins: { legend: { labels: { color: '#8a978f', usePointStyle: true, boxWidth: 8, filter: i => i.text !== 'y = x (no decay)' } } },
+        plugins: { legend: { labels: { color: '#9ba49f', usePointStyle: true, boxWidth: 8, filter: i => i.text !== 'y = x (no decay)' } } },
       },
     })
   }
@@ -1930,7 +1947,7 @@ function initResearch() {
     const labels = pts.map(p => p.cost_bps)
     const anns = {}
     if (beBench != null) anns.beB = { type: 'line', xMin: beBench, xMax: beBench, borderColor: '#e3b341', borderWidth: 2, borderDash: [5, 4],
-      label: { display: true, content: `edge dies @ ${beBench}bp`, color: '#e3b341', position: 'start', font: { size: 10 }, backgroundColor: 'rgba(13,17,15,0.85)' } }
+      label: { display: true, content: `edge dies @ ${beBench}bp`, color: '#e3b341', position: 'start', font: { size: 10 }, backgroundColor: 'rgba(32,36,35,0.92)' } }
     if (costChart) costChart.destroy()
     costChart = new Chart(el('cost-chart'), {
       type: 'line',
@@ -1942,11 +1959,11 @@ function initResearch() {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         scales: {
-          x: { title: { display: true, text: 'Transaction cost per side (basis points)', color: '#8a978f' }, ticks: { color: '#8a978f' }, grid: { display: false } },
-          y: { title: { display: true, text: 'Total return (%)', color: '#8a978f' }, ticks: { color: '#8a978f', callback: v => v + '%' }, grid: { color: 'rgba(30,39,35,0.6)' } },
+          x: { title: { display: true, text: 'Transaction cost per side (basis points)', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { display: false } },
+          y: { title: { display: true, text: 'Total return (%)', color: '#9ba49f' }, ticks: { color: '#9ba49f', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
-          legend: { labels: { color: '#8a978f', usePointStyle: true, boxWidth: 10 } },
+          legend: { labels: { color: '#9ba49f', usePointStyle: true, boxWidth: 10 } },
           tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${fmtPct(c.parsed.y)}` } },
           annotation: { annotations: anns },
         },

@@ -6,7 +6,8 @@
   <title>AlphaGlyph — Backtest</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+  <meta name="theme-color" content="#0b0c0c">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -14,8 +15,8 @@
 <body data-page="backtest">
 
   <!-- ── Navigation ─────────────────────────────────────────────────────── -->
-  <nav class="navbar">
-    <div class="nav-brand">
+  <nav class="navbar" aria-label="Main">
+    <a class="nav-brand" href="index.html" aria-label="AlphaGlyph home">
       <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <!-- Alpha Glyph — α whose tail breaks out like a price path -->
         <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
@@ -23,14 +24,13 @@
         <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
       </svg>
       <span class="nav-brand-name">AlphaGlyph</span>
-      <span class="nav-brand-sub">Strategy Validation Lab</span>
-    </div>
+    </a>
     <div class="nav-links">
-      <a href="index.html"    class="nav-link">Home</a>
-      <a href="backtest.html" class="nav-link active">Backtest</a>
+      <a href="index.html"    class="nav-link">Overview</a>
+      <a href="backtest.html" class="nav-link active" aria-current="page">Backtest</a>
       <a href="tools.html"    class="nav-link">Tools</a>
     </div>
-    <span class="nav-badge">PAPER TRADING</span>
+    <span class="nav-badge" title="Simulated capital on real historical prices">Paper trading</span>
   </nav>
 
   <!-- ── Main ───────────────────────────────────────────────────────────── -->
@@ -39,11 +39,11 @@
 
       <!-- ── LEFT: Sticky form panel ─────────────────────────────────────── -->
       <aside class="form-panel">
-        <h2>Configure Backtest</h2>
+        <h2>Configure backtest</h2>
 
         <!-- Strategy -->
         <div class="form-group">
-          <label class="form-label">Strategy</label>
+          <label class="form-label" for="bt-strategy">Strategy</label>
           <select id="bt-strategy">
             <option value="ml" disabled>ML Transformer (not trained yet)</option>
             <option value="dip_buyer" selected>Dip Buyer (52-Week Value)</option>
@@ -59,9 +59,9 @@
 
         <!-- Tickers -->
         <div class="form-group">
-          <label class="form-label">Tickers</label>
+          <label class="form-label" for="bt-ticker-input">Tickers</label>
           <div class="ticker-input-row">
-            <input type="text" id="bt-ticker-input" placeholder="Type a ticker, e.g. AAPL"
+            <input type="text" id="bt-ticker-input" placeholder="Add a ticker, e.g. AAPL"
                    maxlength="8" autocomplete="off" spellcheck="false">
             <button type="button" class="btn btn-sm" id="bt-ticker-add">Add</button>
           </div>
@@ -70,95 +70,76 @@
         </div>
 
         <!-- Date range -->
-        <div class="form-group">
-          <label class="form-label">Start Date</label>
-          <input type="date" id="bt-start">
-        </div>
-        <div class="form-group">
-          <label class="form-label">End Date</label>
-          <input type="date" id="bt-end">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label" for="bt-start">Start</label>
+            <input type="date" id="bt-start">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bt-end">End</label>
+            <input type="date" id="bt-end">
+          </div>
         </div>
 
         <!-- Capital -->
         <div class="form-group">
-          <label class="form-label">Initial Capital ($)</label>
+          <label class="form-label" for="bt-capital">Starting capital ($)</label>
           <input type="number" id="bt-capital" value="100000" min="1000" max="10000000" step="1000">
         </div>
 
         <!-- Risk tolerance -->
         <div class="form-group">
-          <label class="form-label">Risk Tolerance</label>
-          <div class="risk-btn-group" id="bt-risk-btns">
-            <button class="risk-btn" data-risk="conservative">Conservative</button>
-            <button class="risk-btn active" data-risk="moderate">Moderate</button>
-            <button class="risk-btn" data-risk="aggressive">Aggressive</button>
+          <span class="form-label" id="bt-risk-label">Risk tolerance</span>
+          <div class="risk-btn-group" id="bt-risk-btns" role="group" aria-labelledby="bt-risk-label">
+            <button type="button" class="risk-btn" data-risk="conservative">Conservative</button>
+            <button type="button" class="risk-btn active" data-risk="moderate">Moderate</button>
+            <button type="button" class="risk-btn" data-risk="aggressive">Aggressive</button>
           </div>
         </div>
 
         <!-- Advanced -->
         <details class="collapsible" id="bt-advanced">
-          <summary>Advanced Options</summary>
+          <summary>Advanced options</summary>
           <div class="collapsible-body">
-            <div class="form-group">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="bt-walkforward" style="width:14px;height:14px;accent-color:var(--blue);cursor:pointer;">
-                <span style="font-size:12px;font-weight:600;color:var(--blue);">Walk-Forward Test (out-of-sample)</span>
-              </label>
-              <p style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
-                Warms up on the first 70%, then grades only on the held-out final 30% — the honest out-of-sample test.
-              </p>
+            <label class="check">
+              <input type="checkbox" id="bt-walkforward">
+              <span class="check-title">Walk-forward test</span>
+              <span class="check-desc">Warms up on the first 70%, then grades only on the held-out final 30% — the honest out-of-sample test.</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="bt-markowitz">
+              <span class="check-title">Markowitz weights</span>
+              <span class="check-desc">Size positions using mean-variance optimized weights.</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="bt-range-sizing">
+              <span class="check-title">Dip-weighted sizing</span>
+              <span class="check-desc">Bet bigger the closer a stock is to its 52-week low, smaller near its high.</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="bt-cash-in-market">
+              <span class="check-title">Park idle cash in the S&amp;P 500</span>
+              <span class="check-desc">Idle reserve earns the market's return instead of 0%, then rotates into a stock as it dips. Pairs well with <strong>Dip Buyer</strong>. Higher returns, but also higher drawdown — the reserve falls in a market crash.</span>
+            </label>
+            <div class="form-row-2 mt-5">
+              <div class="form-group">
+                <label class="form-label" for="bt-commission">Commission, %</label>
+                <input type="number" id="bt-commission" value="0.03" min="0" max="5" step="0.01">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bt-slippage">Slippage, %</label>
+                <input type="number" id="bt-slippage" value="0.03" min="0" max="5" step="0.01">
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Commission % (per side)</label>
-              <input type="number" id="bt-commission" value="0.03" min="0" max="5" step="0.01">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Slippage % (per side)</label>
-              <input type="number" id="bt-slippage" value="0.03" min="0" max="5" step="0.01">
-            </div>
-            <div class="form-group">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="bt-markowitz" style="width:14px;height:14px;accent-color:var(--blue);cursor:pointer;">
-                <span style="font-size:12px;font-weight:600;color:var(--blue);">Use Markowitz Weights</span>
-              </label>
-              <p style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
-                Size positions using mean-variance optimized weights.
-              </p>
-            </div>
-            <div class="form-group">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="bt-range-sizing" style="width:14px;height:14px;accent-color:var(--blue);cursor:pointer;">
-                <span style="font-size:12px;font-weight:600;color:var(--blue);">Dip-weighted sizing</span>
-              </label>
-              <p style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
-                Bet bigger the closer a stock is to its 52-week low, smaller near its high.
-              </p>
-            </div>
-            <div class="form-group">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="bt-cash-in-market" style="width:14px;height:14px;accent-color:var(--blue);cursor:pointer;">
-                <span style="font-size:12px;font-weight:600;color:var(--blue);">Park idle cash in the S&amp;P 500 (VOO/SPY)</span>
-              </label>
-              <p style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
-                Idle reserve earns the market's return instead of 0%, then rotates into a stock as it dips. Pairs well with <strong>Dip Buyer</strong>. Higher returns, but also higher drawdown — the reserve falls in a market crash.
-              </p>
-            </div>
+            <p class="check-desc" style="margin-top:-8px;">Both are charged on every buy and every sell.</p>
           </div>
         </details>
 
-        <button class="btn btn-primary" id="run-btn" style="width:100%;margin-top:20px;padding:10px 18px;">
-          Run Backtest
-        </button>
-        <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center;line-height:1.5;">
-          Downloads historical data then simulates the strategy day-by-day
-        </p>
-
-        <button class="btn btn-sm" id="compare-btn" style="width:100%;margin-top:10px;">
-          Compare all strategies
-        </button>
-        <p style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;line-height:1.5;">
-          Runs every strategy on the same tickers &amp; period and ranks them
-        </p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary btn-block btn-lg" id="run-btn">Run backtest</button>
+          <button type="button" class="btn btn-block" id="compare-btn">Compare all strategies</button>
+          <p class="form-hint">Runs every strategy on the same tickers and period, then ranks them.</p>
+        </div>
       </aside>
 
       <!-- ── RIGHT: Results area ─────────────────────────────────────────── -->
@@ -167,8 +148,8 @@
         <!-- Empty state -->
         <div id="empty-state">
           <div class="empty-state">
-            <strong class="empty-title">See whether your strategy's edge is real</strong>
-            <p class="empty-sub">Pick a strategy and a few stocks on the left, then run a backtest. AlphaGlyph simulates it on real market history day by day — and tells you, honestly, whether the result is genuine skill or just luck.</p>
+            <h2 class="empty-title">Find out whether a strategy's edge is real.</h2>
+            <p class="empty-sub">AlphaGlyph simulates the strategy day by day on real market history, then tests whether the result is skill or luck.</p>
 
             <div class="empty-preview">
               <div class="empty-preview-card">
@@ -194,7 +175,7 @@
               </div>
             </div>
 
-            <div class="empty-hint">The form is pre-filled — just press <strong>Run Backtest</strong> to begin.</div>
+            <p class="empty-hint">The settings are pre-filled. Press <strong>Run backtest</strong> to start.</p>
           </div>
         </div>
 
@@ -219,8 +200,8 @@
         <!-- Strategy leaderboard -->
         <div id="compare-container" hidden>
           <div class="card">
-            <div class="section-header">Strategy Leaderboard <span id="cmp-meta" style="margin-left:auto;font-size:11px;color:var(--muted);font-weight:400;"></span></div>
-            <p style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:14px;">
+            <div class="section-header">Strategy leaderboard <span id="cmp-meta" class="text-muted" style="margin-left:auto;font-size:12px;font-weight:400;"></span></div>
+            <p class="card-desc">
               Every strategy run on the <em>same</em> tickers and period, ranked by net return. The same
               risk management, Kelly sizing and costs apply to each — an apples-to-apples comparison.
             </p>
@@ -230,13 +211,13 @@
                 <thead>
                   <tr>
                     <th>#</th><th>Strategy</th><th>Return</th><th>vs SPY</th>
-                    <th>Sharpe</th><th>Max DD</th><th>Calmar</th><th>Win %</th><th>Trades</th>
+                    <th>Sharpe</th><th>Max drawdown</th><th>Calmar</th><th>Win rate</th><th>Trades</th>
                   </tr>
                 </thead>
                 <tbody id="cmp-tbody"></tbody>
               </table>
             </div>
-            <p id="cmp-error" hidden style="color:var(--muted);font-size:12px;margin-top:10px;"></p>
+            <p id="cmp-error" class="fine" hidden></p>
           </div>
         </div>
 
@@ -245,43 +226,23 @@
 
           <!-- Walk-forward banner -->
           <div class="wf-banner" id="wf-banner" hidden>
-            <strong>WALK-FORWARD MODE</strong> — metrics cover only the out-of-sample test period
-            starting <span id="wf-split-date">—</span>. The prior 70% was used for indicator warm-up only.
+            <strong>Walk-forward.</strong> Metrics cover only the out-of-sample period starting
+            <span id="wf-split-date">—</span>; the first 70% was used for indicator warm-up.
           </div>
 
           <!-- Plain-language summary -->
           <div class="bt-summary" id="bt-summary" hidden></div>
 
           <!-- Summary hero stats -->
-          <div class="stats-grid" id="summary-stats" style="margin-bottom:20px;"></div>
-
-          <!-- Optional animated replay of the run -->
-          <div class="card" id="bt-playback" style="margin-bottom:20px;">
-            <div class="section-header" style="display:flex;align-items:center;gap:10px;">
-              Watch it trade
-              <select id="bt-replay-speed" style="width:auto;padding:5px 8px;margin-left:auto;">
-                <option value="slow">Slow</option>
-                <option value="normal" selected>Normal</option>
-                <option value="fast">Fast</option>
-              </select>
-              <button class="btn btn-sm btn-primary" id="bt-replay-btn">▶ Play</button>
-            </div>
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">
-              Replay the backtest day-by-day — the equity curve grows and each trade streams in with a plain-English reason.
-            </p>
-            <div class="chart-wrap" style="height:240px;"><canvas id="bt-replay-chart"></canvas></div>
-            <div class="scroll-box" id="bt-replay-feed" style="max-height:240px;margin-top:12px;">
-              <div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">Press Play to replay the run.</div>
-            </div>
-          </div>
+          <div class="stats-grid" id="summary-stats" style="margin-bottom:16px;"></div>
 
           <!-- Tab card -->
           <div class="card">
-            <div class="tab-list">
-              <button class="tab-btn active" data-tab="perf-tab">Performance</button>
-              <button class="tab-btn" data-tab="mc-tab">Monte Carlo</button>
-              <button class="tab-btn" data-tab="research-tab">Research</button>
-              <button class="tab-btn" data-tab="trades-tab">Trades</button>
+            <div class="tab-list" role="tablist">
+              <button type="button" class="tab-btn active" data-tab="perf-tab">Performance</button>
+              <button type="button" class="tab-btn" data-tab="mc-tab">Monte Carlo</button>
+              <button type="button" class="tab-btn" data-tab="research-tab">Validation</button>
+              <button type="button" class="tab-btn" data-tab="trades-tab">Trades</button>
             </div>
 
             <!-- Performance tab -->
@@ -289,7 +250,7 @@
               <div class="chart-wrap" style="height:320px;margin-bottom:20px;">
                 <canvas id="bt-chart"></canvas>
               </div>
-              <div class="stats-grid" id="secondary-stats" style="margin-bottom:20px;"></div>
+              <div class="stats-grid" id="secondary-stats" style="margin-bottom:24px;"></div>
               <div id="regime-breakdown"></div>
             </div>
 
@@ -319,7 +280,7 @@
                       <th>Action</th>
                       <th>Price</th>
                       <th>Shares</th>
-                      <th>P&amp;L $</th>
+                      <th>P&amp;L</th>
                       <th>P&amp;L %</th>
                       <th>Reason</th>
                       <th>Regime</th>
@@ -331,6 +292,27 @@
             </div>
 
           </div><!-- end tab card -->
+
+          <!-- Optional animated replay of the run -->
+          <div class="card" id="bt-playback">
+            <div class="section-header">
+              Watch it trade
+              <div class="card-actions">
+                <label class="sr-only" for="bt-replay-speed">Replay speed</label>
+                <select id="bt-replay-speed" style="width:auto;height:30px;">
+                  <option value="slow">Slow</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="fast">Fast</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-primary" id="bt-replay-btn">▶ Play</button>
+              </div>
+            </div>
+            <p class="card-desc">Replay the run day by day: the equity curve grows and each trade appears with a plain-English reason.</p>
+            <div class="chart-wrap replay-chart" style="height:240px;"><canvas id="bt-replay-chart"></canvas></div>
+            <div class="scroll-box" id="bt-replay-feed" style="max-height:260px;">
+              <div class="feed-empty">Press Play to replay the run.</div>
+            </div>
+          </div>
         </div><!-- end #results-container -->
 
       </div><!-- end .results-area -->
