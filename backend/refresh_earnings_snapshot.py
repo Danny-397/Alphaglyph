@@ -6,10 +6,15 @@ including Render's).
     python refresh_earnings_snapshot.py            # default universe
     python refresh_earnings_snapshot.py AAPL KO    # add or refresh specific names
 
-Run it from a connection Yahoo answers (a home connection always has; the
-weekly GitHub Action tries a runner). A ticker that fails keeps its previous
-rows, so a blocked run can never empty the snapshot -- it only fails to update
-it. The script exits non-zero if no ticker at all refreshed.
+Run it from a connection Yahoo answers -- a home connection, then commit the
+result. Yahoo refuses datacenter IPs, Render's and GitHub Actions runners
+alike (a scheduled workflow was tried and refused on every ticker), so this
+can't be automated from the cloud. Refresh after each earnings season; the
+PEAD study is historical and ages slowly, the Predictor's latest-report
+signal is what goes stale.
+
+A ticker that fails keeps its previous rows, so a blocked run can never empty
+the snapshot. The script exits non-zero if no ticker at all refreshed.
 """
 
 from __future__ import annotations
@@ -58,8 +63,8 @@ def main(extra: list[str]) -> int:
         print(f'No ticker refreshed (failed: {", ".join(failed)}); snapshot left unchanged.')
         return 1
     if tickers == (snap.get('tickers') or {}):
-        # Only the timestamp would change; skip the write so the weekly job
-        # doesn't commit (and redeploy) when no earnings data moved.
+        # Only the timestamp would change; skip the write so an unchanged
+        # refresh doesn't produce a commit (and a redeploy).
         print(f'Refreshed {len(refreshed)}, no earnings data changed; snapshot left as is.')
         return 0
 

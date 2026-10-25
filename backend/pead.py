@@ -31,6 +31,7 @@ Honest limitations, surfaced in the payload and UI:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 import numpy as np
@@ -51,6 +52,13 @@ _MIN_EVENTS = 12        # below this the study isn't worth reporting
 _CACHE: dict = {}
 _CACHE_TTL = 12 * 3600
 
+# One computation at a time. These runs fetch years of history for a dozen-plus
+# tickers and take minutes on the free Render instance; without a lock, every
+# request that arrived while the cache was cold started its own run, which
+# multiplied CPU and memory and starved the server (even /health stalled).
+# Late arrivals now wait for the first run and then read its cached result.
+_LOCK = threading.Lock()
+
 
 def _event_paths(price: pd.DataFrame, mkt_ret: pd.Series,
                  events: list[tuple[pd.Timestamp, float]], window: int):
@@ -69,6 +77,12 @@ def _event_paths(price: pd.DataFrame, mkt_ret: pd.Series,
 
 
 def compute_pead(tickers=None, window: int = _WINDOW) -> dict:
+    """Serialised entry point; see _compute_pead and _LOCK."""
+    with _LOCK:
+        return _compute_pead(tickers, window)
+
+
+def _compute_pead(tickers=None, window: int = _WINDOW) -> dict:
     """Pooled PEAD event study across the basket. Never raises."""
     tickers = tickers or DEFAULT_UNIVERSE
     tickers = [t.upper().strip() for t in tickers][:25]

@@ -34,6 +34,7 @@ over-confident one.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 import numpy as np
@@ -52,6 +53,13 @@ DEFAULT_UNIVERSE = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'JPM', 'JNJ',
 
 _CACHE: dict = {}
 _CACHE_TTL = 12 * 3600   # 12h — moves only as new daily bars arrive
+
+# One computation at a time. These runs fetch years of history for a dozen-plus
+# tickers and take minutes on the free Render instance; without a lock, every
+# request that arrived while the cache was cold started its own run, which
+# multiplied CPU and memory and starved the server (even /health stalled).
+# Late arrivals now wait for the first run and then read its cached result.
+_LOCK = threading.Lock()
 
 
 def _oos_cutoff(meta: dict) -> pd.Timestamp | None:
@@ -109,6 +117,13 @@ def _collect(tickers, horizon, cutoff):
 
 def compute_calibration(tickers=None, n_bins: int = 10, oos_only: bool = True,
                         bin_mode: str = 'quantile') -> dict:
+    """Serialised entry point; see _compute_calibration and _LOCK."""
+    with _LOCK:
+        return _compute_calibration(tickers, n_bins, oos_only, bin_mode)
+
+
+def _compute_calibration(tickers=None, n_bins: int = 10, oos_only: bool = True,
+                         bin_mode: str = 'quantile') -> dict:
     """
     Reliability diagram + scores for the ML price forecaster. Never raises.
 
