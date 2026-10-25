@@ -183,6 +183,46 @@ def _start_keepalive():
 
 _start_keepalive()
 
+
+def _start_cache_warmup():
+    """
+    Precompute the two slow research results in the background after boot.
+
+    The track record (calibration) and the PEAD study each fetch years of
+    history for a dozen-plus tickers. Locally that is ~15s; on Render's free
+    instance the first run after a restart took several minutes, all of it
+    spent by whichever visitor clicked first. Both cache their result for 12h,
+    so computing them once at boot -- one after the other, to keep peak memory
+    low -- and again before the cache lapses means visitors get the cached
+    answer. Production only (same RENDER_EXTERNAL_URL gate as the keepalive);
+    set WARM_CACHES=0 to disable.
+    """
+    import threading
+    import time
+
+    if not (os.getenv('RENDER_EXTERNAL_URL') or os.getenv('RENDER_EXTERNAL_HOSTNAME')):
+        return
+    if os.getenv('WARM_CACHES', '1').strip().lower() in ('0', 'false', 'no'):
+        return
+
+    def loop():
+        time.sleep(30)  # let gunicorn finish booting and pass its health check
+        while True:
+            for name, fn in (('calibration', calib.compute_calibration),
+                             ('pead', pead_study.compute_pead)):
+                started = time.time()
+                try:
+                    fn()
+                    logger.info('cache warm-up: %s ready in %.0fs', name, time.time() - started)
+                except Exception as exc:
+                    logger.warning('cache warm-up: %s failed: %s', name, exc)
+            time.sleep(11 * 3600)  # refresh just before the 12h caches expire
+
+    threading.Thread(target=loop, daemon=True, name='cache-warmup').start()
+
+
+_start_cache_warmup()
+
 VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive', 'custom')
 
 # Whitelist for user-built custom strategies (no eval — only these are allowed).
