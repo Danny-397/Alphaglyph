@@ -83,11 +83,13 @@ def compute_pead(tickers=None, window: int = _WINDOW) -> dict:
         return {'available': False, 'reason': 'benchmark (SPY) unavailable'}
     mkt_ret = spy['Close'].pct_change()
 
-    all_paths, used = [], []
+    all_paths, used, snapshot_dates = [], [], set()
     for t in tickers:
         frame = earn._fetch_earnings_frame(t)
         if frame is None:
             continue
+        if frame.attrs.get('snapshot_date'):
+            snapshot_dates.add(frame.attrs['snapshot_date'])
         reported = frame[frame['eps_actual'].notna() & frame['surprise_pct'].notna()]
         if reported.empty:
             continue
@@ -170,6 +172,8 @@ def compute_pead(tickers=None, window: int = _WINDOW) -> dict:
             'only a few hundred free-data events, treat this as a demonstration of '
             'the method — the drift is real in the literature but the sample here is '
             'small, the timing coarse, and the basket survivorship-biased.'
+            + (f' Earnings dates come from a saved snapshot ({max(snapshot_dates)}) '
+               'because the live feed was unavailable.' if snapshot_dates else '')
         ),
     }
     _CACHE[cache_key] = (time.time(), result)

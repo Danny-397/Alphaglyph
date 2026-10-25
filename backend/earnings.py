@@ -25,8 +25,10 @@ Honest limitations, surfaced to the caller and the UI:
 
 from __future__ import annotations
 
+import json
 import logging
 import math
+import os
 import time
 
 import numpy as np
@@ -46,6 +48,10 @@ _EVENT_RISK_DAYS = 7
 _CACHE: dict = {}
 _CACHE_TTL = 6 * 3600  # 6 hours
 
+# Committed fallback for when Yahoo blocks the live call (see _fetch_earnings_frame).
+SNAPSHOT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'earnings_snapshot.json')
+_SNAPSHOT: dict | None = None
+
 
 def _find_col(cols, *needles):
     """Locate a column by case-insensitive substring (yfinance renames over versions)."""
@@ -56,13 +62,56 @@ def _find_col(cols, *needles):
     return None
 
 
+def _load_snapshot() -> dict:
+    """The committed earnings snapshot ({} if missing or unreadable). Read once."""
+    global _SNAPSHOT
+    if _SNAPSHOT is None:
+        try:
+            with open(SNAPSHOT_PATH, encoding='utf-8') as fh:
+                _SNAPSHOT = json.load(fh)
+        except (OSError, ValueError) as exc:
+            logger.warning('earnings: snapshot unavailable: %s', exc)
+            _SNAPSHOT = {}
+    return _SNAPSHOT
+
+
+def _snapshot_frame(ticker: str) -> pd.DataFrame | None:
+    """The snapshot's rows for one ticker, in the same shape as the live frame."""
+    rows = (_load_snapshot().get('tickers') or {}).get(ticker)
+    if not rows:
+        return None
+    df = pd.DataFrame(rows)
+    df.index = pd.to_datetime(df.pop('date'))
+    for col in ('eps_est', 'eps_actual', 'surprise_pct'):
+        df[col] = pd.to_numeric(df[col], errors='coerce') if col in df else np.nan
+    return df[['eps_est', 'eps_actual', 'surprise_pct']].sort_index(ascending=False)
+
+
 def _fetch_earnings_frame(ticker: str) -> pd.DataFrame | None:
     """
-    Raw earnings-date table from yfinance, tz-naive and sorted newest-first.
+    Earnings-date table, tz-naive and sorted newest-first.
 
     Columns are normalised to: eps_est, eps_actual, surprise_pct (any may be NaN;
     future rows have NaN eps_actual). Returns None when unavailable.
+
+    Live yfinance first. Yahoo routinely refuses this endpoint from datacenter
+    IPs, including Render's, which left the PEAD study at 0 events and the
+    Predictor without its earnings channel in production while both worked
+    from a home connection. When the live call comes back empty, fall back to
+    earnings_snapshot.json, refreshed by refresh_earnings_snapshot.py.
     """
+    frame = _fetch_live_frame(ticker)
+    if frame is not None:
+        return frame
+    snap = _snapshot_frame(ticker)
+    if snap is not None:
+        logger.info('earnings: using snapshot for %s', ticker)
+        snap.attrs['snapshot_date'] = str(_load_snapshot().get('captured_at', ''))[:10]
+    return snap
+
+
+def _fetch_live_frame(ticker: str) -> pd.DataFrame | None:
+    """Raw earnings-date table from yfinance, normalised. None when unavailable."""
     try:
         raw = yf.Ticker(ticker).get_earnings_dates(limit=16)
     except Exception as exc:
@@ -116,6 +165,7 @@ def earnings_signal(ticker: str) -> dict:
         _CACHE[ticker] = (time.time(), result)
         return result
 
+    snapshot_date = frame.attrs.get('snapshot_date')
     now = pd.Timestamp.now().normalize()
     reported = frame[frame['eps_actual'].notna()]
     future   = frame[(frame['eps_actual'].isna()) & (frame.index > now)]
@@ -197,6 +247,10 @@ def earnings_signal(ticker: str) -> dict:
     if eps_yoy is not None:
         factors.append(f"Reported EPS is {'up' if eps_yoy >= 0 else 'down'} "
                        f"{abs(eps_yoy):.0f}% year-over-year.")
+
+    if snapshot_date:
+        factors.append(f"Earnings history from a saved snapshot ({snapshot_date}); "
+                       "the live earnings feed was unavailable.")
 
     if event_risk:
         factors.append(f"⚠ Next report in {next_days}d — a binary event; "

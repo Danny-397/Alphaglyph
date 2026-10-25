@@ -1,0 +1,55 @@
+name: Refresh earnings snapshot
+
+# backend/earnings_snapshot.json is what production serves when Yahoo refuses
+# the live earnings-dates call from Render. Refresh it weekly so the Predictor's
+# earnings channel and the PEAD study pick up new quarterly reports.
+#
+# Yahoo may refuse GitHub's runners too. The script never empties the file --
+# a ticker that fails keeps its previous rows -- and if nothing refreshes this
+# job logs a warning instead of failing every week. Running
+#   cd backend && python refresh_earnings_snapshot.py
+# from a home connection and committing the result always works.
+
+on:
+  schedule:
+    - cron: '0 13 * * 1'   # Mondays 13:00 UTC, after the weekend
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Refresh snapshot
+        run: |
+          if ! python refresh_earnings_snapshot.py; then
+            echo "::warning::Yahoo refused every ticker from this runner; snapshot left unchanged."
+          fi
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- earnings_snapshot.json; then
+            echo "No change."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add earnings_snapshot.json
+          git commit -m "Refresh earnings snapshot"
+          git push
