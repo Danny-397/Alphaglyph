@@ -57,6 +57,11 @@ def main(extra: list[str]) -> int:
     if not refreshed:
         print(f'No ticker refreshed (failed: {", ".join(failed)}); snapshot left unchanged.')
         return 1
+    if tickers == (snap.get('tickers') or {}):
+        # Only the timestamp would change; skip the write so the weekly job
+        # doesn't commit (and redeploy) when no earnings data moved.
+        print(f'Refreshed {len(refreshed)}, no earnings data changed; snapshot left as is.')
+        return 0
 
     out = {
         'captured_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%MZ'),
