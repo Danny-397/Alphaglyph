@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 15 REST endpoints, 186 automated tests in CI
+- 15 REST endpoints, 192 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -310,7 +310,7 @@ measurement does not get to hide its own null results.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 186 tests
+pytest                     # 192 tests
 python app.py              # http://localhost:5000
 ```
 
