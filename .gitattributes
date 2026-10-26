@@ -1,0 +1,2 @@
+# The PBO snapshot records a SHA-256 of this data; keep its bytes identical on every OS.
+docs/data/*.csv text eol=lf

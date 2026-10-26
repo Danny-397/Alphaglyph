@@ -103,6 +103,14 @@ single PBO as fixed is the exact error the metric exists to catch — see
 [docs/technical-report.md](docs/technical-report.md) for both runs and why the drift
 matters.
 
+**Reproducible.** The table is pinned to a committed snapshot: SPY closes for
+2021-08-02 → 2026-07-31 in
+[`docs/data/`](docs/data/SPY_close_2021-08-02_2026-07-31.csv). Running
+`python tools/pbo_snapshot.py` recomputes every figure above from that file, using the
+same code as the live research page, and writes
+[`pbo_snapshot.json`](docs/data/pbo_snapshot.json) with the data's SHA-256. The live
+page still uses a rolling window, so its number will differ.
+
 *Takeaway: on a broad-market index, hyperparameter search is essentially picking
 noise. The tool says so out loud — reproduce via `POST /api/research/cpcv`.*
 

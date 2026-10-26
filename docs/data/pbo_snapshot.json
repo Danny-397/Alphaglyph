@@ -1,0 +1,26 @@
+{
+  "ticker": "SPY",
+  "window": {
+    "start": "2021-08-02",
+    "end": "2026-07-31",
+    "rows": 1255
+  },
+  "data": {
+    "file": "docs/data/SPY_close_2021-08-02_2026-07-31.csv",
+    "sha256": "247df68d05905c56314e0aabed4ec1da3fd3a79d284411c177660bd4309688df"
+  },
+  "settings": {
+    "n_strategies": 42,
+    "n_groups": 10,
+    "n_splits": 252,
+    "rows_after_warmup": 1050,
+    "embargo": 5
+  },
+  "pbo": 0.7222,
+  "median_is_sharpe": 1.257,
+  "median_oos_sharpe": 0.649,
+  "sharpe_retention": 0.5163,
+  "degradation_slope": -0.5936,
+  "prob_oos_loss": 0.0516,
+  "generated_by": "python tools/pbo_snapshot.py"
+}

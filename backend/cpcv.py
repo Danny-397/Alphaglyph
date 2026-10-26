@@ -138,7 +138,22 @@ def compute_cpcv(ticker: str, n_groups: int = 10, embargo: int = 5,
         return {'available': False,
                 'reason': f'Need ≥ {_MIN_ROWS} trading days of history for {ticker}.'}
 
-    M, names = _strategy_matrix(df['Close'])
+    result = cpcv_from_prices(df['Close'], ticker, n_groups=n_groups, embargo=embargo)
+    if result.get('available'):
+        _CACHE[key] = (time.time(), result)
+    return result
+
+
+def cpcv_from_prices(close: pd.Series, ticker: str, n_groups: int = 10,
+                     embargo: int = 5) -> dict:
+    """The CSCV computation on a close series that has already been fetched.
+
+    Split out of compute_cpcv so a committed price snapshot can be re-run offline
+    (tools/pbo_snapshot.py). The live endpoint fetches a rolling window, and a
+    rolling window cannot reproduce a dated figure: PBO on SPY moved from 63% to
+    72% between two runs of identical code.
+    """
+    M, names = _strategy_matrix(close)
     # Drop the indicator warm-up rows (leading zeros from the longest window).
     warm = 205
     M = M[warm:]
@@ -247,7 +262,6 @@ def compute_cpcv(ticker: str, n_groups: int = 10, embargo: int = 5,
                                    prob_oos_loss),
         'generated_at':   pd.Timestamp.now(tz='UTC').tz_localize(None).isoformat(),
     }
-    _CACHE[key] = (time.time(), result)
     return result
 
 

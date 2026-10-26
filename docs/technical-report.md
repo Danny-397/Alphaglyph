@@ -231,6 +231,13 @@ GET matures any elapsed rows, so the record stays current without a cron job.
 **CPCV on SPY — 42 variants, 10 groups, 252 splits, 1,050 rows after warm-up,
 embargo 5. Run 2026-08-01:**
 
+*Reproducible from committed data:* the window this run used (SPY closes,
+2021-08-02 → 2026-07-31) is committed at
+`docs/data/SPY_close_2021-08-02_2026-07-31.csv`, and `python tools/pbo_snapshot.py`
+recomputes every figure in this table from it, through the same `cpcv_from_prices` the
+live endpoint calls. Re-downloading the same dates would not be the same data: Yahoo
+revises adjusted closes as later dividends are paid.
+
 | Metric | Value | Reading |
 |---|---|---|
 | Probability of backtest overfitting | **72%** | selection is worse than a coin flip |
