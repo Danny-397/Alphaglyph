@@ -541,6 +541,50 @@ function initBacktest() {
 
   el('run-btn').addEventListener('click', runBacktest)
 
+  // ── Quick-start presets ────────────────────────────────────────────────────
+  // A first-time visitor shouldn't have to know what a strategy, ticker list
+  // and date range should look like. Each preset sets all three (and resets
+  // the advanced toggles) and runs straight away; every field stays editable.
+  const BT_PRESETS = {
+    dip:      { strategy: 'dip_buyer',    tickers: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META'], years: 3, cash_in_market: true },
+    trend:    { strategy: 'ma_crossover', tickers: ['SPY', 'QQQ'],                                 years: 5 },
+    oversold: { strategy: 'rsi',          tickers: ['KO', 'PG', 'JNJ', 'PEP', 'WMT'],               years: 5 },
+    chips:    { strategy: 'macd',         tickers: ['NVDA', 'AMD', 'AVGO', 'QCOM'],                 years: 3 },
+    regime:   { strategy: 'adaptive',     tickers: ['SPY', 'QQQ', 'IWM'],                           years: 5 },
+  }
+
+  function applyPreset(key) {
+    const p = BT_PRESETS[key]
+    if (!p) return
+    el('bt-strategy').value = p.strategy
+    applyBtStrategyHints()
+    el('bt-start').value = daysAgo(Math.round(p.years * 365.25))
+    el('bt-end').value = today()
+    btTickers = [...p.tickers]
+    renderTickerChips()
+    hideTickerErr()
+    el('bt-risk-btns').querySelectorAll('.risk-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.risk === 'moderate'))
+    el('bt-walkforward').checked   = false
+    el('bt-markowitz').checked     = false
+    el('bt-range-sizing').checked  = false
+    el('bt-cash-in-market').checked = !!p.cash_in_market
+    el('bt-presets').querySelectorAll('.preset-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.preset === key))
+    runBacktest()
+    // On a phone the form sits above the results; bring the result into view.
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      el('loading-state').scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+  el('bt-presets').querySelectorAll('.preset-btn').forEach(b =>
+    b.addEventListener('click', () => applyPreset(b.dataset.preset)))
+  // Editing the form by hand means the preset no longer describes it.
+  ;['bt-strategy', 'bt-start', 'bt-end'].forEach(id =>
+    el(id).addEventListener('input', () =>
+      el('bt-presets').querySelectorAll('.preset-btn.active').forEach(b => b.classList.remove('active'))))
+
   // ── Strategy leaderboard (compare all strategies) ──────────────────────────
   const CMP_COLORS = {
     adaptive: '#3fb950', ma_crossover: '#58a6ff', rsi: '#d2a8ff',
