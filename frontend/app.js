@@ -776,7 +776,7 @@ function initBacktest() {
       wfb.hidden = true
     }
 
-    renderSummary(m)
+    renderSummary(m, data)
 
     el('summary-stats').innerHTML = [
       statCard('Total Return', fmtPct(m.total_return), clr(m.total_return)),
@@ -793,37 +793,68 @@ function initBacktest() {
     renderTradesTable(data.trades || [])
   }
 
-  // Turn the raw backtest metrics into one human-readable paragraph + a verdict
-  // a non-expert can act on. Directly answers "why did it (under/over)perform?"
-  function renderSummary(m) {
+  // Turn the raw backtest metrics into a one-line verdict plus one short
+  // paragraph a non-expert can act on. The verdict answers the two questions
+  // people actually have: did it beat just buying the index, and is that real?
+  function maxDrawdownPct(curve) {
+    let peak = -Infinity, worst = 0
+    for (const p of curve || []) {
+      peak = Math.max(peak, p.value)
+      if (peak > 0) worst = Math.max(worst, (peak - p.value) / peak * 100)
+    }
+    return worst
+  }
+
+  function verdictFor(m, data) {
+    const ret = m.total_return, bench = m.benchmark_return
+    const real = !!(data.skill_test?.is_significant || data.deflated_sharpe?.is_significant)
+    if (ret == null) return null
+    if (ret <= 0) return { tone: 'red', title: 'Lost money over this period' }
+    if (bench == null) return { tone: 'neutral', title: 'Made money. Check the Validation tab to see if it is luck.' }
+    if (ret > bench && real) return { tone: 'green', title: 'Beat the market, and the edge looks real' }
+    if (ret > bench) return { tone: 'yellow', title: 'Beat the market, but it may be luck' }
+    return { tone: 'yellow', title: 'Made money, but less than buying the index' }
+  }
+
+  function renderSummary(m, data = {}) {
     const box = el('bt-summary')
     if (!box) return
     if (m.total_return == null) { box.hidden = true; return }
 
     const ret = m.total_return, bench = m.benchmark_return, dd = m.max_drawdown
     const wr = m.win_rate, n = m.total_trades, fv = m.final_value, cap = m.initial_capital
+    const spyDD = data.spy_curve?.length ? maxDrawdownPct(data.spy_curve) : null
+    const exposure = data.skill_test?.exposure_pct
     const verb = ret >= 0 ? 'grew' : 'shrank'
 
-    let s = `Starting from ${fmt$(cap)}, the strategy ${verb} to <strong>${fmt$(fv)}</strong> — a <strong>${fmtPct(ret)}</strong> return`
-    if (bench != null) s += `, versus <strong>${fmtPct(bench)}</strong> for simply buying and holding the market (SPY)`
+    let s = `${fmt$(cap)} ${verb} to <strong>${fmt$(fv)}</strong> (<strong>${fmtPct(ret)}</strong>)`
+    if (bench != null) s += `, versus <strong>${fmtPct(bench)}</strong> for buying and holding SPY`
     s += '. '
     if (n != null) {
       s += `It made <strong>${n}</strong> trade${n === 1 ? '' : 's'}`
-      if (wr != null) s += ` with a <strong>${fmtN(wr, 0)}% win rate</strong>`
-      if (dd != null) s += `, and its deepest peak-to-low dip was just <strong>${fmtN(dd, 1)}%</strong>`
+      if (wr != null) s += ` and won <strong>${fmtN(wr, 0)}%</strong> of them`
+      s += '. '
+    }
+    if (dd != null) {
+      s += `Its worst drop was <strong>${fmtN(dd, 1)}%</strong>`
+      if (spyDD != null) s += ` (SPY's was ${fmtN(spyDD, 1)}%)`
       s += '.'
     }
 
     let take = ''
-    if (bench != null && ret > bench) {
-      take = `It beat buy-and-hold over this period${dd != null ? `, with the worst drop held to ${fmtN(dd, 1)}%` : ''} — outperforming with controlled risk.`
-    } else if (bench != null) {
-      take = `It trailed buy-and-hold here, but ${dd != null ? `with a far smaller drawdown (${fmtN(dd, 1)}%)` : 'with less risk'}. Defensive strategies like this give up upside in strong bull markets and protect capital when markets fall — judge them over a full cycle, not a single year.`
-    } else if (ret >= 0) {
-      take = 'A positive result — open the Research tab to check whether it is statistically real or just luck.'
+    if (exposure != null && exposure < 60 && bench != null && ret < bench) {
+      take = `It was invested only ${fmtN(exposure, 0)}% of the time, which is the main reason it trailed a market that rose ${fmtPct(bench)}.`
+    } else if (bench != null && ret < bench && dd != null && spyDD != null && dd < spyDD) {
+      take = 'It gave up some upside for a smaller worst drop. Strategies like this are best judged over a full market cycle.'
+    } else if (bench != null && ret > bench && !(data.skill_test?.is_significant || data.deflated_sharpe?.is_significant)) {
+      take = 'The Validation tab shows how often random trading would have done as well.'
     }
 
-    box.innerHTML = s + (take ? `<span class="summary-take">${take}</span>` : '')
+    const v = verdictFor(m, data)
+    box.innerHTML =
+      (v ? `<div class="verdict-line verdict-${v.tone}"><span class="verdict-dot" aria-hidden="true"></span>${v.title}</div>` : '') +
+      `<p class="summary-body">${s}</p>` +
+      (take ? `<span class="summary-take">${take}</span>` : '')
     box.hidden = false
   }
 

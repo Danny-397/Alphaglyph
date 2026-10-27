@@ -720,6 +720,17 @@ input[type="range"] { width: 100%; accent-color: var(--green); height: 36px; cur
   color: var(--muted);
 }
 .bt-summary strong { color: var(--text); font-weight: 600; }
+.bt-summary .summary-body { margin: 0; }
+.verdict-line {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: var(--s3);
+  color: var(--text);
+  font-size: 19px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3;
+}
+.verdict-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.verdict-green  .verdict-dot { background: var(--green); }
+.verdict-yellow .verdict-dot { background: var(--yellow); }
+.verdict-red    .verdict-dot { background: var(--red); }
 .bt-summary .summary-take {
   display: block; margin-top: var(--s3); padding-top: var(--s3);
   border-top: 1px solid var(--border);
