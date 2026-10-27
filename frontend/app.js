@@ -321,7 +321,16 @@ function makeRuleBuilder(container) {
     }).filter(c => c.left && c.op && (typeof c.right === 'string' || !isNaN(c.right)))
     return { logic, conditions }
   }
-  return { getRules: () => ({ buy: group('buy'), sell: group('sell') }) }
+  function setRules(rules) {
+    for (const side of ['buy', 'sell']) {
+      const g = rules?.[side]
+      if (!g || !Array.isArray(g.conditions)) continue
+      container.querySelector(`.rb-logic[data-side="${side}"]`).value = g.logic === 'any' ? 'any' : 'all'
+      container.querySelector(`.rb-rows[data-side="${side}"]`).innerHTML = ''
+      g.conditions.forEach(c => addRow(side, c))
+    }
+  }
+  return { getRules: () => ({ buy: group('buy'), sell: group('sell') }), setRules }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -580,6 +589,76 @@ function initBacktest() {
 
   el('bt-presets').querySelectorAll('.preset-btn').forEach(b =>
     b.addEventListener('click', () => applyPreset(b.dataset.preset)))
+  // ── Shareable links ────────────────────────────────────────────────────────
+  // Every run writes its settings into the address bar, so the URL always
+  // reproduces what is on screen; "Copy link" hands that URL to someone else,
+  // and opening it fills the form and runs the same backtest.
+  const OPT_FLAGS = { wf: 'bt-walkforward', mz: 'bt-markowitz', rs: 'bt-range-sizing', cim: 'bt-cash-in-market' }
+  const b64url = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const unb64url = s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))))
+
+  function settingsToQuery() {
+    const q = new URLSearchParams()
+    q.set('s', el('bt-strategy').value)
+    q.set('t', btTickers.join(','))
+    q.set('from', el('bt-start').value)
+    q.set('to', el('bt-end').value)
+    q.set('cap', el('bt-capital').value)
+    q.set('risk', el('bt-risk-btns').querySelector('.risk-btn.active')?.dataset.risk || 'moderate')
+    const opts = Object.keys(OPT_FLAGS).filter(k => el(OPT_FLAGS[k]).checked)
+    if (opts.length) q.set('opt', opts.join(','))
+    q.set('cost', `${el('bt-commission').value},${el('bt-slippage').value}`)
+    if (el('bt-strategy').value === 'custom' && btRules) q.set('rules', b64url(JSON.stringify(btRules.getRules())))
+    return q.toString()
+  }
+
+  function settingsFromQuery(search) {
+    const q = new URLSearchParams(search)
+    const tickers = (q.get('t') || '').toUpperCase().split(',')
+      .map(x => x.trim()).filter(x => /^[A-Z0-9.^-]{1,10}$/.test(x)).slice(0, 20)
+    if (!tickers.length) return false
+    const strat = q.get('s')
+    const opt = [...el('bt-strategy').options].find(o => o.value === strat && !o.disabled)
+    if (opt) { el('bt-strategy').value = strat; applyBtStrategyHints() }
+    const date = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null
+    if (date(q.get('from'))) el('bt-start').value = q.get('from')
+    if (date(q.get('to')))   el('bt-end').value = q.get('to')
+    const cap = parseFloat(q.get('cap'))
+    if (cap >= 1000 && cap <= 1e7) el('bt-capital').value = cap
+    const risk = q.get('risk')
+    el('bt-risk-btns').querySelectorAll('.risk-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.risk === (['conservative', 'moderate', 'aggressive'].includes(risk) ? risk : 'moderate')))
+    const opts = (q.get('opt') || '').split(',')
+    Object.entries(OPT_FLAGS).forEach(([k, id]) => { el(id).checked = opts.includes(k) })
+    const [com, slip] = (q.get('cost') || '').split(',').map(parseFloat)
+    if (com >= 0 && com <= 5) el('bt-commission').value = com
+    if (slip >= 0 && slip <= 5) el('bt-slippage').value = slip
+    if (strat === 'custom' && q.get('rules') && btRules) {
+      try { btRules.setRules(JSON.parse(unb64url(q.get('rules')))) } catch { /* keep the default rules */ }
+    }
+    btTickers = tickers
+    renderTickerChips()
+    return true
+  }
+
+  function rememberRunInUrl() {
+    history.replaceState(null, '', `${location.pathname}?${settingsToQuery()}`)
+  }
+
+  const shareBtn = el('bt-share-btn')
+  if (shareBtn) shareBtn.addEventListener('click', async () => {
+    const url = `${location.origin}${location.pathname}?${settingsToQuery()}`
+    try {
+      await navigator.clipboard.writeText(url)
+      shareBtn.textContent = 'Link copied'
+    } catch {
+      window.prompt('Copy this link:', url)
+    }
+    setTimeout(() => { shareBtn.textContent = 'Copy link' }, 1800)
+  })
+
+  if (location.search && settingsFromQuery(location.search)) setTimeout(runBacktest, 0)
+
   // Editing the form by hand means the preset no longer describes it.
   ;['bt-strategy', 'bt-start', 'bt-end'].forEach(id =>
     el(id).addEventListener('input', () =>
@@ -761,6 +840,7 @@ function initBacktest() {
     renderResults(data)
     el('results-container').hidden = false
     initTabs(el('results-container'))
+    rememberRunInUrl()
   }
 
   function renderResults(data) {

@@ -721,6 +721,7 @@ input[type="range"] { width: 100%; accent-color: var(--green); height: 36px; cur
 }
 .bt-summary strong { color: var(--text); font-weight: 600; }
 .bt-summary .summary-body { margin: 0; }
+.results-actions { display: flex; justify-content: flex-end; margin-bottom: var(--s3); }
 .verdict-line {
   display: flex; align-items: center; gap: 10px;
   margin-bottom: var(--s3);
