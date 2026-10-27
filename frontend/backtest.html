@@ -44,6 +44,33 @@
       <aside class="form-panel">
         <h2>Configure backtest</h2>
 
+        <!-- Quick start: one click fills the form and runs it (BT_PRESETS in app.js) -->
+        <div class="form-group">
+          <span class="form-label" id="bt-presets-label">Quick start</span>
+          <div class="preset-list" id="bt-presets" role="group" aria-labelledby="bt-presets-label">
+            <button type="button" class="preset-btn" data-preset="dip">
+              <span class="preset-title">Buy the dip in Big Tech</span>
+              <span class="preset-desc">Dip Buyer on six mega-caps, 3 years</span>
+            </button>
+            <button type="button" class="preset-btn" data-preset="trend">
+              <span class="preset-title">Ride the trend</span>
+              <span class="preset-desc">SMA 20/50 crossover on SPY and QQQ, 5 years</span>
+            </button>
+            <button type="button" class="preset-btn" data-preset="oversold">
+              <span class="preset-title">Buy oversold blue chips</span>
+              <span class="preset-desc">RSI mean reversion on five steady names, 5 years</span>
+            </button>
+            <button type="button" class="preset-btn" data-preset="chips">
+              <span class="preset-title">Chip momentum</span>
+              <span class="preset-desc">MACD on four semiconductor stocks, 3 years</span>
+            </button>
+            <button type="button" class="preset-btn" data-preset="regime">
+              <span class="preset-title">Follow the market regime</span>
+              <span class="preset-desc">Adaptive strategy on three index ETFs, 5 years</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Strategy -->
         <div class="form-group">
           <label class="form-label" for="bt-strategy">Strategy</label>
@@ -234,6 +261,9 @@
           </div>
 
           <!-- Plain-language summary -->
+          <div class="results-actions">
+            <button type="button" class="btn btn-sm" id="bt-share-btn">Copy link</button>
+          </div>
           <div class="bt-summary" id="bt-summary" hidden></div>
 
           <!-- Summary hero stats -->

@@ -40,6 +40,9 @@ RISK_PROFILES = {
 # Default profile (backward compatible)
 _DEFAULT = RISK_PROFILES['moderate']
 
+# Smallest Kelly-sized position, as a share of the profile's max_position_pct.
+KELLY_FLOOR_FRAC = 0.25
+
 # Legacy module-level constants (kept for backward compatibility)
 STOP_LOSS_PCT    = _DEFAULT['stop_loss_pct']
 TAKE_PROFIT_PCT  = _DEFAULT['take_profit_pct']
@@ -112,8 +115,13 @@ def calculate_position_size_kelly(portfolio_value: float, price: float, cash: fl
         return calculate_position_size(portfolio_value, price, cash, profile)
 
     p = profile or _DEFAULT
-    # Kelly fraction as % of portfolio, capped at the profile's hard limit
-    effective_pct = min(kelly_fraction, p['max_position_pct'])
+    # Kelly fraction as % of portfolio, between a floor and the profile's hard
+    # limit. Without the floor a small positive edge (half-Kelly of 0.3% is
+    # common) buys less than one share, the strategy stops trading, and since
+    # no new trades close, the Kelly estimate can never recover: a 2021-2026
+    # SMA-crossover backtest on SPY/QQQ went flat in May 2024 for that reason.
+    floor = p['max_position_pct'] * KELLY_FLOOR_FRAC
+    effective_pct = min(max(kelly_fraction, floor), p['max_position_pct'])
     max_spend     = portfolio_value * effective_pct
     usable_cash   = cash - (portfolio_value * p['min_cash_reserve'])
 

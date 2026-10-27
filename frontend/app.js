@@ -321,7 +321,16 @@ function makeRuleBuilder(container) {
     }).filter(c => c.left && c.op && (typeof c.right === 'string' || !isNaN(c.right)))
     return { logic, conditions }
   }
-  return { getRules: () => ({ buy: group('buy'), sell: group('sell') }) }
+  function setRules(rules) {
+    for (const side of ['buy', 'sell']) {
+      const g = rules?.[side]
+      if (!g || !Array.isArray(g.conditions)) continue
+      container.querySelector(`.rb-logic[data-side="${side}"]`).value = g.logic === 'any' ? 'any' : 'all'
+      container.querySelector(`.rb-rows[data-side="${side}"]`).innerHTML = ''
+      g.conditions.forEach(c => addRow(side, c))
+    }
+  }
+  return { getRules: () => ({ buy: group('buy'), sell: group('sell') }), setRules }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -541,6 +550,120 @@ function initBacktest() {
 
   el('run-btn').addEventListener('click', runBacktest)
 
+  // ── Quick-start presets ────────────────────────────────────────────────────
+  // A first-time visitor shouldn't have to know what a strategy, ticker list
+  // and date range should look like. Each preset sets all three (and resets
+  // the advanced toggles) and runs straight away; every field stays editable.
+  const BT_PRESETS = {
+    dip:      { strategy: 'dip_buyer',    tickers: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META'], years: 3, cash_in_market: true },
+    trend:    { strategy: 'ma_crossover', tickers: ['SPY', 'QQQ'],                                 years: 5 },
+    oversold: { strategy: 'rsi',          tickers: ['KO', 'PG', 'JNJ', 'PEP', 'WMT'],               years: 5 },
+    chips:    { strategy: 'macd',         tickers: ['NVDA', 'AMD', 'AVGO', 'QCOM'],                 years: 3 },
+    regime:   { strategy: 'adaptive',     tickers: ['SPY', 'QQQ', 'IWM'],                           years: 5 },
+  }
+
+  function applyPreset(key) {
+    const p = BT_PRESETS[key]
+    if (!p) return
+    el('bt-strategy').value = p.strategy
+    applyBtStrategyHints()
+    el('bt-start').value = daysAgo(Math.round(p.years * 365.25))
+    el('bt-end').value = today()
+    btTickers = [...p.tickers]
+    renderTickerChips()
+    hideTickerErr()
+    el('bt-risk-btns').querySelectorAll('.risk-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.risk === 'moderate'))
+    el('bt-walkforward').checked   = false
+    el('bt-markowitz').checked     = false
+    el('bt-range-sizing').checked  = false
+    el('bt-cash-in-market').checked = !!p.cash_in_market
+    el('bt-presets').querySelectorAll('.preset-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.preset === key))
+    runBacktest()
+    // On a phone the form sits above the results; bring the result into view.
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      el('loading-state').scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+  el('bt-presets').querySelectorAll('.preset-btn').forEach(b =>
+    b.addEventListener('click', () => applyPreset(b.dataset.preset)))
+  // ── Shareable links ────────────────────────────────────────────────────────
+  // Every run writes its settings into the address bar, so the URL always
+  // reproduces what is on screen; "Copy link" hands that URL to someone else,
+  // and opening it fills the form and runs the same backtest.
+  const OPT_FLAGS = { wf: 'bt-walkforward', mz: 'bt-markowitz', rs: 'bt-range-sizing', cim: 'bt-cash-in-market' }
+  const b64url = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const unb64url = s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))))
+
+  function settingsToQuery() {
+    const q = new URLSearchParams()
+    q.set('s', el('bt-strategy').value)
+    q.set('t', btTickers.join(','))
+    q.set('from', el('bt-start').value)
+    q.set('to', el('bt-end').value)
+    q.set('cap', el('bt-capital').value)
+    q.set('risk', el('bt-risk-btns').querySelector('.risk-btn.active')?.dataset.risk || 'moderate')
+    const opts = Object.keys(OPT_FLAGS).filter(k => el(OPT_FLAGS[k]).checked)
+    if (opts.length) q.set('opt', opts.join(','))
+    q.set('cost', `${el('bt-commission').value},${el('bt-slippage').value}`)
+    if (el('bt-strategy').value === 'custom' && btRules) q.set('rules', b64url(JSON.stringify(btRules.getRules())))
+    return q.toString()
+  }
+
+  function settingsFromQuery(search) {
+    const q = new URLSearchParams(search)
+    const tickers = (q.get('t') || '').toUpperCase().split(',')
+      .map(x => x.trim()).filter(x => /^[A-Z0-9.^-]{1,10}$/.test(x)).slice(0, 20)
+    if (!tickers.length) return false
+    const strat = q.get('s')
+    const opt = [...el('bt-strategy').options].find(o => o.value === strat && !o.disabled)
+    if (opt) { el('bt-strategy').value = strat; applyBtStrategyHints() }
+    const date = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null
+    if (date(q.get('from'))) el('bt-start').value = q.get('from')
+    if (date(q.get('to')))   el('bt-end').value = q.get('to')
+    const cap = parseFloat(q.get('cap'))
+    if (cap >= 1000 && cap <= 1e7) el('bt-capital').value = cap
+    const risk = q.get('risk')
+    el('bt-risk-btns').querySelectorAll('.risk-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.risk === (['conservative', 'moderate', 'aggressive'].includes(risk) ? risk : 'moderate')))
+    const opts = (q.get('opt') || '').split(',')
+    Object.entries(OPT_FLAGS).forEach(([k, id]) => { el(id).checked = opts.includes(k) })
+    const [com, slip] = (q.get('cost') || '').split(',').map(parseFloat)
+    if (com >= 0 && com <= 5) el('bt-commission').value = com
+    if (slip >= 0 && slip <= 5) el('bt-slippage').value = slip
+    if (strat === 'custom' && q.get('rules') && btRules) {
+      try { btRules.setRules(JSON.parse(unb64url(q.get('rules')))) } catch { /* keep the default rules */ }
+    }
+    btTickers = tickers
+    renderTickerChips()
+    return true
+  }
+
+  function rememberRunInUrl() {
+    history.replaceState(null, '', `${location.pathname}?${settingsToQuery()}`)
+  }
+
+  const shareBtn = el('bt-share-btn')
+  if (shareBtn) shareBtn.addEventListener('click', async () => {
+    const url = `${location.origin}${location.pathname}?${settingsToQuery()}`
+    try {
+      await navigator.clipboard.writeText(url)
+      shareBtn.textContent = 'Link copied'
+    } catch {
+      window.prompt('Copy this link:', url)
+    }
+    setTimeout(() => { shareBtn.textContent = 'Copy link' }, 1800)
+  })
+
+  if (location.search && settingsFromQuery(location.search)) setTimeout(runBacktest, 0)
+
+  // Editing the form by hand means the preset no longer describes it.
+  ;['bt-strategy', 'bt-start', 'bt-end'].forEach(id =>
+    el(id).addEventListener('input', () =>
+      el('bt-presets').querySelectorAll('.preset-btn.active').forEach(b => b.classList.remove('active'))))
+
   // ── Strategy leaderboard (compare all strategies) ──────────────────────────
   const CMP_COLORS = {
     adaptive: '#3fb950', ma_crossover: '#58a6ff', rsi: '#d2a8ff',
@@ -717,6 +840,7 @@ function initBacktest() {
     renderResults(data)
     el('results-container').hidden = false
     initTabs(el('results-container'))
+    rememberRunInUrl()
   }
 
   function renderResults(data) {
@@ -732,7 +856,7 @@ function initBacktest() {
       wfb.hidden = true
     }
 
-    renderSummary(m)
+    renderSummary(m, data)
 
     el('summary-stats').innerHTML = [
       statCard('Total Return', fmtPct(m.total_return), clr(m.total_return)),
@@ -749,37 +873,68 @@ function initBacktest() {
     renderTradesTable(data.trades || [])
   }
 
-  // Turn the raw backtest metrics into one human-readable paragraph + a verdict
-  // a non-expert can act on. Directly answers "why did it (under/over)perform?"
-  function renderSummary(m) {
+  // Turn the raw backtest metrics into a one-line verdict plus one short
+  // paragraph a non-expert can act on. The verdict answers the two questions
+  // people actually have: did it beat just buying the index, and is that real?
+  function maxDrawdownPct(curve) {
+    let peak = -Infinity, worst = 0
+    for (const p of curve || []) {
+      peak = Math.max(peak, p.value)
+      if (peak > 0) worst = Math.max(worst, (peak - p.value) / peak * 100)
+    }
+    return worst
+  }
+
+  function verdictFor(m, data) {
+    const ret = m.total_return, bench = m.benchmark_return
+    const real = !!(data.skill_test?.is_significant || data.deflated_sharpe?.is_significant)
+    if (ret == null) return null
+    if (ret <= 0) return { tone: 'red', title: 'Lost money over this period' }
+    if (bench == null) return { tone: 'neutral', title: 'Made money. Check the Validation tab to see if it is luck.' }
+    if (ret > bench && real) return { tone: 'green', title: 'Beat the market, and the edge looks real' }
+    if (ret > bench) return { tone: 'yellow', title: 'Beat the market, but it may be luck' }
+    return { tone: 'yellow', title: 'Made money, but less than buying the index' }
+  }
+
+  function renderSummary(m, data = {}) {
     const box = el('bt-summary')
     if (!box) return
     if (m.total_return == null) { box.hidden = true; return }
 
     const ret = m.total_return, bench = m.benchmark_return, dd = m.max_drawdown
     const wr = m.win_rate, n = m.total_trades, fv = m.final_value, cap = m.initial_capital
+    const spyDD = data.spy_curve?.length ? maxDrawdownPct(data.spy_curve) : null
+    const exposure = data.skill_test?.exposure_pct
     const verb = ret >= 0 ? 'grew' : 'shrank'
 
-    let s = `Starting from ${fmt$(cap)}, the strategy ${verb} to <strong>${fmt$(fv)}</strong> — a <strong>${fmtPct(ret)}</strong> return`
-    if (bench != null) s += `, versus <strong>${fmtPct(bench)}</strong> for simply buying and holding the market (SPY)`
+    let s = `${fmt$(cap)} ${verb} to <strong>${fmt$(fv)}</strong> (<strong>${fmtPct(ret)}</strong>)`
+    if (bench != null) s += `, versus <strong>${fmtPct(bench)}</strong> for buying and holding SPY`
     s += '. '
     if (n != null) {
       s += `It made <strong>${n}</strong> trade${n === 1 ? '' : 's'}`
-      if (wr != null) s += ` with a <strong>${fmtN(wr, 0)}% win rate</strong>`
-      if (dd != null) s += `, and its deepest peak-to-low dip was just <strong>${fmtN(dd, 1)}%</strong>`
+      if (wr != null) s += ` and won <strong>${fmtN(wr, 0)}%</strong> of them`
+      s += '. '
+    }
+    if (dd != null) {
+      s += `Its worst drop was <strong>${fmtN(dd, 1)}%</strong>`
+      if (spyDD != null) s += ` (SPY's was ${fmtN(spyDD, 1)}%)`
       s += '.'
     }
 
     let take = ''
-    if (bench != null && ret > bench) {
-      take = `It beat buy-and-hold over this period${dd != null ? `, with the worst drop held to ${fmtN(dd, 1)}%` : ''} — outperforming with controlled risk.`
-    } else if (bench != null) {
-      take = `It trailed buy-and-hold here, but ${dd != null ? `with a far smaller drawdown (${fmtN(dd, 1)}%)` : 'with less risk'}. Defensive strategies like this give up upside in strong bull markets and protect capital when markets fall — judge them over a full cycle, not a single year.`
-    } else if (ret >= 0) {
-      take = 'A positive result — open the Research tab to check whether it is statistically real or just luck.'
+    if (exposure != null && exposure < 60 && bench != null && ret < bench) {
+      take = `It was invested only ${fmtN(exposure, 0)}% of the time, which is the main reason it trailed a market that rose ${fmtPct(bench)}.`
+    } else if (bench != null && ret < bench && dd != null && spyDD != null && dd < spyDD) {
+      take = 'It gave up some upside for a smaller worst drop. Strategies like this are best judged over a full market cycle.'
+    } else if (bench != null && ret > bench && !(data.skill_test?.is_significant || data.deflated_sharpe?.is_significant)) {
+      take = 'The Validation tab shows how often random trading would have done as well.'
     }
 
-    box.innerHTML = s + (take ? `<span class="summary-take">${take}</span>` : '')
+    const v = verdictFor(m, data)
+    box.innerHTML =
+      (v ? `<div class="verdict-line verdict-${v.tone}"><span class="verdict-dot" aria-hidden="true"></span>${v.title}</div>` : '') +
+      `<p class="summary-body">${s}</p>` +
+      (take ? `<span class="summary-take">${take}</span>` : '')
     box.hidden = false
   }
 
