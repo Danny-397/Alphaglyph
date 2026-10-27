@@ -144,3 +144,31 @@ class TestCanTrade:
         ok, reason = risk.can_trade(100_000, 50_000)
         assert ok is True
         assert reason == 'OK'
+
+
+# ── Kelly sizing floor ────────────────────────────────────────────────────────
+
+def test_small_positive_kelly_still_buys_shares():
+    """A tiny edge must mean a small position, not zero shares forever.
+
+    Half-Kelly of 0.3% on a $100k book is $300, under one $700 SPY share.
+    Before the floor that returned 0, so the backtest stopped trading and the
+    Kelly estimate (fed only by closed trades) could never recover.
+    """
+    prof = risk.get_risk_profile('moderate')
+    shares = risk.calculate_position_size_kelly(100_000, 700.0, 100_000, 0.003, prof)
+    floor_spend = 100_000 * prof['max_position_pct'] * risk.KELLY_FLOOR_FRAC
+    assert shares == int(floor_spend / 700.0) > 0
+
+
+def test_kelly_is_still_capped_at_the_profile_max():
+    prof = risk.get_risk_profile('moderate')
+    shares = risk.calculate_position_size_kelly(100_000, 100.0, 100_000, 0.9, prof)
+    assert shares == int(100_000 * prof['max_position_pct'] / 100.0)
+
+
+def test_kelly_between_floor_and_cap_is_used_as_is():
+    prof = risk.get_risk_profile('moderate')
+    f = prof['max_position_pct'] * 0.6
+    shares = risk.calculate_position_size_kelly(100_000, 100.0, 100_000, f, prof)
+    assert shares == int(100_000 * f / 100.0)
