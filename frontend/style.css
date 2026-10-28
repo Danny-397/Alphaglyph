@@ -872,6 +872,10 @@ input[type="range"] { width: 100%; accent-color: var(--green); height: 36px; cur
   animation: connPulse 1.4s ease-in-out infinite;
 }
 @keyframes connPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.conn-banner.offline { width: min(560px, calc(100vw - 32px)); flex-wrap: wrap; }
+.conn-banner.offline > span:nth-child(2) { flex: 1 1 220px; }
+.conn-banner.offline .conn-dot { background: var(--red); animation: none; }
+.conn-retry { flex-shrink: 0; }
 
 /* ── Replay feed ────────────────────────────────────────────────────────── */
 .feed-empty { text-align: center; color: var(--muted); padding: 28px 16px; font-size: 13px; }

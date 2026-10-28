@@ -90,27 +90,56 @@ function tradeWhy(t) {
 }
 
 // ── Connection state (free-tier cold-start UX) ───────────────────────────────
-// Render's free instance sleeps after inactivity and takes ~30s to wake. Without
-// this the first loads just fail silently and the page looks broken. We detect
-// network-level failures (server unreachable) and show a friendly auto-retry
-// banner, then clear it the moment a request succeeds.
+// Render's free instance sleeps after inactivity and takes ~30-75s to wake.
+// While it boots, Render holds the request open, so a slow answer is a cold
+// start and the "waking" banner covers it. A request that *fails* instead means
+// the server answered without CORS headers: a deploy restarting (seconds) or a
+// suspended service (Render's 503 page, which lasts until the account's free
+// hours reset). After RETRY_BUDGET_MS of failures we stop pretending it is
+// waking, say plainly that the backend is offline, and fail fast from then on.
 let _connFails = 0
-function setConn(reachable) {
+let _offline = false
+const RETRY_BUDGET_MS = 20000
+
+function setConn(reachable, offline = false) {
   let b = document.getElementById('conn-banner')
   if (reachable) {
     _connFails = 0
-    if (b) b.classList.remove('show')
+    _offline = false
+    if (b) b.classList.remove('show', 'offline')
     return
   }
-  if (++_connFails < 2) return          // tolerate a single transient blip
+  if (!offline && ++_connFails < 2) return   // tolerate a single transient blip
   if (!b) {
     b = document.createElement('div')
     b.id = 'conn-banner'
     b.className = 'conn-banner'
-    b.innerHTML = '<span class="conn-dot"></span> Waking the server up — the free instance sleeps after inactivity and takes ~30s to start. Retrying automatically…'
+    b.setAttribute('role', 'status')
     document.body.appendChild(b)
   }
+  if (offline) {
+    _offline = true
+    b.classList.add('offline')
+    b.innerHTML = '<span class="conn-dot"></span><span>The live backend is offline right now, so backtests, ' +
+      'predictions and scans can’t run. Please check back later.</span>' +
+      '<button type="button" class="btn btn-ghost btn-sm conn-retry">Check again</button>'
+    b.querySelector('.conn-retry').addEventListener('click', checkBackend)
+  } else if (!b.classList.contains('offline')) {
+    b.innerHTML = '<span class="conn-dot"></span> Waking the server up — the free instance sleeps after inactivity and takes ~30s to start. Retrying automatically…'
+  }
   b.classList.add('show')
+}
+
+// "Check again": one request, and a reload once the backend answers so every
+// panel on the page loads its data.
+async function checkBackend(e) {
+  const btn = e && e.currentTarget
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…' }
+  try {
+    const r = await fetch(API_BASE + '/health', { cache: 'no-store' })
+    if (r.ok) { location.reload(); return }
+  } catch (_) { /* still offline */ }
+  if (btn) { btn.disabled = false; btn.textContent = 'Still offline' }
 }
 
 // ── Utilities ───────────────────────────────────────────────────────────────
@@ -119,35 +148,47 @@ const _sleep = ms => new Promise(r => setTimeout(r, ms))
 // Resilient fetch. Free-tier cold starts, brief rate limits, and the market-data
 // providers' occasional hiccups are all transient — so instead of surfacing an
 // error we back off and retry silently, showing only the friendly "waking up"
-// banner. Returns null only after several attempts genuinely fail.
-async function api(path, opts = {}, _attempt = 0) {
+// banner. Network failures are retried for RETRY_BUDGET_MS, then the backend is
+// declared offline (see setConn) and later calls make a single attempt.
+// Returns null when the request genuinely fails.
+async function api(path, opts = {}) {
   const MAX = 5
-  try {
-    const r = await fetch(API_BASE + path, {
-      ...opts,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(opts.headers || {}),
-      },
-    })
-    setConn(true)                        // we reached the server
-    if (r.ok) return r.json()
-    // Transient server states (cold start / rate limit) → back off and retry.
-    if ((r.status === 429 || r.status >= 500) && _attempt < MAX) {
-      await _sleep(Math.min(5000, 500 * 2 ** _attempt))
-      return api(path, opts, _attempt + 1)
+  const started = Date.now()
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await fetch(API_BASE + path, {
+        ...opts,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(opts.headers || {}),
+        },
+      })
+      setConn(true)                        // we reached the server
+      if (r.ok) return r.json()
+      // Transient server states (cold start / rate limit) → back off and retry.
+      if ((r.status === 429 || r.status >= 500) && attempt < MAX) {
+        await _sleep(Math.min(5000, 500 * 2 ** attempt))
+        continue
+      }
+      return null                          // a real 4xx — caller handles gracefully
+    } catch (err) {
+      if (!(err instanceof TypeError)) return null
+      // fetch threw → the server answered without CORS or not at all.
+      if (_offline || Date.now() - started >= RETRY_BUDGET_MS) {
+        setConn(false, true)
+        return null
+      }
+      setConn(false)
+      await _sleep(Math.min(5000, 500 * 2 ** attempt))
     }
-    return null                          // a real 4xx — caller handles gracefully
-  } catch (err) {
-    // fetch threw → server asleep/unreachable. Show the waking banner, retry.
-    if (err instanceof TypeError) setConn(false)
-    if (_attempt < MAX) {
-      await _sleep(Math.min(5000, 500 * 2 ** _attempt))
-      return api(path, opts, _attempt + 1)
-    }
-    return null
   }
 }
+
+// What to tell the reader when a request returned nothing.
+const failMsg = (data, fallback) =>
+  data?.error ? 'Error: ' + data.error
+  : _offline ? 'The backend is offline right now, so this can’t run. Please check back later.'
+  : fallback
 
 const el     = id => document.getElementById(id)
 const fmt$   = n  => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -702,8 +743,9 @@ function initBacktest() {
 
     if (!data || data.error) {
       el('empty-state').hidden = false
-      el('empty-state').querySelector('strong').textContent =
-        'Error: ' + (data?.error || 'Comparison failed — try again.')
+      el('empty-state').querySelector('.empty-title').textContent =
+        failMsg(data, 'The comparison failed. Please try again.')
+      el('empty-state').querySelector('.empty-hint')?.setAttribute('hidden', '')
       return
     }
     renderCompare(data)
@@ -828,8 +870,9 @@ function initBacktest() {
 
     if (!data || data.error) {
       el('empty-state').hidden = false
-      el('empty-state').querySelector('strong').textContent =
-        'Error: ' + (data?.error || 'Request failed — is the backend running?')
+      el('empty-state').querySelector('.empty-title').textContent =
+        failMsg(data, 'The backtest failed. Please try again.')
+      el('empty-state').querySelector('.empty-hint')?.setAttribute('hidden', '')
       return
     }
 
