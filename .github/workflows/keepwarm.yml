@@ -24,8 +24,11 @@ name: Keep bot warm
 # Nothing is lost by narrowing it: the bot trades US equities and risk.py
 # refuses to trade when the market is shut (is_market_open(), 09:30-16:00
 # America/New_York, weekdays), so an off-hours ping woke the instance only to
-# decline. The window below is 13:00-21:59 UTC, which covers 09:30-16:00 ET in
-# both EDT and EST, and costs ~190 h/month instead of ~720.
+# decline. The cron below fires 13:00-21:59 UTC so it covers the session in both
+# EDT and EST, and the job then skips any run outside 09:00-16:30 New York time,
+# the same window as the backend's own self-ping (backend/app.py). Without that
+# check the cron alone woke the service up to 1.5 h a day past the window
+# (~30 h/month); with it the bot costs ~165 h/month instead of ~720.
 
 on:
   schedule:
@@ -43,7 +46,18 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      - name: Skip outside 09:00-16:30 New York time
+        id: window
+        run: |
+          now=$(TZ=America/New_York date +%H%M)
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || { [ "$now" -ge 0900 ] && [ "$now" -lt 1630 ]; }; then
+            echo "ping=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$now ET is outside the trading window; letting the instance sleep."
+          fi
+
       - name: Ping /health (wake instance + run a due trading cycle)
+        if: steps.window.outputs.ping == 'true'
         env:
           # Override by setting a repo variable BACKEND_URL if you rename the
           # service: Settings → Secrets and variables → Actions → Variables.
