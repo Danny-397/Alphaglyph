@@ -276,10 +276,14 @@ strategies are ruinous — it is that **choosing among them on in-sample perform
 does not identify the good ones.** The money is mostly fine; the selection procedure
 is what's worthless.
 
-**The one clean positive:** a dip-buying strategy on AAPL/MSFT over 2021–2024 in
-ranging markets returned **+21.8%** against SPY's **+5.6%** — an excess of +16.3
-percentage points. Reported with the regime condition attached, because the condition
-is load-bearing: it is not a claim that the strategy works in general.
+**The one clean positive, with its conditions:** a dip-buying strategy on AAPL/MSFT
+from 2021-01-01 to 2024-01-01 returned **+21.6%** in ranging markets against SPY's
+**+5.6%** over the same days — an excess of +16.1 percentage points. Both conditions are
+load-bearing. The regime one is the obvious one; the window is the other: extending the
+run to 2025-01-01 shrinks the ranging-market excess to **+3.6** points, because 2024's
+ranging days rewarded simply holding the index. It is not a claim that the strategy
+works in general. (Rerun on 2026-10-27; the July figures, +21.8% vs +5.6%, differed
+only by data revisions.)
 
 The AUC of 0.51 is worth stating plainly. The machine-learning forecaster, which took
 the most work to build, cannot predict next-week direction. It is reported at 0.51
