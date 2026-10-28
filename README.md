@@ -116,20 +116,27 @@ noise. The tool says so out loud — reproduce via `POST /api/research/cpcv`.*
 
 ### Is the edge just one regime? (regime-conditional performance)
 
-The Dip Buyer on `AAPL, MSFT` (2021–2024), split by the market regime each invested
-day fell in, strategy return vs. buy-and-hold **within** that regime:
+The Dip Buyer on `AAPL, MSFT` from **2021-01-01 to 2024-01-01** (default settings,
+$100k), split by the market regime each invested day fell in, strategy return vs.
+buy-and-hold **within** that regime:
 
 | Regime | % of time | Strategy | SPY | Excess |
 |---|--:|--:|--:|--:|
-| Ranging / sideways | 55.8% | +21.8% | +5.6% | **+16.3%** |
-| High volatility | 9.8% | −5.8% | −12.8% | **+7.0%** |
-| Trending down | 15.9% | +8.1% | +32.2% | −24.1% |
-| Trending up | 18.5% | −4.0% | +3.2% | −7.2% |
+| Ranging / sideways | 55.8% | +21.6% | +5.6% | **+16.1%** |
+| High volatility | 9.8% | −5.9% | −12.8% | **+7.0%** |
+| Trending down | 15.9% | +8.0% | +32.2% | −24.2% |
+| Trending up | 18.5% | −4.1% | +3.2% | −7.2% |
 
-*Takeaway: the Dip Buyer's edge lives almost entirely in ranging markets and it defends
-capital in high-vol — but it gives ground in trends. A strategy whose whole edge lives
-in one regime is far more fragile than one that beats the benchmark across several, and
-this table makes that legible instead of hiding it in a single blended Sharpe.*
+**The window is load-bearing.** Extending the same run by one year, to 2025-01-01,
+leaves the high-volatility row unchanged but shrinks the ranging-market excess from
++16.1 to **+3.6** points (strategy +24.4% vs SPY +20.8%), because 2024's ranging days
+were good ones to simply hold the index. Rerun on 2026-10-27; the original July figures
+(+21.8% / +5.6%) differed only by data revisions.
+
+*Takeaway: in this window the Dip Buyer's edge lives almost entirely in ranging markets
+and it defends capital in high-vol — but it gives ground in trends, and one more year of
+data nearly erases the ranging edge. A strategy whose whole edge lives in one regime, in
+one window, is far more fragile than a blended Sharpe makes it look.*
 
 ### Is the forecaster honest? (out-of-sample calibration)
 
