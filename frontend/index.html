@@ -89,7 +89,7 @@
             <div class="verdict-row">
               <span class="lbl">In-sample Sharpe</span>
               <span class="val">1.26</span>
-              <span class="ctx">median across 252 splits: looks like a good strategy</span>
+              <span class="ctx">median: looks like a good strategy</span>
             </div>
             <div class="verdict-row">
               <span class="lbl">Out-of-sample Sharpe</span>
@@ -99,7 +99,7 @@
           </div>
           <figcaption class="verdict-note">What AlphaGlyph found when it tested its own 42 strategy variants with
             combinatorial purged cross-validation. Picking the best backtest was worse than a coin flip.
-            Every run you do gets the same scrutiny.
+            Your own backtests get three checks of their own: Monte Carlo, deflated Sharpe and Fama-French.
             <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Read the report</a></figcaption>
         </figure>
       </div>
