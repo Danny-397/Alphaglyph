@@ -19,6 +19,8 @@
   --green:     #3fb950;
   --green-br:  #4cc85f;
   --green-dim: rgba(63,185,80,0.12);
+  --amber:     #e3913b;
+  --amber-dim: rgba(227,145,59,0.14);
 
   --font-ui:   -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, monospace;
@@ -160,6 +162,8 @@ a { color: inherit; text-decoration: none; }
   font-size: 14px; flex-shrink: 0;
 }
 .verdict-rows { border-top: 1px solid var(--border); }
+.verdict-headline.is-warn { color: var(--amber); }
+.verdict-headline.is-warn .tick { background: var(--amber-dim); font-weight: 700; }
 .verdict-row {
   display: grid;
   grid-template-columns: 140px auto 1fr;

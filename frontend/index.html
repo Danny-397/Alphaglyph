@@ -70,35 +70,36 @@
         <p class="hero-note">No account. No real money. Every trade explained in plain English.</p>
       </div>
 
-      <!-- The product, not a mockup of it: the verdict every run ends with -->
+      <!-- The real result, not a flattering example: AlphaGlyph's validation of its own grid -->
       <div class="container">
-        <figure class="verdict" aria-label="Example validation report">
+        <figure class="verdict" aria-label="AlphaGlyph's validation of its own strategy grid">
           <div class="verdict-top">
-            <span>Strategy validation report</span>
-            <span class="verdict-tag">Example</span>
+            <span>Validation report: AlphaGlyph's own strategy grid</span>
+            <span class="verdict-tag">Real result · SPY, 2026-08-01</span>
           </div>
-          <div class="verdict-headline">
-            <span class="tick" aria-hidden="true">✓</span> Statistically significant
+          <div class="verdict-headline is-warn">
+            <span class="tick" aria-hidden="true">!</span> Likely overfit
           </div>
           <div class="verdict-rows">
             <div class="verdict-row">
-              <span class="lbl">Monte Carlo</span>
-              <span class="val">92nd percentile</span>
-              <span class="ctx">of 1,000 resampled paths</span>
+              <span class="lbl">Overfitting risk</span>
+              <span class="val">72%</span>
+              <span class="ctx">chance the in-sample winner lands in the bottom half out of sample</span>
             </div>
             <div class="verdict-row">
-              <span class="lbl">Deflated Sharpe</span>
-              <span class="val">96.4%</span>
-              <span class="ctx">confidence the edge is real</span>
+              <span class="lbl">In-sample Sharpe</span>
+              <span class="val">1.26</span>
+              <span class="ctx">median: looks like a good strategy</span>
             </div>
             <div class="verdict-row">
-              <span class="lbl">Fama-French</span>
-              <span class="val">+6.8% / yr alpha</span>
-              <span class="ctx">|t| = 2.31, significant</span>
+              <span class="lbl">Out-of-sample Sharpe</span>
+              <span class="val">0.65</span>
+              <span class="ctx">median: about half the edge survives</span>
             </div>
           </div>
-          <figcaption class="verdict-note">What a passing verdict looks like. Most strategies don't get one: on AlphaGlyph's own
-            42-variant grid, the in-sample winner is more likely than not to land in the bottom half out of sample.
+          <figcaption class="verdict-note">What AlphaGlyph found when it tested its own 42 strategy variants with
+            combinatorial purged cross-validation. Picking the best backtest was worse than a coin flip.
+            Your own backtests get three checks of their own: Monte Carlo, deflated Sharpe and Fama-French.
             <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Read the report</a></figcaption>
         </figure>
       </div>
