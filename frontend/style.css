@@ -1035,3 +1035,9 @@ input[type="range"] { width: 100%; accent-color: var(--green); height: 36px; cur
 /* Replay chart is collapsed until a replay starts (app.js toggles .is-playing) */
 #bt-playback .replay-chart { display: none; margin-bottom: var(--s3); }
 #bt-playback.is-playing .replay-chart { display: block; animation: fadeIn var(--med) var(--ease); }
+
+/* Skip link: hidden until a keyboard user tabs to it, then the first stop on the page. */
+.skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 10px 14px;
+  border-radius: 8px; background: var(--green); color: #06180a; font-weight: 600; text-decoration: none; }
+.skip-link:focus { top: 12px; }
+main:focus { outline: none; }
