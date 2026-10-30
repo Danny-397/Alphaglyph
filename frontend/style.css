@@ -1,3 +1,15 @@
+/* Inter arrives late (display=swap). Until it does, text set in plain Arial
+   wraps differently and the hero jumps when Inter lands (CLS 0.17 measured
+   2026-10-30). Arial scaled to Inter's metrics keeps the line breaks put. */
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial");
+  size-adjust: 107.12%;
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    AlphaGlyph — App design system (Backtest + Tools)
    Calm dark surfaces, one green accent, system typography with tabular
@@ -35,7 +47,7 @@
   --purple-dim: rgba(196,165,245,0.12);
 
   /* Type */
-  --font-ui:   -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-ui:   -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Inter Fallback', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, monospace;
 
   /* Shape */
