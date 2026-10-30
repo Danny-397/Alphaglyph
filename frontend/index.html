@@ -277,20 +277,29 @@
     </div>
   </footer>
 
-  <!-- Pre-warm the free-tier backend the moment someone lands here, so it's
-       already awake by the time they open the Backtester. This hides the Render
-       cold start behind the few seconds a visitor spends reading the page. -->
+  <!-- Pre-warm the free-tier backend when a visitor reaches for a tool (hovers,
+       focuses or taps a link to one), so the cold start overlaps the click.
+       Not on page load: Render's 750 free instance-hours are shared by every
+       backend on the account, each wake costs at least 15 minutes, and a
+       visitor who only reads this page (or a crawler) should not spend any. -->
   <script src="config.js"></script>
   <script>
-    try {
+    (function () {
       var base = window.RENDER_URL || ''
-      // No mode:'no-cors' here. It was cancelling the request during page load
-      // (net::ERR_ABORTED) so the backend was never actually pinged -- the one
-      // thing this script exists to do. It isn't needed either: /health sends
-      // access-control-allow-origin for this site, so an ordinary CORS fetch
-      // succeeds and we get a real response instead of an opaque one.
-      if (base) fetch(base + '/health', { cache: 'no-store' }).catch(function () {})
-    } catch (e) { /* never let a warm-up ping break the page */ }
+      if (!base || navigator.webdriver) return
+      var woke = false
+      function wake(e) {
+        var a = e.target.closest && e.target.closest('a[href]')
+        if (woke || !a || !/(backtest|predict|research|screener|portfolio|tools)\.html/.test(a.getAttribute('href'))) return
+        woke = true
+        // No mode:'no-cors': /health sends access-control-allow-origin for this
+        // site, and no-cors was getting the request cancelled (net::ERR_ABORTED).
+        try { fetch(base + '/health', { cache: 'no-store' }).catch(function () {}) } catch (err) { /* never break the page */ }
+      }
+      ['pointerover', 'focusin', 'touchstart'].forEach(function (t) {
+        document.addEventListener(t, wake, { passive: true })
+      })
+    })()
   </script>
 
 </body>
