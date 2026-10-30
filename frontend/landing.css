@@ -358,3 +358,9 @@ a { color: inherit; text-decoration: none; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* Skip link: hidden until a keyboard user tabs to it, then the first stop on the page. */
+.skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 10px 14px;
+  border-radius: 8px; background: #3fb950; color: #06180a; font-weight: 600; text-decoration: none; }
+.skip-link:focus { top: 12px; }
+main:focus { outline: none; }

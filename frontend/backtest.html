@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AlphaGlyph — Backtest</title>
   <meta name="description" content="Backtest a trading strategy day by day on real market history, then test whether the result is skill or luck with Monte Carlo, a deflated Sharpe ratio and Fama-French attribution.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Fonts are self-hosted: the Google Fonts stylesheet blocked first paint for ~0.9 s on a mobile connection (Lighthouse, 2026-10-30). -->
+  <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <style>@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-greek.woff2) format('woff2');unicode-range:U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF}</style>
   <meta name="theme-color" content="#0b0c0c">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body data-page="backtest">
+<a class="skip-link" href="#main">Skip to content</a>
 
   <!-- ── Navigation ─────────────────────────────────────────────────────── -->
   <nav class="navbar" aria-label="Main">
@@ -38,7 +39,7 @@
   </nav>
 
   <!-- ── Main ───────────────────────────────────────────────────────────── -->
-  <main class="page-wrap" data-page="backtest">
+  <main class="page-wrap" data-page="backtest" id="main" tabindex="-1">
     <h1 class="sr-only">AlphaGlyph backtester</h1>
     <div class="sidebar-layout">
 
