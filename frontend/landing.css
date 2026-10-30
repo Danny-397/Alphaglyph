@@ -1,3 +1,15 @@
+/* Inter arrives late (display=swap). Until it does, text set in plain Arial
+   wraps differently and the hero jumps when Inter lands (CLS 0.17 measured
+   2026-10-30). Arial scaled to Inter's metrics keeps the line breaks put. */
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial");
+  size-adjust: 107.12%;
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    AlphaGlyph — Landing page
    Same tokens as the app (style.css): neutral near-black, one green accent,
@@ -22,7 +34,7 @@
   --amber:     #e3913b;
   --amber-dim: rgba(227,145,59,0.14);
 
-  --font-ui:   -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-ui:   -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Inter Fallback', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, monospace;
   --maxw:      1080px;
   --ease:      cubic-bezier(0.2, 0.8, 0.2, 1);
