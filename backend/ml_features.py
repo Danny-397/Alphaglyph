@@ -185,8 +185,61 @@ def fetch_macro(start: str, end: str) -> pd.DataFrame | None:
 
 _SENTI_FAILS    = 0
 _SENTI_DISABLED = False
+_SENTI_LAST_CALL = 0.0
+_SENTI_SPACING  = 5.5         # GDELT asks for at most one request every 5 s
 _SENTI_MAX_FAILS = 6          # consecutive failures before giving up for the run
-_SENTI_RETRY_SLEEP = 6        # seconds before a single 429 retry
+_SENTI_RETRY_SLEEP = 15       # seconds before a single 429 retry
+
+# GDELT matches words in article text, so a bare ticker is a poor query: it
+# rejects a quoted phrase as short as "AAPL" outright, and short tickers such
+# as C, V, MA, GE or SO match unrelated words. Query the company's name for
+# every ticker in the training universe (ml/dataset.py) and the common ones
+# people look up; anything else falls back to the unquoted ticker when it is
+# at least four letters, and to no news at all when it is shorter.
+_NEWS_NAMES = {
+    'AAPL': 'Apple', 'MSFT': 'Microsoft', 'GOOGL': 'Alphabet', 'GOOG': 'Alphabet',
+    'AMZN': 'Amazon', 'META': 'Meta Platforms', 'NVDA': 'Nvidia', 'AVGO': 'Broadcom',
+    'ORCL': 'Oracle', 'CRM': 'Salesforce', 'ADBE': 'Adobe', 'AMD': 'Advanced Micro Devices',
+    'INTC': 'Intel', 'QCOM': 'Qualcomm', 'TXN': 'Texas Instruments', 'CSCO': 'Cisco',
+    'IBM': 'IBM', 'NFLX': 'Netflix', 'DIS': 'Disney', 'TMUS': 'T-Mobile', 'VZ': 'Verizon',
+    'JPM': 'JPMorgan', 'BAC': 'Bank of America', 'WFC': 'Wells Fargo',
+    'GS': 'Goldman Sachs', 'MS': 'Morgan Stanley', 'C': 'Citigroup', 'BLK': 'BlackRock',
+    'SCHW': 'Charles Schwab', 'AXP': 'American Express', 'V': 'Visa', 'MA': 'Mastercard',
+    'COF': 'Capital One', 'UNH': 'UnitedHealth', 'JNJ': 'Johnson & Johnson',
+    'LLY': 'Eli Lilly', 'PFE': 'Pfizer', 'MRK': 'Merck', 'ABBV': 'AbbVie',
+    'TMO': 'Thermo Fisher', 'ABT': 'Abbott Laboratories', 'BMY': 'Bristol Myers Squibb',
+    'AMGN': 'Amgen', 'GILD': 'Gilead', 'CVS': 'CVS Health', 'WMT': 'Walmart',
+    'PG': 'Procter & Gamble', 'KO': 'Coca-Cola', 'PEP': 'PepsiCo', 'COST': 'Costco',
+    'MCD': "McDonald's", 'NKE': 'Nike', 'SBUX': 'Starbucks', 'TGT': 'Target Corp',
+    'HD': 'Home Depot', 'LOW': "Lowe's", 'TSLA': 'Tesla', 'CAT': 'Caterpillar',
+    'DE': 'John Deere', 'BA': 'Boeing', 'GE': 'General Electric', 'HON': 'Honeywell',
+    'UPS': 'UPS', 'UNP': 'Union Pacific', 'LMT': 'Lockheed Martin', 'RTX': 'Raytheon',
+    'MMM': '3M', 'XOM': 'Exxon Mobil', 'CVX': 'Chevron', 'COP': 'ConocoPhillips',
+    'SLB': 'Schlumberger', 'EOG': 'EOG Resources', 'LIN': 'Linde', 'FCX': 'Freeport-McMoRan',
+    'NEM': 'Newmont', 'NEE': 'NextEra Energy', 'DUK': 'Duke Energy', 'SO': 'Southern Company',
+    'AMT': 'American Tower', 'PLD': 'Prologis', 'SPG': 'Simon Property', 'CL': 'Colgate-Palmolive',
+    'KMB': 'Kimberly-Clark', 'GIS': 'General Mills', 'MO': 'Altria', 'SPY': 'S&P 500',
+    'PLTR': 'Palantir', 'SOFI': 'SoFi', 'COIN': 'Coinbase', 'UBER': 'Uber', 'SHOP': 'Shopify',
+}
+
+
+def news_query(ticker: str) -> str | None:
+    """The GDELT query for a ticker, or None when no meaningful one exists."""
+    t = ticker.upper()
+    name = _NEWS_NAMES.get(t)
+    if name:
+        # A phrase only when it must be one: GDELT rejects quoted phrases that
+        # are too short, and single words need no quotes.
+        term = f'"{name}"' if ' ' in name or '&' in name or '-' in name else name
+    elif len(t) >= 4 and t.isalpha():
+        term = t
+    else:
+        return None
+    # The name alone: GDELT treats a multi-term query over a multi-year range
+    # as a "large query" and rate-limits it, while a single term or phrase
+    # returns the whole timeline in one request.
+    return term
+
 
 
 def fetch_sentiment(ticker: str, start: str, end: str) -> pd.DataFrame | None:
@@ -205,8 +258,29 @@ def fetch_sentiment(ticker: str, start: str, end: str) -> pd.DataFrame | None:
     if hit and (time.time() - hit[0]) < _CACHE_TTL:
         return hit[1]
 
+    # Training reads news that ml/fetch_news.py saved to disk, so a dataset
+    # build never depends on GDELT's rate limit (ML_NEWS_DIR; unset live).
+    news_dir = os.getenv('ML_NEWS_DIR')
+    if news_dir:
+        path = os.path.join(news_dir, f'{ticker}.csv')
+        if not os.path.exists(path):
+            return None
+        disk = pd.read_csv(path, index_col='date', parse_dates=True)
+        disk = disk.loc[(disk.index >= pd.Timestamp(start)) & (disk.index <= pd.Timestamp(end))]
+        return disk.resample('D').mean().ffill() if not disk.empty else None
+
+    query = news_query(ticker)
+    if query is None:
+        return None               # no unambiguous query — not a failure
+
+    global _SENTI_LAST_CALL
+    wait = _SENTI_LAST_CALL + _SENTI_SPACING - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    _SENTI_LAST_CALL = time.time()
+
     params = {
-        'query':         f'"{ticker}" (stock OR shares OR earnings)',
+        'query':         query,
         'mode':          'timelinetone',
         'format':        'json',
         'startdatetime': pd.Timestamp(start).strftime('%Y%m%d') + '000000',
@@ -217,6 +291,7 @@ def fetch_sentiment(ticker: str, start: str, end: str) -> pd.DataFrame | None:
                             headers={'User-Agent': 'AlphaGlyph research (educational)'})
         if resp.status_code == 429:
             time.sleep(_SENTI_RETRY_SLEEP)
+            _SENTI_LAST_CALL = time.time()
             resp = requests.get(_GDELT_URL, params=params, timeout=20,
                                 headers={'User-Agent': 'AlphaGlyph research (educational)'})
         resp.raise_for_status()
@@ -300,7 +375,10 @@ def build_feature_frame(ohlcv: pd.DataFrame, ticker: str,
     # SENTI block — per ticker, zero-filled on failure or pre-2017 dates
     senti = fetch_sentiment(ticker, start, end) if include_sentiment else None
     if senti is not None:
-        tone = senti['f_news_tone'].reindex(out.index).ffill()
+        # GDELT buckets articles by UTC day, so day t's tone includes stories
+        # published after that day's close. Lag it a day so a window ending on
+        # day t only sees news that was out before the close it predicts from.
+        tone = senti['f_news_tone'].shift(1, freq='D').reindex(out.index).ffill()
         out['f_news_tone'] = tone
         out['f_tone_mom']  = tone - tone.rolling(21, min_periods=1).mean()
     for col in SENTI_FEATURES:
