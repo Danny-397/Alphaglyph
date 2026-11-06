@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-200%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="200 tests passing">
+  <img src="https://img.shields.io/badge/tests-207%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="207 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
@@ -192,8 +192,14 @@ An **append-only**, time-stamped track record. Every prediction is logged the mo
 it's made (ticker, probability, price, horizon) and **lazily graded** once its horizon
 elapses — nothing is ever edited after the fact. This is the honest counterpart to
 calibration: calibration measures the model on historical out-of-sample data; the
-ledger measures it on the *future*, one real day at a time. Persists to SQLite locally
-or Postgres in production (see [Honest limits](#methodology--honest-limitations)).
+ledger measures it on the *future*, one real day at a time.
+
+**The record is kept in git.** A daily workflow ([`tools/forward_ledger.py`](tools/forward_ledger.py))
+asks the live Predictor about a fixed basket of ten tickers near the close, appends each
+call to [`frontend/data/forward_ledger.csv`](frontend/data/forward_ledger.csv), grades calls
+whose horizon has passed, and commits. Each call is in a commit dated before its outcome,
+so the record can't be revised in hindsight. The backend's own SQLite ledger still logs
+visitors' predictions, but on Render's free tier it resets on every redeploy.
 
 ### Strategies (6 + adaptive + custom)
 - **MA Crossover** — trend stance with a 1% hysteresis band (dead band kills whipsaw churn).
@@ -375,7 +381,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (200
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (207
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -405,7 +411,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           200 tests, fully offline
+│   └── tests/           207 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
@@ -434,7 +440,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 200 passing
+cd backend && pytest -q                    # 207 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)

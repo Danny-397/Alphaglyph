@@ -29,11 +29,11 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-import numpy as np
 import pandas as pd
 
 import database as db
 import features as feat
+import track_record
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def _ensure_schema() -> None:
 
 def _due_date(created: datetime, horizon: int) -> pd.Timestamp:
     """The trading day the call matures on: created + `horizon` business days."""
-    return (pd.Timestamp(created.date()) + pd.tseries.offsets.BDay(max(1, horizon))).normalize()
+    return track_record.due_date(created.date(), horizon)
 
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -180,21 +180,12 @@ def grade_pending(max_rows: int = 100) -> int:
             if landed is None:
                 continue                       # not matured / no data yet
             _, close = landed
-            entry    = float(r['price_at_pred'])
-            realized = (close - entry) / entry * 100.0 if entry else 0.0
-            up       = 1 if realized > 0 else 0
-            direction = r['direction']
-            if direction == 'BULLISH':
-                correct = up
-            elif direction == 'BEARISH':
-                correct = 1 - up
-            else:
-                correct = None                 # NEUTRAL: recorded but not scored
+            out = track_record.grade(float(r['price_at_pred']), close, r['direction'])
             conn.execute(
                 "UPDATE predictions SET status='graded', graded_at=?, price_at_grade=?, "
                 'realized_pct=?, realized_up=?, correct=? WHERE id=?',
                 (datetime.now(timezone.utc).isoformat(), round(close, 4),
-                 round(realized, 4), up, correct, r['id']))
+                 out['realized_pct'], out['realized_up'], out['correct'], r['id']))
             graded += 1
         except Exception as exc:
             logger.warning('ledger: grading row %s failed: %s', r.get('id'), exc)
@@ -208,36 +199,7 @@ def grade_pending(max_rows: int = 100) -> int:
 
 def _summary(graded: list[dict]) -> dict:
     """Track-record stats over the graded, directional (non-neutral) calls."""
-    scored = [g for g in graded if g.get('correct') is not None]
-    if not scored:
-        return {'n_graded': 0, 'n_scored': 0, 'hit_rate': None, 'brier': None,
-                'brier_skill': None, 'avg_realized_pct': None,
-                'avg_when_bullish': None, 'avg_when_bearish': None}
-
-    correct = np.array([g['correct'] for g in scored], dtype=float)
-    p_up    = np.array([g['p_up'] for g in scored], dtype=float)
-    up      = np.array([g['realized_up'] for g in scored], dtype=float)
-    realized = np.array([g['realized_pct'] for g in scored], dtype=float)
-
-    base = float(up.mean())                                    # unconditional up-rate
-    brier = float(np.mean((p_up - up) ** 2))
-    brier_base = float(np.mean((base - up) ** 2))
-    bss = (1.0 - brier / brier_base) if brier_base > 1e-9 else None
-
-    bull = realized[[g['direction'] == 'BULLISH' for g in scored]]
-    bear = realized[[g['direction'] == 'BEARISH' for g in scored]]
-
-    return {
-        'n_graded':        len(graded),
-        'n_scored':        len(scored),
-        'hit_rate':        round(float(correct.mean()) * 100, 1),
-        'base_up_rate':    round(base * 100, 1),
-        'brier':           round(brier, 4),
-        'brier_skill':     round(bss, 4) if bss is not None else None,
-        'avg_realized_pct': round(float(realized.mean()), 3),
-        'avg_when_bullish': round(float(bull.mean()), 3) if bull.size else None,
-        'avg_when_bearish': round(float(bear.mean()), 3) if bear.size else None,
-    }
+    return track_record.summary(graded)
 
 
 def get_ledger(limit: int = 50, grade: bool = True) -> dict:

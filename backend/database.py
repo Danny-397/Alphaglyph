@@ -19,6 +19,13 @@ if _USE_PG:
     import psycopg2
     import psycopg2.extras
 
+
+
+def is_postgres() -> bool:
+    """True when DATABASE_URL points at Postgres (data survives redeploys)."""
+    return _USE_PG
+
+
 # SQLite fallback path (used only when DATABASE_URL is unset).
 _LOCAL_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alphaglyph.db')
 DB_PATH = os.getenv('DATABASE_PATH', '').strip() or _LOCAL_DB
