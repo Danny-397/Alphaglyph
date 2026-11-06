@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 15 REST endpoints, 195 automated tests in CI
+- 15 REST endpoints, 200 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -115,10 +115,13 @@ a zero benchmark, which is the correct degenerate case and is asserted in the te
 
 ---
 
-## 4. CPCV and the Probability of Backtest Overfitting
+## 4. CSCV and the Probability of Backtest Overfitting
 
 `backend/cpcv.py`. Method from Bailey, Borwein, López de Prado & Zhu (2017), via
-Combinatorially-Symmetric Cross-Validation.
+Combinatorially-Symmetric Cross-Validation (CSCV). An earlier version of this report called it
+CPCV, which is a different method: López de Prado's Combinatorial *Purged* CV builds many
+backtest paths, while CSCV measures how often the in-sample winner fails out of sample. The
+module and the `/api/research/cpcv` route keep the old name so existing links work.
 
 ### 4.1 The strategy grid
 
@@ -170,6 +173,28 @@ correct method into a wrong number.
   means the in-sample edge mostly evaporates.
 - **Probability of OOS loss** — how often the selected strategy actually loses money.
 - Logit histogram, IS-vs-OOS scatter, and a split diagram for the interface.
+
+### 4.6 Calibrated by simulation
+
+Checking a formula on one worked example shows the code matches the paper. It does not show
+the statistic does its job. `backend/tests/test_stats_calibration.py` checks the property each
+statistic exists for, on simulated data where the right answer is known (seeded, two years of
+daily returns):
+
+| Check | Should be | Measured |
+|---|---|---|
+| PSR at 95% calls pure noise significant (normal returns, 2,000 draws) | about 5% | **5.05%** |
+| Same, fat-tailed returns (Student-t, 4 df) | about 5% | **5.1%** |
+| Best of 20 noise strategies: PSR calls the winner significant | often (selection bias) | **63%** |
+| Best of 20 noise strategies: DSR calls the winner significant | under 5% | **0.5%** |
+| PBO when all 30 strategies are noise | about 0.5 | **0.49** |
+| PBO when one of 30 has a real edge (Sharpe ≈ 2.4) | near 0 | **0.07** |
+
+The middle rows are the reason the Deflated Sharpe Ratio exists: picking the best of 20 coin
+flips and testing it as if it were the only one fools the plain test most of the time. DSR is
+conservative here, because it tests against the *expected* best of N. To make the simulation
+possible, PBO's core was split from the price-driven grid into `pbo_from_matrix`, which
+accepts any matrix of strategy returns.
 
 ---
 
@@ -224,11 +249,11 @@ GET matures any elapsed rows, so the record stays current without a cron job.
 
 ## 7. Results
 
-> **Reproduce before citing.** CPCV runs live against a rolling window of fetched
+> **Reproduce before citing.** CSCV runs live against a rolling window of fetched
 > price data, so PBO is a function of the window it was run on. Every figure below
 > carries the date it was produced.
 
-**CPCV on SPY — 42 variants, 10 groups, 252 splits, 1,050 rows after warm-up,
+**CSCV on SPY — 42 variants, 10 groups, 252 splits, 1,050 rows after warm-up,
 embargo 5. Run 2026-08-01:**
 
 *Reproducible from committed data:* the window this run used (SPY closes,
@@ -314,7 +339,7 @@ measurement does not get to hide its own null results.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 195 tests
+pytest                     # 200 tests
 python app.py              # http://localhost:5000
 ```
 

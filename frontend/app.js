@@ -2030,14 +2030,14 @@ function initResearch() {
     renderDm(data)
   })
 
-  // ── CPCV + PBO ───────────────────────────────────────────────────────────────
+  // ── CSCV + PBO ───────────────────────────────────────────────────────────────
   let cpcvHist = null, cpcvScatter = null
   function pboTone(pbo) { return pbo >= 0.5 ? 'negative' : pbo >= 0.25 ? '' : 'positive' }
 
   function renderCpcv(data) {
     const box = el('cpcv-result'); box.hidden = false
     if (!data || !data.available) {
-      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'CPCV unavailable right now.'}</p>`
+      box.innerHTML = `<p class="text-muted" style="font-size:12.5px;">${(data && data.reason) || 'CSCV unavailable right now.'}</p>`
       return
     }
     const d = data.degradation || {}
@@ -2061,7 +2061,7 @@ function initResearch() {
         <div><div class="section-header" style="font-size:13px;">In-sample vs out-of-sample Sharpe</div>
           <div class="chart-wrap" style="height:260px;"><canvas id="cpcv-scatter"></canvas></div></div>
       </div>
-      <div class="section-header" style="font-size:13px;">CPCV split structure (${data.n_groups} groups, embargo ${data.embargo}d) — first ${(data.splits_diagram || []).length} of ${data.n_combos}</div>
+      <div class="section-header" style="font-size:13px;">CSCV split structure (${data.n_groups} groups, embargo ${data.embargo}d) — first ${(data.splits_diagram || []).length} of ${data.n_combos}</div>
       <div class="cpcv-grid" style="margin-bottom:14px;">${grid}</div>
       <p style="font-size:13px;line-height:1.65;color:var(--text);"><strong>${data.verdict}</strong></p>
       <p class="text-muted" style="font-size:11px;line-height:1.6;margin-top:8px;">${data.ticker} · ${data.n_rows} trading days after warm-up · CSCV (Bailey & López de Prado 2014). A trend/mean-reversion grid, not the site's headline strategies.</p>`
@@ -2123,7 +2123,7 @@ function initResearch() {
     el('cpcv-loading').hidden = false; el('cpcv-result').hidden = true
     const data = await api('/api/research/cpcv', { method: 'POST', body: JSON.stringify({ ticker }) })
     el('cpcv-loading').hidden = true
-    btn.disabled = false; btn.textContent = 'Run CPCV'
+    btn.disabled = false; btn.textContent = 'Run CSCV'
     renderCpcv(data)
   })
 
