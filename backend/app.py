@@ -441,7 +441,7 @@ def research_datamine():
 @limiter.limit('10 per hour')
 def research_cpcv():
     """
-    Combinatorial Purged Cross-Validation → Probability of Backtest Overfitting.
+    Combinatorially-Symmetric Cross-Validation (CSCV) → Probability of Backtest Overfitting.
     Runs a real trend/mean-reversion hyperparameter grid on one ticker, then uses
     CSCV to measure how often the in-sample winner degrades out-of-sample. Heavy
     (hundreds of IS/OOS splits) but cached.

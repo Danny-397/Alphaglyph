@@ -10,10 +10,10 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-195%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="195 tests passing">
+  <img src="https://img.shields.io/badge/tests-200%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="200 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
-  <img src="https://img.shields.io/badge/overfitting-CPCV%20%2B%20PBO-3fb950?style=flat-square" alt="CPCV + PBO">
+  <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
   <img src="https://img.shields.io/badge/SciPy-1.13-8CAAE6?style=flat-square&logo=scipy&logoColor=white" alt="SciPy 1.13">
   <img src="https://img.shields.io/badge/PRs-welcome-5b73e8?style=flat-square" alt="PRs welcome">
 </p>
@@ -82,7 +82,7 @@ being fooled?* — from a different angle.
 The point of AlphaGlyph is that these numbers are *measured, not asserted* — every
 figure below is live output you can reproduce from the app or the API.
 
-### Overfitting probability (CPCV → PBO)
+### Overfitting probability (CSCV → PBO)
 
 A real trend + mean-reversion **hyperparameter grid** (42 variants) is cross-validated
 on SPY using Combinatorially-Symmetric Cross-Validation (Bailey, Borwein, López de Prado
@@ -97,7 +97,7 @@ leak the edge:
 | Chosen strategy loses money OOS | **~5%** | It doesn't blow up — selection just fails to find the good ones |
 | Grid size × CV splits | **42 × 252** | A genuine search, exactly the situation PBO was built to police |
 
-**Run 2026-08-01.** These figures move: CPCV runs against a rolling window, so PBO is a
+**Run 2026-08-01.** These figures move: CSCV runs against a rolling window, so PBO is a
 property of the window, not a constant. An earlier run reported 63% / ~38%. Quoting any
 single PBO as fixed is the exact error the metric exists to catch — see
 [docs/technical-report.md](docs/technical-report.md) for both runs and why the drift
@@ -180,7 +180,7 @@ because this is still a near-coin-flip domain.
 - **Data-Mining Lab** — generates hundreds of *purely random* timing strategies, keeps
   the luckiest, and shows the trap: naive statistics call it significant, the Deflated
   Sharpe deflates it back to noise.
-- **CPCV + PBO** — Combinatorially-Symmetric Cross-Validation over a real
+- **CSCV + PBO** — Combinatorially-Symmetric Cross-Validation over a real
   hyperparameter grid → the Probability of Backtest Overfitting, with a λ-histogram,
   an in-sample-vs-out-of-sample Sharpe scatter, and the purged split-structure grid.
 - **Cost sensitivity** — reruns a strategy across a 0→100 bp/side cost grid and solves
@@ -239,7 +239,7 @@ benchmark**, and a **client-side animated replay** of every explained trade.
 | Typical student trading project | AlphaGlyph |
 |---|---|
 | "My Sharpe is 1.4" | "My Sharpe is 1.4, the Deflated Sharpe gives 91% it's real after 5 strategies, and the **PBO says the search that found it overfits 72% of the time**" |
-| Backtest and stop | After the backtest: skill test, DSR, Fama-French, CPCV/PBO, and a cost-sensitivity sweep |
+| Backtest and stop | After the backtest: skill test, DSR, Fama-French, CSCV/PBO, and a cost-sensitivity sweep |
 | Return metric only | Fama-French alpha decomposition — skill vs. passive factor exposure |
 | One blended Sharpe | **Regime-conditional** performance — is the edge real, or just one lucky regime? |
 | Backtest = truth | A live **append-only forward ledger** that grades predictions after the fact |
@@ -324,7 +324,7 @@ store. All are per-IP rate-limited.
 | `/api/predict/ledger` | GET | The live append-only forward track record (lazily grades matured rows) |
 | `/api/research/pead` | GET | Pooled post-earnings-drift event study with a beat-minus-miss t-test |
 | `/api/research/datamine` | POST | Random-strategy sweep → Deflated Sharpe deflation (p-hacking demo) |
-| `/api/research/cpcv` | POST | Combinatorial Purged CV → Probability of Backtest Overfitting |
+| `/api/research/cpcv` | POST | Combinatorially-Symmetric CV → Probability of Backtest Overfitting (route name kept for compatibility) |
 | `/api/research/cost-sensitivity` | POST | Cost-sweep: net-return decay + break-even cost vs. buy-and-hold |
 | `/api/scan` | GET | Live Signal Scanner: current stance of every strategy + ML per ticker |
 | `/api/regime` | GET | Detect the current market regime from live SPY data |
@@ -375,7 +375,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (195
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (200
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -392,7 +392,7 @@ alphaglyph/
 │   ├── earnings.py      PEAD + YoY EPS-growth signal
 │   ├── calibration.py   Out-of-sample reliability of the ML forecaster
 │   ├── ledger.py        Append-only forward prediction record + lazy grading
-│   ├── cpcv.py          Combinatorial Purged CV → Probability of Backtest Overfitting
+│   ├── cpcv.py          Combinatorially-Symmetric CV (CSCV) → Probability of Backtest Overfitting
 │   ├── costsweep.py     Transaction-cost sensitivity sweep + break-even solver
 │   ├── pead.py          Pooled post-earnings-drift event study
 │   ├── datamining.py    Random-strategy sweep (p-hacking demo)
@@ -405,7 +405,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           195 tests, fully offline
+│   └── tests/           200 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
@@ -434,7 +434,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 195 passing
+cd backend && pytest -q                    # 200 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)
@@ -548,6 +548,6 @@ engine does — and, just as importantly, what it does **not** claim.
 inference, machine learning, and full-stack engineering. Concepts implemented from
 scratch include Wilder's ADX / RSI / MACD, rolling Kelly sizing, the random-timing
 permutation and stationary block-bootstrap tests, Probabilistic & Deflated Sharpe,
-Combinatorial Purged CV → PBO, Ledoit-Wolf shrinkage, and Fama-French 3-factor OLS.
+Combinatorially-Symmetric CV → PBO, Ledoit-Wolf shrinkage, and Fama-French 3-factor OLS.
 </content>
 </invoke>

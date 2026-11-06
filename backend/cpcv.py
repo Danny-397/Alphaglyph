@@ -1,6 +1,10 @@
 """
-Combinatorial Purged Cross-Validation (CPCV) + Probability of Backtest
-Overfitting (PBO).
+Probability of Backtest Overfitting (PBO) via Combinatorially-Symmetric
+Cross-Validation (CSCV), with an embargo at block boundaries.
+
+(The module keeps its historical name, cpcv, and the /api/research/cpcv route,
+for compatibility. The method is Bailey et al.'s CSCV, not López de Prado's
+Combinatorial Purged CV, which builds backtest paths rather than a PBO.)
 
 The single most important question about any backtest is: *did I overfit?* When
 you search a grid of strategy variants and keep the best one, its in-sample
@@ -153,10 +157,19 @@ def cpcv_from_prices(close: pd.Series, ticker: str, n_groups: int = 10,
     rolling window cannot reproduce a dated figure: PBO on SPY moved from 63% to
     72% between two runs of identical code.
     """
-    M, names = _strategy_matrix(close)
+    M, _ = _strategy_matrix(close)
     # Drop the indicator warm-up rows (leading zeros from the longest window).
     warm = 205
-    M = M[warm:]
+    return pbo_from_matrix(M[warm:], n_groups=n_groups, embargo=embargo, ticker=ticker)
+
+
+def pbo_from_matrix(M: np.ndarray, n_groups: int = 10, embargo: int = 5,
+                    ticker: str | None = None) -> dict:
+    """CSCV/PBO on any (T periods x N strategies) matrix of per-period returns.
+
+    Separate from the price-driven grid so the method itself can be checked on
+    matrices whose answer is known (tests/test_stats_calibration.py).
+    """
     T, N = M.shape
     if T < n_groups * 20:
         return {'available': False, 'reason': 'Not enough usable rows after warm-up.'}
