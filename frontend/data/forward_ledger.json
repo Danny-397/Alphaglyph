@@ -1,0 +1,32 @@
+{
+ "available": true,
+ "source": "git",
+ "generated_at": "2026-11-06T19:37:20+00:00",
+ "since": null,
+ "basket": [
+  "SPY",
+  "QQQ",
+  "AAPL",
+  "MSFT",
+  "NVDA",
+  "AMZN",
+  "GOOGL",
+  "META",
+  "TSLA",
+  "JPM"
+ ],
+ "n_total": 0,
+ "n_pending": 0,
+ "summary": {
+  "n_graded": 0,
+  "n_scored": 0,
+  "hit_rate": null,
+  "brier": null,
+  "brier_skill": null,
+  "avg_realized_pct": null,
+  "avg_when_bullish": null,
+  "avg_when_bearish": null
+ },
+ "rows": [],
+ "note": "Logged automatically every trading day near the close for a fixed basket, and committed to GitHub before the outcome exists. A row is graded once, against the first close on or after its due date, and never edited afterwards. Full history: frontend/data/forward_ledger.csv in the repository."
+}
