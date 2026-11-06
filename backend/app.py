@@ -21,6 +21,7 @@ import backtest as backtester
 import calibration as calib
 import costsweep
 import cpcv
+import database as db
 import datamining
 import features  # noqa: F401 — imported so startup errors surface early
 import ledger
@@ -679,11 +680,14 @@ def optimize_portfolio():
 def health():
     # Exempt from rate limiting: the keep-warm self-ping (and any external
     # uptime monitor) hits this frequently to keep the free instance awake.
-    # The API is fully stateless — no bot, no database to report on.
     return jsonify({
         'status': 'ok',
         'ts':     datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         'ml':     'loaded' if ml_runtime.get_info().get('loaded') else 'unavailable',
+        # Which database the live ledger writes to. "sqlite" on Render's free
+        # tier means an ephemeral disk: the live ledger resets on redeploy,
+        # which is why the committed record (tools/forward_ledger.py) exists.
+        'db':     'postgres' if db.is_postgres() else 'sqlite',
     })
 
 

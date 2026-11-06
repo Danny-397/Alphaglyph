@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 15 REST endpoints, 200 automated tests in CI
+- 15 REST endpoints, 207 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -245,6 +245,22 @@ Calibration measures the model on historical out-of-sample data already in hand;
 ledger measures it on the future, one real day at a time. Grading is lazy — a plain
 GET matures any elapsed rows, so the record stays current without a cron job.
 
+**The live ledger turned out not to accrue.** After three months it held three graded
+calls. The backend runs on Render's free tier with no database configured, so the table
+lived in a SQLite file on an ephemeral disk that every redeploy wiped, and it only
+recorded predictions a visitor happened to ask for. A forward record that resets is not
+a forward record.
+
+**So the forward record now lives in git** ([`tools/forward_ledger.py`](../tools/forward_ledger.py),
+run by `.github/workflows/forward-ledger.yml`). Every trading day near the close, the live
+Predictor is asked about a fixed basket of ten tickers (SPY, QQQ and eight large caps), and
+each call is appended to `frontend/data/forward_ledger.csv` and committed. Calls whose
+horizon has passed are graded against the first close on or after the due date and filled
+in once. The commit history is the audit trail: each call sits in a commit dated before its
+outcome existed. Both records grade with the same rules
+([`track_record.py`](../backend/track_record.py)), and `/health` now reports which database
+the live ledger is using.
+
 ---
 
 ## 7. Results
@@ -328,8 +344,9 @@ measurement does not get to hide its own null results.
   exposure profiles, rank-based comparison is less meaningful.
 - **Transaction costs are modelled, not measured.** Real fills, slippage and market
   impact are not simulated.
-- **The forward ledger is young.** A track record is only as good as its length, and
-  this one accrues one day at a time.
+- **The forward record is young.** It accrues ten calls a trading day from November
+  2026. Until it holds a few hundred graded calls, its hit rate and Brier skill are
+  noise, and a single market regime dominates it.
 
 ---
 
@@ -339,7 +356,7 @@ measurement does not get to hide its own null results.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 200 tests
+pytest                     # 207 tests
 python app.py              # http://localhost:5000
 ```
 

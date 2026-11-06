@@ -1842,7 +1842,7 @@ function initPredictor() {
     const s = data.summary || {}
     if (!rows.length) {
       box.innerHTML = `<p class="text-muted" style="font-size:12.5px;line-height:1.65;">
-        The ledger is empty. Run a prediction above — it gets logged here immediately and graded once its ${data.rows?.[0]?.horizon || 5}-day horizon passes. The forward track record builds from there.</p>`
+        No calls logged yet. The first ones are recorded on the next trading day near the close, and graded once their 5-day horizon passes.</p>`
       return
     }
     const hitTag = s.hit_rate == null ? ['', 'awaiting first graded call']
@@ -1859,7 +1859,7 @@ function initPredictor() {
 
     box.innerHTML = `
       <div class="hero-row" style="margin-bottom:16px;">
-        <div class="hero-stat"><div class="hero-stat-value">${s.n_scored || 0}</div><div class="hero-stat-label">Graded directional calls (${data.n_pending || 0} pending)</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">${s.n_scored || 0}</div><div class="hero-stat-label">Graded directional calls (${data.n_pending || 0} pending${data.since ? `, since ${data.since}` : ''})</div></div>
         <div class="hero-stat"><div class="hero-stat-value ${hitTag[0]}">${s.hit_rate == null ? '—' : s.hit_rate + '%'}</div><div class="hero-stat-label">Forward hit rate · ${hitTag[1]}</div></div>
         <div class="hero-stat"><div class="hero-stat-value ${bssTag}">${s.brier_skill == null ? '—' : fmtN(s.brier_skill, 3)}</div><div class="hero-stat-label">Brier skill (>0 = beats base rate)</div></div>
         <div class="hero-stat"><div class="hero-stat-value ${clr(s.avg_realized_pct)}">${s.avg_realized_pct == null ? '—' : fmtPct(s.avg_realized_pct, 2)}</div><div class="hero-stat-label">Avg realized move / call</div></div>
@@ -1884,7 +1884,14 @@ function initPredictor() {
     ledgerBtn.disabled = true; ledgerBtn.textContent = ledgerLoaded ? 'Refreshing…' : 'Loading…'
     el('ledger-loading').hidden = false
     el('ledger-result').hidden = true
-    const data = await api('/api/predict/ledger')
+    // The committed record is a static file served with the site, so reading
+    // it never has to wake the backend.
+    let data = null
+    try {
+      const res = await fetch('/data/forward_ledger.json', { cache: 'no-cache' })
+      if (res.ok) data = await res.json()
+    } catch (_) { data = null }
+    if (!data) data = await api('/api/predict/ledger')
     el('ledger-loading').hidden = true
     ledgerBtn.disabled = false; ledgerBtn.textContent = 'Refresh'
     ledgerLoaded = true

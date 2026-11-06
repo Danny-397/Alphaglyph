@@ -96,7 +96,7 @@
         <button type="button" class="btn btn-sm" id="ledger-load">Load ledger</button>
       </div>
       <p class="card-desc">
-        Every prediction made here is <strong>logged the moment it's made</strong> (ticker, probability, price) and graded once its horizon passes. Nothing is edited afterwards, so the hit rate is a genuine forward record that can't be fitted in hindsight.
+        Every trading day near the close, the Predictor's call for a fixed basket of ten tickers is <strong>committed to GitHub</strong> (ticker, probability, price), and graded once its horizon passes. The commit lands before the outcome exists and a graded row is never edited, so the hit rate is a forward record that can't be fitted in hindsight. <a href="https://github.com/Danny-397/Alphaglyph/commits/main/frontend/data/forward_ledger.csv" target="_blank" rel="noopener">See every commit</a>.
       </p>
       <div id="ledger-loading" hidden>
         <div class="loading-state"><div class="spinner"></div>
