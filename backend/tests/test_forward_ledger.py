@@ -100,3 +100,14 @@ def test_csv_round_trip_and_summary_shape(tmp_path):
     assert s['n_graded'] == 3 and s['n_scored'] == 2        # the neutral call is not scored
     assert s['hit_rate'] == 50.0                            # SPY right, QQQ wrong
     assert isinstance(out['rows'][0]['p_up'], float)
+
+
+def test_late_runs_still_log_the_day():
+    """GitHub starts scheduled runs hours late; any time from 15:15 ET to midnight counts."""
+    ny = fl.NY
+    at = lambda h, m: datetime(2026, 11, 6, h, m, tzinfo=ny)  # noqa: E731
+    assert not fl.can_log(at(14, 59))
+    assert fl.can_log(at(15, 15)) and fl.can_log(at(15, 40))
+    assert fl.can_log(at(18, 49))           # the 2026-11-06 run, three hours late
+    assert fl.can_log(at(23, 59))
+    assert not fl.can_log(at(9, 30))        # next morning: that day's close is gone

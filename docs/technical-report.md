@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 15 REST endpoints, 207 automated tests in CI
+- 15 REST endpoints, 208 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -257,7 +257,10 @@ Predictor is asked about a fixed basket of ten tickers (SPY, QQQ and eight large
 each call is appended to `frontend/data/forward_ledger.csv` and committed. Calls whose
 horizon has passed are graded against the first close on or after the due date and filled
 in once. The commit history is the audit trail: each call sits in a commit dated before its
-outcome existed. Both records grade with the same rules
+outcome existed. The first scheduled runs started about three hours late, and a logging
+window that closed at 16:15 ET would have recorded nothing. Calls are now accepted from
+15:15 ET until midnight New York time, priced at that day's close, which is still days
+before the outcome. A third, later schedule is a backup. Both records grade with the same rules
 ([`track_record.py`](../backend/track_record.py)), and `/health` now reports which database
 the live ledger is using.
 
@@ -356,7 +359,7 @@ measurement does not get to hide its own null results.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 207 tests
+pytest                     # 208 tests
 python app.py              # http://localhost:5000
 ```
 
