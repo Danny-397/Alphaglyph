@@ -47,9 +47,18 @@ JSON_PATH = os.path.join(DATA_DIR, 'forward_ledger.json')
 
 BASKET = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'JPM']
 NY = ZoneInfo('America/New_York')
-# Log near the close, so the entry price is close to the day's close, and
-# inside the backend's keep-alive window (09:00-16:30 ET), so no extra wake-up.
-WINDOW = (time(15, 15), time(16, 15))
+# From shortly before the close to the end of the trading day. GitHub starts
+# scheduled runs late, by three hours on 2026-11-06, so a window that closed
+# at 16:15 silently recorded nothing on a normal day. A call made after the
+# close uses that day's closing price and is still made days before its
+# 5-day outcome exists, so it is as forward as one made at 15:40.
+WINDOW = (time(15, 15), time(23, 59, 59))
+
+
+def can_log(ny_now: datetime) -> bool:
+    """Whether a run at this New York time may log today's calls."""
+    return WINDOW[0] <= ny_now.time() <= WINDOW[1]
+
 
 FIELDS = ['created_at', 'created_date', 'ticker', 'horizon', 'direction', 'signal', 'p_up',
           'confidence', 'price_at_pred', 'due_date', 'model_version', 'status',
@@ -249,8 +258,7 @@ def main() -> int:
     rows = read_rows()
 
     if not args.grade:
-        in_window = WINDOW[0] <= ny_now.time() <= WINDOW[1]
-        if not (in_window or args.force):
+        if not (can_log(ny_now) or args.force):
             print(f'{ny_now:%H:%M} ET is outside the logging window; grading only.')
         elif not is_trading_day(ny_now.date()):
             print(f'{ny_now.date()} is not a trading day; grading only.')

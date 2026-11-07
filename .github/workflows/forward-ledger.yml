@@ -5,16 +5,19 @@ name: Forward ledger
 # frontend/data/. The commit history is the audit trail: each call is in a
 # commit dated before its outcome existed. See tools/forward_ledger.py.
 #
-# Two crons, because GitHub schedules in UTC: 19:40 UTC is 15:40 New York time
-# in summer (EDT) and 20:40 UTC is 15:40 in winter (EST). The script logs only
-# between 15:15 and 16:15 ET on trading days, so the other run just grades.
-# Both land inside the backend's own keep-alive window (09:00-16:30 ET), so
-# this costs no extra Render free-tier hours.
+# Three crons, because GitHub schedules in UTC and often starts them hours late
+# (both of 2026-11-06's ran about three hours after their time). 19:40 UTC is
+# 15:40 New York time in summer (EDT) and 20:40 UTC is 15:40 in winter (EST);
+# 23:15 UTC is a backup in case both are late or dropped. The script logs from
+# 15:15 ET to midnight on trading days, once per ticker per day, so later runs
+# only grade. A run after 16:30 ET wakes the Render backend outside its
+# keep-alive window, which costs about a quarter of an hour of free-tier time.
 
 on:
   schedule:
     - cron: '40 19 * * 1-5'
     - cron: '40 20 * * 1-5'
+    - cron: '15 23 * * 1-5'
   workflow_dispatch:
     inputs:
       force:
