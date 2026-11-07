@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-208%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="208 tests passing">
+  <img src="https://img.shields.io/badge/tests-245%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="245 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
@@ -210,6 +210,40 @@ visitors' predictions, but on Render's free tier it resets on every redeploy.
 - **Custom (no-code rule builder)** — BUY/SELL from indicators (price, SMAs, RSI, MACD, volume, returns, 52-week range) with below / above / crosses-above / crosses-below, combined with ALL/ANY.
 - **Adaptive Mode** — detects the current SPY regime and auto-selects the fitting strategy.
 
+### Options strategy backtester
+A separate **Options** page backtests option strategies day by day on an underlying's real
+history ([`options_bt.py`](backend/options_bt.py)): it opens the position, marks every leg
+to market each day, applies the exit rules, and rolls into the next position.
+
+- **One to six legs.** 19 presets: long and short calls and puts, covered calls, protective
+  puts, vertical spreads, straddles, strangles, a calendar, collars, butterflies, iron
+  condors and iron butterflies. Or build your own legs (stock included), with strikes at the
+  money, a percent from the price, a target delta, or an offset from another leg's strike.
+- **Says exactly what it tests.** Every run is spelled out: *"Protective collar: a
+  three-leg backtest (long stock, long put, short call)"*, then each leg, the first
+  position's actual strikes and expiries, and its payoff at expiry.
+- **Exit rules and costs:** hold to expiry or close N days before, profit targets and stop
+  losses; $0.65 a contract plus a bid/ask cost per side (1% on index ETFs, 3% on single
+  stocks by default). Cash earns the T-bill rate; sizing is by each position's worst case.
+- **Model-priced, and labelled so.** Free historical option quotes don't exist, so prices are
+  Black-Scholes on each day's close with implied volatility from the VIX (0.87 × VIX for SPY;
+  other tickers scale their realized volatility by the market's implied-to-realized ratio),
+  a term structure, and a put-heavy skew. The UI says this above every result.
+
+On SPY over five years (2021-11-08 → 2026-11-06, 30 days to expiry, default settings),
+none of the 19 beat buying and holding on return, which is what a strong bull market does
+to option overlays. Selling premium cut the drawdown; buying it bled:
+
+| Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
+|---|---:|---:|---:|---:|
+| Buy and hold SPY | +67.7% | +10.9% | 0.46 | −24.5% |
+| Cash-secured put (1) | +62.2% | +10.2% | 0.95 | −7.9% |
+| Covered call (2) | +61.3% | +10.1% | 0.52 | −17.4% |
+| Iron condor (4) | +31.7% | +5.7% | 0.18 | −21.9% |
+| Protective collar (3) | +10.5% | +2.0% | −0.17 | −22.0% |
+| Long call (1) | +4.2% | +0.8% | 0.12 | −50.3% |
+| Long straddle (2) | −42.1% | −10.4% | −0.43 | −50.7% |
+
 ### Statistical validation (after every backtest)
 - **Skill test vs. random timing** — 1,000 "monkey" traders long the benchmark on a random subset of days, matched to the strategy's exposure; the real "beats random?" test (a bootstrap of a strategy's *own* returns sits at ~the 50th percentile by construction and can't separate skill from luck).
 - **Monte Carlo fan chart** — 1,000 stationary block-bootstrap paths (Politis & Romano, 1994); labelled as an outcome-*spread* view, **not** a skill test.
@@ -325,6 +359,9 @@ store. All are per-IP rate-limited.
 |---|---|---|
 | `/api/backtest` | POST | Full backtest — walk-forward, Kelly, costs, skill test, Monte Carlo, DSR, Fama-French, **regime-conditional** breakdown |
 | `/api/compare` | POST | Run every strategy on the same inputs → ranked leaderboard |
+| `/api/options/backtest` | POST | Backtest one options strategy (a preset or up to six custom legs, stock included) on one underlying |
+| `/api/options/compare` | POST | Run all 19 preset options strategies on the same underlying and window → ranked leaderboard |
+| `/api/options/presets` | GET | The preset options strategies, grouped by leg count, each with what its backtest holds |
 | `/api/predict` | GET | Multi-signal Predictor (price + earnings + sentiment); also logs the call to the forward ledger |
 | `/api/predict/calibration` | GET | Out-of-sample reliability of the ML forecaster (reliability diagram + Brier/skill scores) |
 | `/api/predict/ledger` | GET | The live append-only forward track record (lazily grades matured rows) |
@@ -381,7 +418,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (208
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (245
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -391,7 +428,7 @@ tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 ```
 alphaglyph/
 ├── backend/                  (Flask API — stateless core + optional ledger store)
-│   ├── app.py           REST API — 15 endpoints
+│   ├── app.py           REST API — 18 endpoints
 │   ├── strategies.py    Signal generators + current-stance scanner
 │   ├── backtest.py      Simulation — walk-forward, Kelly, costs, regime tagging + conditional split
 │   ├── predictor.py     Multi-signal Predictor (price + earnings + sentiment blend)
@@ -402,6 +439,7 @@ alphaglyph/
 │   ├── costsweep.py     Transaction-cost sensitivity sweep + break-even solver
 │   ├── pead.py          Pooled post-earnings-drift event study
 │   ├── datamining.py    Random-strategy sweep (p-hacking demo)
+│   ├── options_bt.py    Options strategy backtester — model-priced legs, rolls, costs
 │   ├── portfolio.py     Markowitz efficient frontier + Ledoit-Wolf shrinkage (SciPy SLSQP)
 │   ├── monte_carlo.py   Random-timing skill test + stationary block-bootstrap fan chart
 │   ├── stats.py         PSR, Deflated Sharpe Ratio, Fama-French 3-factor OLS
@@ -411,13 +449,13 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           208 tests, fully offline
+│   └── tests/           245 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
-│   ├── index.html · backtest.html · predict.html
+│   ├── index.html · backtest.html · options.html · predict.html
 │   ├── screener.html · portfolio.html · research.html
-│   └── landing.css · style.css · config.js · app.js
+│   └── landing.css · style.css · config.js · app.js · options.js
 ├── .github/workflows/   ci.yml · keepwarm.yml
 └── render.yaml · .flake8 · .env.example · README.md
 ```
@@ -440,7 +478,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 208 passing
+cd backend && pytest -q                    # 245 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)
