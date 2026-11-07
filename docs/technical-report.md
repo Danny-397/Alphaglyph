@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 15 REST endpoints, 208 automated tests in CI
+- 18 REST endpoints, 245 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -347,19 +347,79 @@ measurement does not get to hide its own null results.
   exposure profiles, rank-based comparison is less meaningful.
 - **Transaction costs are modelled, not measured.** Real fills, slippage and market
   impact are not simulated.
+- **Option prices in the options backtester are modelled.** Black-Scholes with a modelled
+  volatility level, skew and term structure, no dividends and no early assignment (§9).
 - **The forward record is young.** It accrues ten calls a trading day from November
   2026. Until it holds a few hundred graded calls, its hit rate and Brier skill are
   noise, and a single market regime dominates it.
 
 ---
 
-## 9. Reproducing
+## 9. Options strategy backtests
+
+The options backtester extends the same question, whether an edge is real, to option
+strategies. It holds one position at a time on one underlying: it opens the legs, marks
+them to market at every close, closes on the first of expiry, a days-before-expiry rule,
+a profit target or a stop loss, and opens the next position the same day. Units are sized
+so that each position's worst case at expiry (or, for uncovered short calls, the loss on a
+30% rally) uses at most a set share of the account. Idle cash earns the 3-month T-bill.
+
+**Prices are modelled, and this is the central limitation.** No free source has
+historical option quotes, so each leg is priced with Black-Scholes on that day's close.
+Three choices keep the prices close to real chains:
+
+1. *Level.* For SPY, at-the-money implied volatility is 0.87 × the VIX: the VIX is a
+   variance-swap rate that includes the skew, and 30-day at-the-money IV usually sits
+   about that far below it. Other tickers use their own 21-day realized volatility times
+   the market's implied-to-realized ratio that day (clipped to 0.8-2.0), so their IV rises
+   in fearful markets, as real IV does.
+2. *Skew.* IV changes with standardized moneyness, by 0.40 per standard deviation on the
+   put side and 0.15 on the call side: a 16-delta put trades near 1.4 × at-the-money IV and
+   a 16-delta call near 0.85 ×. An early version used the raw VIX with a mild symmetric
+   skew and flattered short-premium trades badly: at the same sizing, an SPY iron condor
+   showed a 26% CAGR over 2021-2025. With the VIX adjustment and the asymmetric skew it
+   fell to about 12%.
+3. *Term structure.* IV at other maturities scales with (T / 30 days)^β, where β falls
+   from about +0.10 in calm markets to below zero in panics. Without it, a calendar spread
+   bought a 60-day option at the 30-day volatility and showed a 26% CAGR; with it, the
+   calendar roughly breaks even.
+
+Each of those corrections moved results toward what is known about these strategies,
+which is evidence the model is directionally right, but it is still a model. Calendars and
+far out-of-the-money wings depend most on the modelled shapes, so they are the least
+reliable results. Every result in the UI carries a "model-priced" banner and the
+volatility source.
+
+On SPY over 2021-11-08 → 2026-11-06 (30 days to expiry, default sizing and costs):
+
+| Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
+|---|---:|---:|---:|---:|
+| Buy and hold SPY | +67.7% | +10.9% | 0.46 | −24.5% |
+| Cash-secured put (1) | +62.2% | +10.2% | 0.95 | −7.9% |
+| Covered call (2) | +61.3% | +10.1% | 0.52 | −17.4% |
+| Iron condor (4) | +31.7% | +5.7% | 0.18 | −21.9% |
+| Protective collar (3) | +10.5% | +2.0% | −0.17 | −22.0% |
+| Long call (1) | +4.2% | +0.8% | 0.12 | −50.3% |
+| Long straddle (2) | −42.1% | −10.4% | −0.43 | −50.7% |
+
+None beat buy-and-hold on return in a window where SPY rose 68%. The short-premium
+strategies earned most of the market's return with a third to two-thirds of its drawdown;
+the long-premium ones paid theta every month. The tests check the parts that do not
+depend on the volatility model: Black-Scholes against a textbook value and put-call
+parity, expiries on Fridays, delta strikes, offsets that always form a spread, the capital
+rule for each structure, no look-ahead (changing later prices leaves the first trade
+unchanged), costs that only ever lower the result, and an exact accounting identity:
+final equity equals starting capital plus the sum of every trade's P&L.
+
+---
+
+## 10. Reproducing
 
 ```bash
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 208 tests
+pytest                     # 245 tests
 python app.py              # http://localhost:5000
 ```
 
@@ -370,7 +430,7 @@ single upstream outage does not take the system down.
 
 ---
 
-## 10. References
+## 11. References
 
 1. Bailey, D. H., Borwein, J. M., López de Prado, M., & Zhu, Q. J. *The Probability of
    Backtest Overfitting.* **Journal of Computational Finance, 20(4), 39–70 (2017).**

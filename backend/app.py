@@ -26,6 +26,7 @@ import datamining
 import features  # noqa: F401 — imported so startup errors surface early
 import ledger
 import ml_runtime
+import options_bt
 import pead as pead_study
 import portfolio as portopt
 import predictor as predictor_engine
@@ -640,6 +641,119 @@ def run_backtest():
         custom_rules=custom_rules,
     )
     return jsonify(result)
+
+
+# ── Options strategy backtests ────────────────────────────────────────────────
+
+_OPT_TICKER = re.compile(r'^[A-Z][A-Z0-9.\-]{0,9}$')
+
+
+def _num(data, key, default, lo, hi, label, allow_none=False):
+    """A bounded number from the request body; raises ValueError with a readable message."""
+    v = data.get(key, default)
+    if v is None or v == '':
+        if allow_none:
+            return None
+        v = default
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        raise ValueError(f'{label} must be a number')
+    if not (lo <= v <= hi):
+        raise ValueError(f'{label} must be between {lo:g} and {hi:g}')
+    return v
+
+
+def _options_args(data: dict) -> dict:
+    """Validated settings shared by the options backtest and comparison endpoints."""
+    ticker = str(data.get('ticker') or 'SPY').strip().upper()
+    if not _OPT_TICKER.match(ticker):
+        raise ValueError('Enter a valid ticker')
+    end = data.get('end_date') or datetime.now().strftime('%Y-%m-%d')
+    start = data.get('start_date') or (datetime.now() - timedelta(days=5 * 365)).strftime('%Y-%m-%d')
+    try:
+        s_dt, e_dt = datetime.strptime(start, '%Y-%m-%d'), datetime.strptime(end, '%Y-%m-%d')
+    except (TypeError, ValueError):
+        raise ValueError('Dates must be YYYY-MM-DD')
+    if s_dt < datetime(1995, 1, 1) or e_dt <= s_dt + timedelta(days=60):
+        raise ValueError('Pick a window of at least two months, starting 1995 or later')
+    if (e_dt - s_dt).days > options_bt.MAX_YEARS * 366:
+        raise ValueError(f'The window can be at most {options_bt.MAX_YEARS} years')
+    spread = _num(data, 'spread_pct', None, 0, 20, 'Bid/ask cost', allow_none=True)
+    return {
+        'ticker': ticker, 'start': start, 'end': end,
+        'dte': int(_num(data, 'dte', 30, 3, 180, 'Days to expiry')),
+        'initial_capital': _num(data, 'initial_capital', 100_000, 1_000, 10_000_000, 'Capital'),
+        'exit_dte': (None if data.get('exit_dte') in (None, '') else
+                     int(_num(data, 'exit_dte', 0, 0, 179, 'Exit days before expiry'))),
+        'profit_take': _num(data, 'profit_take', None, 1, 1000, 'Profit target', allow_none=True),
+        'stop_loss': _num(data, 'stop_loss', None, 1, 1000, 'Stop loss', allow_none=True),
+        'spread_pct': None if spread is None else spread / 100.0,
+        'commission': _num(data, 'commission', 0.65, 0, 10, 'Commission per contract'),
+        'skew': bool(data.get('skew', True)),
+    }
+
+
+@app.route('/api/options/presets')
+def options_presets():
+    """Every preset options strategy, grouped by leg count, with what each backtest holds."""
+    dte = request.args.get('dte', 30, type=int)
+    return jsonify({'presets': options_bt.presets_summary(max(3, min(dte or 30, 180)))})
+
+
+@app.route('/api/options/backtest', methods=['POST'])
+@limiter.limit('30 per hour')
+def options_backtest():
+    """Backtest one options strategy (a preset or custom legs) on one underlying."""
+    data = request.get_json() or {}
+    try:
+        args = _options_args(data)
+        preset = data.get('preset')
+        if preset:
+            if preset not in options_bt.PRESETS:
+                raise ValueError('Unknown strategy')
+            p = options_bt.PRESETS[preset]
+            legs, name = p['legs'], p['name']
+            alloc = _num(data, 'alloc_pct', p['alloc'], 1, 100, 'Capital per position')
+        else:
+            legs = options_bt.clean_legs(data.get('legs'))
+            name = str(data.get('name') or 'Custom strategy').strip()[:60] or 'Custom strategy'
+            alloc = _num(data, 'alloc_pct', 10, 1, 100, 'Capital per position')
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    result = options_bt.run(legs=legs, name=name, alloc_pct=alloc, **args)
+    if 'error' in result:
+        return jsonify(result), 422
+    return jsonify(result)
+
+
+@app.route('/api/options/compare', methods=['POST'])
+@limiter.limit('15 per hour')
+def options_compare():
+    """Run every preset options strategy on the same underlying and window, ranked by return."""
+    data = request.get_json() or {}
+    try:
+        args = _options_args(data)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    market = options_bt.load_market(args['ticker'], args['start'], args['end'])
+    if 'error' in market:
+        return jsonify(market), 422
+    rows, bench = [], None
+    for key, p in options_bt.PRESETS.items():
+        r = options_bt.run(legs=p['legs'], name=p['name'], alloc_pct=p['alloc'], market=market, **args)
+        if 'error' in r:
+            continue
+        bench = r['benchmark']
+        m = r['metrics']
+        rows.append({'key': key, 'name': p['name'], 'group': p['group'], 'legs_count': len(p['legs']),
+                     'headline': r['strategy']['headline'], 'alloc_pct': p['alloc'],
+                     **{k: m[k] for k in ('total_return', 'cagr', 'sharpe', 'max_drawdown', 'win_rate',
+                                          'trades', 'psr', 'total_costs')},
+                     'equity': [e['value'] for e in r['equity']][::5]})
+    rows.sort(key=lambda r: -(r['total_return'] or -1e9))
+    return jsonify({'ticker': args['ticker'], 'start_date': args['start'], 'end_date': args['end'],
+                    'dte': args['dte'], 'benchmark': bench, 'results': rows})
 
 
 # ── Portfolio optimization ─────────────────────────────────────────────────────
