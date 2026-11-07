@@ -102,7 +102,11 @@ def build():
     macro = mlf.fetch_macro(START_DATE, end_date)
     print('  macro:', 'OK' if macro is not None else 'unavailable — zero-filled',
           flush=True)
-    if not os.getenv('ML_SKIP_SENTIMENT'):
+    news_dir = os.path.join(OUT_DIR, 'news')
+    if not os.getenv('ML_SKIP_SENTIMENT') and os.path.isdir(news_dir):
+        os.environ.setdefault('ML_NEWS_DIR', news_dir)
+        print(f'News sentiment read from {news_dir} (ml/fetch_news.py).', flush=True)
+    elif not os.getenv('ML_SKIP_SENTIMENT'):
         print('News sentiment (GDELT) enabled — it auto-disables if rate-limited. '
               'Set ML_SKIP_SENTIMENT=1 to skip it for a faster run.', flush=True)
 
