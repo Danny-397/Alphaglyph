@@ -364,13 +364,39 @@ def implied_vol_series(close: pd.Series, ticker: str, vix: pd.Series | None,
                                        '(the VIX was unavailable)')
 
 
+_FRED_URL = 'https://fred.stlouisfed.org/graph/fredgraph.csv'
+_FRED_CACHE: dict = {}              # series id -> (fetched_at, Series covering 1990 to that day)
+_FRED_TTL = 6 * 3600
+
+
 def _fred(series_id: str, lo, hi) -> pd.Series | None:
-    try:
-        import ml_features
-        return ml_features._fred_series_chunked(series_id, pd.Timestamp(lo), pd.Timestamp(hi))
-    except Exception as exc:          # pragma: no cover - network
-        logger.warning('FRED %s unavailable: %s', series_id, exc)
-        return None
+    """A daily FRED series for [lo, hi]: one request for the whole history, cached for six hours.
+
+    Kept fast and bounded so a backtest never waits on FRED for long (the server's request
+    timeout is 120 s); when FRED is down the caller falls back (realized volatility, 3% rate).
+    """
+    import io
+    import time
+
+    import requests
+    hit = _FRED_CACHE.get(series_id)
+    if hit is None or time.time() - hit[0] > _FRED_TTL:
+        series = None
+        for attempt in range(2):
+            try:
+                resp = requests.get(_FRED_URL, params={'id': series_id, 'cosd': '1990-01-01'}, timeout=15)
+                resp.raise_for_status()
+                df = pd.read_csv(io.StringIO(resp.text), na_values='.')
+                series = pd.Series(df.iloc[:, 1].values, index=pd.to_datetime(df.iloc[:, 0])).dropna()
+                break
+            except Exception as exc:      # pragma: no cover - network
+                logger.warning('FRED %s attempt %d failed: %s', series_id, attempt + 1, exc)
+        if series is None or series.empty:
+            return None
+        hit = (time.time(), series)
+        _FRED_CACHE[series_id] = hit
+    s = hit[1]
+    return s[(s.index >= pd.Timestamp(lo)) & (s.index <= pd.Timestamp(hi))]
 
 
 def load_market(ticker: str, start: str, end: str) -> dict:
