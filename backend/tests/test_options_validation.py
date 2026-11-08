@@ -109,3 +109,49 @@ def test_replica_restores_the_level_it_borrows():
     hi = ov.replica(start, end, m, level=0.95)
     assert ob.VIX_TO_ATM == keep
     assert hi.iloc[-1] > lo.iloc[-1]          # richer puts, more premium in a rising market
+
+
+def test_notional_sizing_holds_one_unit_per_100_shares_of_value():
+    m = _market()
+    start, end = m['close'].index[25].date().isoformat(), m['close'].index[-1].date().isoformat()
+    legs = ob.PRESETS['iron_condor']['legs']
+    risk = ob.run('SPY', start, end, legs, market=m, alloc_pct=100, initial_capital=1_000_000)
+    notional = ob.run('SPY', start, end, legs, market=m, alloc_pct=100, initial_capital=1_000_000, sizing='notional')
+    S0 = float(m['close'].iloc[25])
+    assert notional['trades'][0]['units'] == int(1_000_000 // (S0 * 100))
+    assert risk['trades'][0]['units'] > notional['trades'][0]['units']     # worst-case sizing levers a condor up
+
+
+def test_every_index_has_a_replica_that_validates():
+    for code, spec in ov.INDICES.items():
+        legs = ob.clean_legs(spec['legs'])
+        assert legs and spec['name'] and spec['what']
+        assert any(leg['type'] != 'stock' for leg in legs), code
+
+
+def test_fit_skew_finds_the_settings_that_generated_the_index(monkeypatch):
+    m = _market(n=300)
+    monkeypatch.setattr(ov, 'FIT', (m['close'].index[25].date().isoformat(), m['close'].index[-1].date().isoformat()))
+    monkeypatch.setattr(ov, 'SKEW_GRID_PUT', [0.1, 0.2, 0.3])
+    monkeypatch.setattr(ov, 'SKEW_GRID_CALL', [0.1, 0.25, 0.4])
+    # "Real" indices made by the model itself with known skews: the fit has to recover them.
+    truth = (0.3, 0.1)
+    real = {code: ov.replica(*ov.FIT, m, legs=ov.INDICES[code]['legs'], skew=truth) for code in ('PPUT', 'BXMD')}
+    keep = (ob.SKEW_PUT, ob.SKEW_CALL)
+    monkeypatch.setattr(ob, 'SKEW_PUT', truth[0])
+    monkeypatch.setattr(ob, 'SKEW_CALL', truth[1])
+    assert ov.fit_skew(m, real) == {'put': 0.3, 'call': 0.1}
+    monkeypatch.setattr(ob, 'SKEW_PUT', keep[0])
+    monkeypatch.setattr(ob, 'SKEW_CALL', keep[1])
+
+
+def test_index_checks_compare_each_available_index():
+    m = _market(n=300)
+    idx = m['close'].index
+    start, end = idx[25].date().isoformat(), idx[-1].date().isoformat()
+    real = ov.replica(start, end, m, legs=ov.INDICES['BXM']['legs'])
+    rows = ov.index_checks(m, {'BXM': real}, start, end, before=(0.40, 0.15))
+    assert [r['code'] for r in rows] == ['BXM']
+    assert rows[0]['cagr_gap'] == 0 and rows[0]['monthly_corr'] == 1.0
+    assert rows[0]['cagr_gap_before_skew_fit'] is not None
+    assert len(rows[0]['chart']['model']) == len(rows[0]['chart']['real'])

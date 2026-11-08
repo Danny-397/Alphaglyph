@@ -9,9 +9,10 @@ with its model prices, so the two return streams can be compared directly.
 
 Fit, then test
 --------------
-The one free level in the model, VIX_TO_ATM (at-the-money IV as a share of the
-VIX), is fitted on 2007-2015 so that the replica's annual return matches the
-index's. The comparison that matters is 2016 on, which the fit never saw.
+The volatility level, VIX_TO_ATM (at-the-money IV as a share of the VIX), is
+fitted on 2007-2015 so that the PutWrite replica's annual return matches the
+index's; the skew is then fitted the same way (below). The comparison that
+matters is 2016 on, which the fits never saw.
 
 The replica is not identical to the index: the index trades SPX options at
 Cboe's special opening quotation on the third Friday, the replica trades SPY
@@ -21,6 +22,11 @@ measurement of implied volatility.
 
 The term structure is checked the same way: the modelled slope (used only where
 the real VIX curve is missing) against the VIX9D, VIX3M and VIX6M.
+
+Five more Cboe indices test what the PutWrite index can't: out-of-the-money
+strikes and calls. Cboe publishes their daily history as CSV files. The skew is
+fitted on 2007-2015 against two of them (PPUT for the put side, BXMD for the
+call side); everything is then compared on 2016 on.
 """
 
 from __future__ import annotations
@@ -33,6 +39,38 @@ import pandas as pd
 import options_bt as ob
 
 PUTWRITE_LEGS = [{'type': 'put', 'side': 'short', 'qty': 1, 'strike': {'mode': 'atm'}}]
+
+
+def _leg(kind, side, strike=None, dte=None):
+    leg = {'type': kind, 'side': side, 'qty': 1}
+    if strike:
+        leg['strike'] = strike
+    if dte:
+        leg['dte'] = dte
+    return leg
+
+
+# Cboe strategy indices and their replicas on SPY (each index's published method, simplified).
+INDICES = {
+    'PUT': {'name': 'PutWrite', 'what': 'sell a one-month at-the-money put', 'legs': PUTWRITE_LEGS},
+    'BXM': {'name': 'BuyWrite', 'what': 'own the index, sell a one-month at-the-money call',
+            'legs': [_leg('stock', 'long'), _leg('call', 'short', {'mode': 'atm'})]},
+    'BXMD': {'name': '30-delta BuyWrite', 'what': 'own the index, sell a one-month 30-delta call',
+             'legs': [_leg('stock', 'long'), _leg('call', 'short', {'mode': 'delta', 'value': 0.30})]},
+    'PPUT': {'name': '5% Put Protection', 'what': 'own the index, buy a one-month put 5% out of the money',
+             'legs': [_leg('stock', 'long'), _leg('put', 'long', {'mode': 'pct', 'value': -5})]},
+    'CLL': {'name': '95-110 Collar', 'what': 'own the index, buy a three-month put 5% below, sell a one-month '
+                                            'call 10% above',
+            'legs': [_leg('stock', 'long'), _leg('put', 'long', {'mode': 'pct', 'value': -5}, dte=90),
+                     _leg('call', 'short', {'mode': 'pct', 'value': 10})]},
+    'CNDR': {'name': 'Iron Condor', 'what': 'sell one-month 20-delta puts and calls, buy 5-delta wings',
+             'legs': [_leg('put', 'short', {'mode': 'delta', 'value': 0.20}),
+                      _leg('put', 'long', {'mode': 'delta', 'value': 0.05}),
+                      _leg('call', 'short', {'mode': 'delta', 'value': 0.20}),
+                      _leg('call', 'long', {'mode': 'delta', 'value': 0.05})]},
+}
+SKEW_GRID_PUT = [round(0.10 + 0.025 * i, 3) for i in range(17)]     # 0.100 ... 0.500
+SKEW_GRID_CALL = [round(0.025 * i, 3) for i in range(17)]           # 0.000 ... 0.400
 FIT = ('2007-01-03', '2015-12-31')
 TEST_START = '2016-01-04'
 GRID = [round(0.75 + 0.005 * i, 3) for i in range(41)]          # 0.750 ... 0.950
@@ -68,17 +106,24 @@ def compare(model: pd.Series, real: pd.Series) -> dict:
 
 
 def replica(start: str, end: str, market: dict, level: float | None = None,
-            use_curve: bool = True) -> pd.Series:
-    """The PutWrite replica's equity curve on SPY, without costs (the index has none)."""
-    keep = ob.VIX_TO_ATM
+            use_curve: bool = True, legs: list | None = None, skew: tuple | None = None) -> pd.Series:
+    """A Cboe index replica's equity curve on SPY (PutWrite by default), without costs.
+
+    Sized by notional, one unit per 100 shares' worth of SPY, as the indices are. `level`
+    and `skew` (put, call) temporarily replace the model's settings, for fitting.
+    """
+    keep = (ob.VIX_TO_ATM, ob.SKEW_PUT, ob.SKEW_CALL)
     if level is not None:
         ob.VIX_TO_ATM = level
+    if skew is not None:
+        ob.SKEW_PUT, ob.SKEW_CALL = skew
     try:
         m = market if use_curve else {**market, 'curve': None}
-        r = ob.run('SPY', start, end, PUTWRITE_LEGS, name='PutWrite replica', dte=30, alloc_pct=100,
-                   initial_capital=10_000_000, spread_pct=0.0, commission=0.0, stock_slip=0.0, market=m)
+        r = ob.run('SPY', start, end, legs or PUTWRITE_LEGS, name='Cboe index replica', dte=30, alloc_pct=100,
+                   initial_capital=10_000_000, spread_pct=0.0, commission=0.0, stock_slip=0.0, market=m,
+                   sizing='notional')
     finally:
-        ob.VIX_TO_ATM = keep
+        ob.VIX_TO_ATM, ob.SKEW_PUT, ob.SKEW_CALL = keep
     if 'error' in r:
         raise RuntimeError(r['error'])
     return pd.Series([e['value'] for e in r['equity']],
@@ -89,6 +134,41 @@ def fit_level(market: dict, real: pd.Series, grid=GRID) -> float:
     """The VIX_TO_ATM on the grid whose replica best matches the index's CAGR over FIT."""
     target = _cagr(real.reindex(replica(*FIT, market).index).ffill().bfill())
     return min(grid, key=lambda k: abs(_cagr(replica(*FIT, market, level=k)) - target))
+
+
+def fit_skew(market: dict, indices: dict) -> dict:
+    """Put and call skew on their grids that best match PPUT and BXMD over FIT (separately:
+    the PPUT put is out of the money and the BXMD call is out of the money, so each index
+    depends on one side of the skew)."""
+    def best(code, grid, side):
+        real = indices[code]
+        legs = INDICES[code]['legs']
+
+        def miss(v):
+            sk = (v, ob.SKEW_CALL) if side == 'put' else (ob.SKEW_PUT, v)
+            eq = replica(*FIT, market, legs=legs, skew=sk)
+            return abs(_cagr(eq) - _cagr(real.reindex(eq.index).ffill().bfill()))
+        return min(grid, key=miss)
+    return {'put': best('PPUT', SKEW_GRID_PUT, 'put'), 'call': best('BXMD', SKEW_GRID_CALL, 'call')}
+
+
+def index_checks(market: dict, indices: dict, start: str, end: str, before: tuple | None = None) -> list:
+    """Every index against its replica over [start, end], with the model as it stands, and the
+    annual-return gap with the skew `before` (put, call) the fit, for comparison."""
+    out = []
+    for code, spec in INDICES.items():
+        real = indices.get(code)
+        if real is None or real.index[0] > pd.Timestamp(start):
+            continue
+        eq = replica(start, end, market, legs=spec['legs'])
+        prev = None
+        if before is not None:
+            prev = compare(replica(start, end, market, legs=spec['legs'], skew=before), real)['cagr_gap']
+        out.append({'code': code, 'name': spec['name'], 'what': spec['what'], **compare(eq, real),
+                    'cagr_gap_before_skew_fit': prev,
+                    'chart': {'model': monthly_index(eq),
+                              'real': monthly_index(real.reindex(eq.index).ffill().bfill())}})
+    return out
 
 
 def term_check(vix: pd.Series, curve: pd.DataFrame, level: float) -> list:

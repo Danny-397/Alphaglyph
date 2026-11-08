@@ -90,9 +90,16 @@ def test_iv_rank_rule_full_range_changes_nothing():
 
 def test_iv_scale_moves_premium_the_right_way():
     m = _market(np.full(400, 100.0), vix=20.0)
-    lo, mid, hi = (_run(m, iv_scale=k)['metrics']['final_value'] for k in (0.9, 1.0, 1.1))
+    idx = m['close'].index
+    # A fixed strike (3% below), so only the premium moves with IV; a delta strike would also shift.
+    legs = [{'type': 'put', 'side': 'short', 'qty': 1, 'strike': {'mode': 'pct', 'value': -3}}]
+
+    def final(k):
+        return ob.run('SPY', idx[230].date().isoformat(), idx[-1].date().isoformat(), legs, 'Short put',
+                      alloc_pct=100, market=m, iv_scale=k)
+    lo, mid, hi = (final(k)['metrics']['final_value'] for k in (0.9, 1.0, 1.1))
     assert lo < mid < hi                                       # a put seller in a flat market keeps more premium
-    assert _run(m, iv_scale=1.1)['model']['iv_scale'] == 1.1
+    assert final(1.1)['model']['iv_scale'] == 1.1
 
 
 def test_model_sensitivity_reruns_each_variant():

@@ -217,8 +217,12 @@
             <p class="empty-hint">Pick a strategy and press <strong>Run options backtest</strong>.</p>
           </div>
           <div class="card opt-check" id="ob-check" hidden>
-            <div class="section-header">How close are the model prices to real ones? <span class="badge badge-green">Checked out of sample</span></div>
+            <div class="section-header">How close are the model prices to real ones? <span class="badge badge-green">Six Cboe indices, out of sample</span></div>
             <p class="card-desc" id="ob-check-lede"></p>
+            <div class="table-wrap" id="ob-check-idx" hidden><table class="data-table opt-check-table opt-check-idx">
+              <thead><tr><th>Index</th><th>Strategy</th><th>Model</th><th>Real</th><th>Gap</th><th>Before skew fit</th><th>Correlation</th></tr></thead>
+              <tbody id="ob-check-idx-tbody"></tbody></table></div>
+            <div class="opt-sub" id="ob-check-which" style="margin-top:14px;"></div>
             <div class="chart-wrap" style="height:240px;margin-bottom:14px;"><canvas id="ob-check-chart"></canvas></div>
             <div class="table-wrap"><table class="data-table opt-check-table"><thead><tr><th></th><th>Model replica</th><th>Real index</th></tr></thead>
               <tbody id="ob-check-tbody"></tbody></table></div>

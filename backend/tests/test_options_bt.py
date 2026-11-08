@@ -53,7 +53,7 @@ def test_skew_makes_puts_richer_and_calls_cheaper():
     atm = ob.skewed_iv(0.20, 100, 100, T)
     assert atm == pytest.approx(0.20, abs=1e-9)
     assert ob.skewed_iv(0.20, 100, 92, T) > 0.20 * 1.2         # OTM put
-    assert 0.20 * 0.75 < ob.skewed_iv(0.20, 100, 108, T) < 0.20  # OTM call, milder
+    assert 0.20 * 0.75 <= ob.skewed_iv(0.20, 100, 108, T) < 0.20  # OTM call cheaper, floored at 0.75x
     assert ob.skewed_iv(0.20, 100, 92, T, skew=False) == pytest.approx(0.20)
 
 
