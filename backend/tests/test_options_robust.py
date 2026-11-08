@@ -119,7 +119,7 @@ def test_sweep_endpoint(client):
 
 @pytest.mark.parametrize('payload', [
     {'preset': 'nope'},
-    {'preset': 'short_put', 'start_date': '2010-01-04', 'end_date': '2024-01-04'},    # over 10 years
+    {'preset': 'short_put', 'start_date': '2018-01-04', 'end_date': '2024-01-04'},    # over 5 years
     {'preset': 'short_put', 'start_date': '2024-01-04', 'end_date': '2024-06-04'},    # under a year
 ])
 def test_sweep_endpoint_rejects_bad_requests(client, payload):

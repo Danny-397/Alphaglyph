@@ -29,7 +29,7 @@ SWEEP_EXITS = (
     ('half', 'Close halfway to expiry'),
     ('stop100', 'Stop at a 100% loss'),
 )
-SWEEP_MAX_YEARS = 10
+SWEEP_MAX_YEARS = 5                 # 20 backtests must finish inside the server's 120 s timeout
 PBO_GROUPS = 10
 
 
