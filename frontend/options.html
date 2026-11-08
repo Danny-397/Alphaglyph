@@ -124,6 +124,42 @@
           </div>
         </details>
 
+        <details class="collapsible" id="ob-entry">
+          <summary>Entry rules</summary>
+          <div class="collapsible-body">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label" for="ob-vix-min">VIX at least</label>
+                <input type="number" id="ob-vix-min" min="5" max="150" step="1" placeholder="Any">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ob-vix-max">VIX at most</label>
+                <input type="number" id="ob-vix-max" min="5" max="150" step="1" placeholder="Any">
+              </div>
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label" for="ob-ivr-min">IV rank at least</label>
+                <input type="number" id="ob-ivr-min" min="0" max="100" step="5" placeholder="Any">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ob-ivr-max">IV rank at most</label>
+                <input type="number" id="ob-ivr-max" min="0" max="100" step="5" placeholder="Any">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ob-trend">Trend</label>
+              <select id="ob-trend">
+                <option value="any">Any</option>
+                <option value="above">Only above its 200-day average</option>
+                <option value="below">Only below its 200-day average</option>
+              </select>
+            </div>
+            <p class="check-desc">New positions open only on days that pass every rule; open positions are never closed by them.
+              IV rank is where today's implied volatility sits in its past year, 0 to 100.</p>
+          </div>
+        </details>
+
         <details class="collapsible" id="ob-advanced">
           <summary>Costs and pricing</summary>
           <div class="collapsible-body">

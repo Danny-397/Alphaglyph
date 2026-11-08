@@ -692,6 +692,7 @@ def _options_args(data: dict) -> dict:
         'spread_pct': None if spread is None else spread / 100.0,
         'commission': _num(data, 'commission', 0.65, 0, 10, 'Commission per contract'),
         'skew': bool(data.get('skew', True)),
+        'entry': options_bt.clean_entry(data.get('entry')),
     }
 
 
@@ -722,9 +723,14 @@ def options_backtest():
             alloc = _num(data, 'alloc_pct', 10, 1, 100, 'Capital per position')
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
-    result = options_bt.run(legs=legs, name=name, alloc_pct=alloc, **args)
+    market = options_bt.load_market(args['ticker'], args['start'], args['end'])
+    if 'error' in market:
+        return jsonify(market), 422
+    run_kw = {'legs': legs, 'name': name, 'alloc_pct': alloc, 'market': market, **args}
+    result = options_bt.run(**run_kw)
     if 'error' in result:
         return jsonify(result), 422
+    result['sensitivity'] = options_robust.model_sensitivity(run_kw, result)
     return jsonify(result)
 
 
