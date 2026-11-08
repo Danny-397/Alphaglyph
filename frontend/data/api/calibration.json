@@ -90,7 +90,7 @@
  "n_tickers": 12,
  "note": "Out-of-sample reliability of the ML price forecaster on data after the validation cutoff. Points on the diagonal = perfectly calibrated. The model lives near a coin flip by design \u2014 a humble, honest forecaster is the goal, not an over-confident one.",
  "oos_only": true,
- "snapshot_at": "2026-11-08T23:34Z",
+ "snapshot_at": "2026-11-08T23:41Z",
  "tickers": [
   "AAPL",
   "MSFT",
