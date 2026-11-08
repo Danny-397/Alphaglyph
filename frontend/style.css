@@ -1120,3 +1120,8 @@ main:focus { outline: none; }
 .opt-import { background: var(--purple-dim); border: 1px solid var(--purple); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.5; color: var(--text); }
 .opt-import p { margin: 0; }
 .opt-import ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+
+.opt-check-row { cursor: pointer; }
+.opt-check-row.active td { background: var(--purple-dim); }
+.opt-check-row:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
+.opt-check-idx td:nth-child(2) { color: var(--muted); font-size: 12.5px; white-space: normal; min-width: 180px; }
