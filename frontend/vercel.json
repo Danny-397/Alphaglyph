@@ -18,6 +18,12 @@
       ]
     },
     {
+      "source": "/options-import.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    },
+    {
       "source": "/options.js",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache" }
