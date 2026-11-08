@@ -26,7 +26,12 @@ not traded quotes. Every price comes from Black-Scholes on that day's close:
   standardized moneyness, fitted on 2007-2015 against Cboe's PPUT and BXMD
   indices and checked on 2016 on with four more (optional);
 - the risk-free rate from the 3-month Treasury bill (FRED DGS3MO);
-- no dividends, and European exercise (no early assignment).
+- dividends: options are priced on unadjusted prices with the trailing 12-month
+  dividend yield (Black-Scholes-Merton), stock legs are paid each dividend in
+  cash on its ex-date, and a short call is assigned early the day before an
+  ex-date when the dividend is worth more than its remaining time value. Puts
+  are treated as European. Without dividend data, prices are dividend-adjusted
+  and the yield is zero, and the result says so.
 
 Costs are charged on every option and stock trade: a per-contract commission,
 and a bid/ask cost as a share of each option's price (with a one-cent floor).
@@ -58,9 +63,9 @@ IV_CLIP = (0.05, 2.5)
 # (PPUT, puts 5% out of the money) and 30-delta covered-call (BXMD) indices and checked on 2016
 # on (tools/options_validation.py): a 5%-out-of-the-money 30-day put trades near 1.2x
 # at-the-money IV, a 30-delta call near 0.8x.
-SKEW_PUT, SKEW_CALL = 0.20, 0.35
+SKEW_PUT, SKEW_CALL = 0.175, 0.325
 SKEW_CLIP = (0.75, 2.0)
-VIX_TO_ATM = 0.885                  # fitted on 2007-2015 against Cboe's PutWrite index (see the docstring)
+VIX_TO_ATM = 0.875                  # fitted on 2007-2015 against Cboe's PutWrite index (see the docstring)
 CURVE_TENORS = (9, 93, 183)         # days covered by the VIX9D, VIX3M and VIX6M
 CURVE_SYMBOLS = ('^VIX9D', '^VIX3M', '^VIX6M')
 UNBOUNDED_MOVE = 0.30               # cash reserved against an uncovered short call: a 30% rise
@@ -568,6 +573,28 @@ def vix_curve(lo: str, hi: str) -> pd.DataFrame | None:
         return None
 
 
+def dividend_data(ticker: str, lo: str, hi: str) -> tuple:
+    """(unadjusted closes, dividends per share by ex-date) from Yahoo, or (None, None)."""
+    try:
+        import yfinance as yf
+        df = yf.download(ticker, start=lo, end=hi, progress=False, auto_adjust=False)
+        if df is None or df.empty:
+            return None, None
+        c = df['Close']
+        if isinstance(c, pd.DataFrame):
+            c = c.iloc[:, 0]
+        c = c.astype(float)
+        c.index = pd.to_datetime(c.index).tz_localize(None).normalize()
+        dv = yf.Ticker(ticker).dividends
+        dv = dv.astype(float) if dv is not None else pd.Series(dtype=float)
+        if len(dv):
+            dv.index = pd.to_datetime(dv.index).tz_localize(None).normalize()
+        return c.dropna(), dv[dv > 0]
+    except Exception as exc:                       # pragma: no cover - network
+        logger.warning('dividend data unavailable for %s: %s', ticker, exc)
+        return None, None
+
+
 def load_market(ticker: str, start: str, end: str) -> dict:
     """Closes for the ticker (and SPY), the VIX, its term structure and T-bill rates, with a warm-up."""
     # A year and more of warm-up: the 200-day average and a 252-day IV rank need it.
@@ -586,7 +613,9 @@ def load_market(ticker: str, start: str, end: str) -> dict:
     vix = _fred('VIXCLS', lo, end)
     rate = _fred('DGS3MO', lo, end)
     curve = vix_curve(lo, end)
-    return {'close': close, 'spy': spy, 'vix': vix, 'rate': rate, 'curve': curve}
+    raw, divs = dividend_data(ticker, lo, end)
+    return {'close': close, 'spy': spy, 'vix': vix, 'rate': rate, 'curve': curve,
+            'raw_close': raw, 'dividends': divs}
 
 
 # ── Position mechanics ───────────────────────────────────────────────────────
@@ -596,7 +625,7 @@ def _sign(leg):
 
 
 def _delta_strike(grid: list, kind: str, want: float, S: float, T: float, r: float,
-                  iv_atm: float, skew: bool, curve: tuple | None) -> float:
+                  iv_atm: float, skew: bool, curve: tuple | None, q: float = 0.0) -> float:
     """The strike on a sorted grid whose |delta| is closest to `want`.
 
     |delta| falls with the strike for calls and rises for puts, so a bisection finds the
@@ -604,7 +633,8 @@ def _delta_strike(grid: list, kind: str, want: float, S: float, T: float, r: flo
     the answer is the same as checking every strike, about twenty times faster.
     """
     def miss(k):
-        return abs(bs_delta(kind, S, k, T, r, skewed_iv(iv_atm, S, k, T, skew, curve))) - want
+        dq = math.exp(-q * T)
+        return abs(dq * bs_delta(kind, S * dq, k, T, r, skewed_iv(iv_atm, S, k, T, skew, curve))) - want
     sign = -1.0 if kind == 'call' else 1.0          # make the miss increase with the strike
     lo, hi = 0, len(grid) - 1
     while hi - lo > 1:
@@ -618,7 +648,8 @@ def _delta_strike(grid: list, kind: str, want: float, S: float, T: float, r: flo
 
 
 def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte: int,
-                   ticker: str, skew: bool, curve: tuple | None = None, monthly: bool = False) -> list:
+                   ticker: str, skew: bool, curve: tuple | None = None, monthly: bool = False,
+                   q: float = 0.0) -> list:
     """Concrete legs (strike, expiry, entry price) for a position opened on `day` at price S."""
     step = strike_step(S, ticker)
     built = []
@@ -642,25 +673,25 @@ def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte
             want = s['value']
             grid = [round_strike(S * (1 + p / 200.0), step) for p in range(-100, 101)]
             grid = sorted(set(k for k in grid if k > 0))
-            K = _delta_strike(grid, leg['type'], want, S, T, r, iv_atm, skew, curve)
+            K = _delta_strike(grid, leg['type'], want, S, T, r, iv_atm, skew, curve, q)
         iv = skewed_iv(iv_atm, S, K, T, skew, curve)
         built.append({**leg, 'strike': float(K), 'expiry': exp,
-                      'price': bs_price(leg['type'], S, K, T, r, iv)})
+                      'price': bs_price(leg['type'], S * math.exp(-q * T), K, T, r, iv)})
     return built
 
 
 def leg_value(leg: dict, day: date, S: float, iv_atm: float, r: float, skew: bool,
-              curve: tuple | None = None) -> float:
+              curve: tuple | None = None, q: float = 0.0) -> float:
     """Per-share value of one leg on `day`."""
     if leg['type'] == 'stock':
         return S
     T = max(0.0, (leg['expiry'] - day).days / 365.0)
-    return bs_price(leg['type'], S, leg['strike'], T, r,
+    return bs_price(leg['type'], S * math.exp(-q * T), leg['strike'], T, r,
                     skewed_iv(iv_atm, S, leg['strike'], T, skew, curve))
 
 
 def position_marks(pos: list, day: date, S: float, iv_atm: float, r: float, skew: bool,
-                   curve: tuple | None = None) -> dict:
+                   curve: tuple | None = None, q: float = 0.0) -> dict:
     """One unit's value and Greeks (dollars), plus each leg's IV, for P&L attribution.
 
     delta, gamma: dollars per $1 move of the underlying (and per $1 squared); theta: dollars
@@ -678,12 +709,13 @@ def position_marks(pos: list, day: date, S: float, iv_atm: float, r: float, skew
             continue
         T = max(0.0, (leg['expiry'] - day).days / 365.0)
         sig = skewed_iv(iv_atm, S, leg['strike'], T, skew, curve)
-        value += k * bs_price(leg['type'], S, leg['strike'], T, r, sig)
-        d, g, th, vg = bs_greeks(leg['type'], S, leg['strike'], T, r, sig)
-        delta += k * d
-        gamma += k * g
+        dq = math.exp(-q * T)
+        value += k * bs_price(leg['type'], S * dq, leg['strike'], T, r, sig)
+        d, g, th, vg = bs_greeks(leg['type'], S * dq, leg['strike'], T, r, sig)
+        delta += k * d * dq                 # Greeks with respect to the spot, not the discounted spot
+        gamma += k * g * dq * dq
         theta += k * th
-        legs.append((sig, k * vg))
+        legs.append((sig, k * vg * dq))
     return {'S': S, 'day': day, 'value': value, 'delta': delta, 'gamma': gamma, 'theta': theta,
             'legs': legs}
 
@@ -708,10 +740,26 @@ def attribute(prev: dict, now: dict) -> dict:
     return out
 
 
-def position_value(pos: list, day, S, iv_atm, r, skew, curve: tuple | None = None) -> float:
+def position_value(pos: list, day, S, iv_atm, r, skew, curve: tuple | None = None, q: float = 0.0) -> float:
     """Value of one unit of the position (dollars), long legs positive, short negative."""
-    return sum(_sign(leg) * leg['qty'] * CONTRACT * leg_value(leg, day, S, iv_atm, r, skew, curve)
+    return sum(_sign(leg) * leg['qty'] * CONTRACT * leg_value(leg, day, S, iv_atm, r, skew, curve, q)
                for leg in pos)
+
+
+def early_assignment(pos: list, day: date, S: float, iv_atm: float, r: float, skew: bool,
+                     curve: tuple | None, q: float, dividend: float) -> bool:
+    """True when a short call in the position would be assigned before tomorrow's ex-date.
+
+    A holder exercises an in-the-money call the day before the stock goes ex-dividend when
+    the dividend is worth more than the time value given up by exercising.
+    """
+    for leg in pos:
+        if leg['type'] != 'call' or leg['side'] != 'short' or S <= leg['strike']:
+            continue
+        time_value = leg_value(leg, day, S, iv_atm, r, skew, curve, q) - (S - leg['strike'])
+        if time_value < dividend:
+            return True
+    return False
 
 
 def payoff_at_expiry(pos: list, x: float) -> float:
@@ -768,7 +816,9 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     m = market or load_market(ticker, start, end)
     if 'error' in m:
         return m
-    close = m['close']
+    close = m['close']                    # dividend-adjusted: the buy-and-hold benchmark (total return)
+    raw_close, divs = m.get('raw_close'), m.get('dividends')
+    use_divs = raw_close is not None and len(raw_close) and divs is not None
     iv_all, iv_note = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'))
     if iv_scale != 1.0:
         iv_all = (iv_all * iv_scale).clip(*IV_CLIP)
@@ -793,25 +843,34 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     days_in = 0
     curve_days = 0
     interest = 0.0
+    dividends_paid = 0.0
+    assignments = 0
     bench_shares = initial_capital / float(close[days[0]])
+    bench_arr = close.reindex(days).to_numpy(dtype=float)
     last_day = days[-1].date()
 
-    def close_position(day, S, iv, r, cv, reason):
+    def close_position(day, S, iv, r, cv, q, reason):
         nonlocal cash, pos, units, entry, total_costs
         settle = reason == 'expiry'
-        prices = [leg_value(leg, day, S, iv, r, skew, cv) for leg in pos]
+        assigned = reason.startswith('assigned')
+        prices = [leg_value(leg, day, S, iv, r, skew, cv, q) for leg in pos]
+        if assigned:                      # short calls are exercised against us: settled at intrinsic
+            prices = [max(0.0, S - leg['strike']) if leg['type'] == 'call' and leg['side'] == 'short' else p
+                      for leg, p in zip(pos, prices)]
         value = sum(_sign(leg) * leg['qty'] * CONTRACT * p for leg, p in zip(pos, prices))
         # Expiring options settle at intrinsic; any longer-dated legs are sold at the model price.
         cost = 0.0
         for leg, p in zip(pos, prices):
-            done = settle and leg['type'] != 'stock' and leg['expiry'] <= day
+            done = (settle and leg['type'] != 'stock' and leg['expiry'] <= day) or \
+                (assigned and leg['type'] == 'call' and leg['side'] == 'short')
             cost += trade_cost([leg], [p], spread_pct, commission, stock_slip, settle=done)
         cost *= units
         cash += units * value - cost
         total_costs += cost
-        pnl = units * (value - entry['value']) - cost - entry['cost']
+        pnl = units * (value - entry['value']) - cost - entry['cost'] + entry['divs']
         attr = {k: round(units * v, 2) for k, v in entry['attr'].items()}
         attr['costs'] = round(-(cost + entry['cost']), 2)
+        attr['dividends'] = round(entry['divs'], 2)
         attr['other'] = round(attr['other'] + round(pnl, 2) - sum(attr.values()), 2)   # rounding
         trades.append({
             'opened': entry['day'].isoformat(), 'closed': day.isoformat(), 'reason': reason,
@@ -820,7 +879,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                       'strike': leg['strike'], 'expiry': leg['expiry'].isoformat() if leg['expiry'] else None,
                       'open': round(leg['price'], 2), 'close': round(p, 2)} for leg, p in zip(pos, prices)],
             'net_open': round(units * entry['value'], 2), 'net_close': round(units * value, 2),
-            'costs': round(cost + entry['cost'], 2), 'pnl': round(pnl, 2),
+            'costs': round(cost + entry['cost'], 2), 'dividends': round(entry['divs'], 2), 'pnl': round(pnl, 2),
             'pnl_pct': round(pnl / entry['basis'] * 100, 2) if entry['basis'] else None,
             'attribution': attr,
         })
@@ -828,7 +887,21 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
 
     prev_day = None
     # Plain arrays for the daily loop (pandas lookups per day were a large share of the run time).
-    S_arr = close.reindex(days).to_numpy(dtype=float)
+    # Options and stock legs trade the unadjusted price; dividends arrive as cash.
+    px = raw_close.reindex(close.index).ffill() if use_divs else close
+    S_arr = px.reindex(days).to_numpy(dtype=float)
+    if use_divs and not np.all(np.isfinite(S_arr)):
+        use_divs = False
+        px = close
+        S_arr = close.reindex(days).to_numpy(dtype=float)
+    if use_divs:
+        div_on = divs.groupby(level=0).sum()
+        div_arr = div_on.reindex(days).fillna(0.0).to_numpy(dtype=float)
+        trailing = div_on.reindex(close.index, fill_value=0.0).rolling('365D').sum()
+        q_arr = np.clip((trailing.reindex(days).to_numpy(dtype=float) / S_arr), 0.0, 0.2)
+    else:
+        div_arr = np.zeros(len(days))
+        q_arr = np.zeros(len(days))
     iv_arr = iv_all.reindex(days).to_numpy(dtype=float)
     r_arr = r_all.reindex(days).fillna(0.03).to_numpy(dtype=float)
     iv_fill = float(iv_all.dropna().iloc[0]) if iv_all.notna().any() else 0.25
@@ -849,7 +922,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 allow &= ivr_arr >= rules.get('ivr_min', -np.inf)
                 allow &= ivr_arr <= rules.get('ivr_max', np.inf)
         if rules.get('trend'):
-            sma = close.rolling(TREND_DAYS, min_periods=TREND_DAYS).mean().reindex(days).to_numpy(dtype=float)
+            # On the same prices as S (unadjusted when dividends are on), or the comparison is skewed.
+            sma = px.rolling(TREND_DAYS, min_periods=TREND_DAYS).mean().reindex(days).to_numpy(dtype=float)
             with np.errstate(invalid='ignore'):
                 allow &= (S_arr > sma) if rules['trend'] == 'above' else (S_arr < sma)
     for i, ts in enumerate(days):
@@ -857,6 +931,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         S = float(S_arr[i])
         iv = float(iv_arr[i])
         r = float(r_arr[i])
+        q = float(q_arr[i]) if np.isfinite(q_arr[i]) else 0.0
         if not np.isfinite(iv):
             iv = iv_fill
         if prev_day is not None and cash > 0:
@@ -870,7 +945,14 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
 
         if pos is not None:
             first_exp = min(leg['expiry'] for leg in pos if leg['expiry'])
-            mark = position_marks(pos, day, S, iv, r, skew, cv)
+            if div_arr[i] > 0:            # held at yesterday's close: the stock legs are paid the dividend
+                shares = units * sum(leg['qty'] * CONTRACT for leg in pos if leg['type'] == 'stock')
+                if shares:
+                    paid = shares * float(div_arr[i])
+                    cash += paid
+                    entry['divs'] += paid
+                    dividends_paid += paid
+            mark = position_marks(pos, day, S, iv, r, skew, cv, q)
             for k, v in attribute(entry['mark'], mark).items():
                 entry['attr'][k] += v
             entry['mark'] = mark
@@ -878,33 +960,37 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             pnl = units * (value - entry['value'])
             ref = abs(entry['value']) * units or 1.0
             if day >= first_exp:
-                close_position(day, S, iv, r, cv, 'expiry')
+                close_position(day, S, iv, r, cv, q, 'expiry')
             elif exit_dte is not None and (first_exp - day).days <= exit_dte:
-                close_position(day, S, iv, r, cv, f'{exit_dte} days before expiry')
+                close_position(day, S, iv, r, cv, q, f'{exit_dte} days before expiry')
             elif profit_take is not None and pnl >= profit_take / 100.0 * ref:
-                close_position(day, S, iv, r, cv, f'profit target ({profit_take:g}%)')
+                close_position(day, S, iv, r, cv, q, f'profit target ({profit_take:g}%)')
             elif stop_loss is not None and pnl <= -stop_loss / 100.0 * ref:
-                close_position(day, S, iv, r, cv, f'stop loss ({stop_loss:g}%)')
+                close_position(day, S, iv, r, cv, q, f'stop loss ({stop_loss:g}%)')
             elif day == last_day:
-                close_position(day, S, iv, r, cv, 'end of test')
+                close_position(day, S, iv, r, cv, q, 'end of test')
+            elif i + 1 < len(days) and div_arr[i + 1] > 0 and \
+                    early_assignment(pos, day, S, iv, r, skew, cv, q, float(div_arr[i + 1])):
+                close_position(day, S, iv, r, cv, q, 'assigned early (dividend)')
+                assignments += 1
 
         remaining = (last_day - day).days
         if pos is None and day != last_day and remaining >= max(5, dte // 2) and allow[i]:
             eq_now = cash
-            cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv, monthly=expiries == 'monthly')
+            cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv, monthly=expiries == 'monthly', q=q)
             need, unbounded = capital_required(cand, S)
             # 'risk' sizes by each position's worst case; 'notional' holds one unit per 100 shares'
             # worth of the underlying, as Cboe's strategy indices do (used to replicate them).
             per_unit = S * CONTRACT if sizing == 'notional' else need
             n = int(max(0.0, eq_now) * alloc_pct / 100.0 // per_unit)
             if n >= 1:
-                open_value = position_value(cand, day, S, iv, r, skew, cv)
+                open_value = position_value(cand, day, S, iv, r, skew, cv, q)
                 cost = n * trade_cost(cand, [leg['price'] for leg in cand], spread_pct, commission, stock_slip)
                 cash -= n * open_value + cost
                 total_costs += cost
                 pos, units = cand, n
                 entry = {'day': day, 'S': S, 'value': open_value, 'cost': cost, 'basis': n * need,
-                         'mark': position_marks(cand, day, S, iv, r, skew, cv),
+                         'mark': position_marks(cand, day, S, iv, r, skew, cv, q), 'divs': 0.0,
                          'attr': dict.fromkeys(ATTR_KEYS, 0.0)}
                 if first_pos is None:
                     first_pos = {'day': day.isoformat(), 'S': S, 'legs': cand, 'need': need,
@@ -915,7 +1001,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
 
         held = pos is not None
         days_in += held
-        row = {'date': day.isoformat(), 'benchmark': round(bench_shares * S, 2), 'iv': round(iv * 100, 1)}
+        row = {'date': day.isoformat(), 'benchmark': round(bench_shares * float(bench_arr[i]), 2),
+               'iv': round(iv * 100, 1)}
         if held:
             mk = entry['mark']
             val = cash + units * mk['value']
@@ -956,6 +1043,16 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             out['strategy']['rules'] = out['strategy']['rules'].replace(
                 'Opens a new position the day the last one closes',
                 f'Opens a new position {when}, from the day the last one closes', 1)
+    if 'model' in out:
+        if use_divs:
+            out['model']['dividends'] = (
+                f'Options priced on unadjusted prices with the trailing 12-month dividend yield; stock legs were '
+                f'paid ${dividends_paid:,.0f} in dividends; short calls assigned early before an ex-date '
+                f'{assignments} time{"s" if assignments != 1 else ""}.')
+        else:
+            out['model']['dividends'] = ('Dividend data was unavailable: prices are dividend-adjusted and the '
+                                         'dividend yield is zero.')
+        out['metrics']['early_assignments'] = assignments
     if expiries == 'monthly' and 'strategy' in out:
         out['strategy']['rules'] = out['strategy']['rules'].replace(
             f'{dte} days to expiry', f'on the monthly (third-Friday) expiry nearest {dte} days out', 1)
@@ -965,7 +1062,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     if 'model' in out:
         out['model']['term'] = term_note
         out['model']['rf_daily'] = round(rf_daily, 10)
-        total = {k: round(sum(t['attribution'][k] for t in trades), 2) for k in ATTR_KEYS + ('costs',)}
+        total = {k: round(sum(t['attribution'][k] for t in trades), 2) for k in ATTR_KEYS + ('costs', 'dividends')}
         total['interest'] = round(interest, 2)
         out['attribution'] = total
     return out
@@ -1049,7 +1146,8 @@ def _summarize(ticker, name, legs, dte, capital, equity, trades, total_costs, da
             'limits': ['Option prices are reconstructed with Black-Scholes, not real quotes; the skew and '
                        'term structure are modelled shapes, so strategies that depend on them (calendars, '
                        'far out-of-the-money wings) are the least reliable.',
-                       'No dividends; European exercise, so no early assignment.',
+                       'Dividends use the trailing yield, not announced amounts; only short calls are '
+                       'assigned early (before ex-dates), puts are treated as European.',
                        'Daily closes only: exits are checked once a day, at the close.'],
         },
     }

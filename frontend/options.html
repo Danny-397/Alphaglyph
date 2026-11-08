@@ -325,8 +325,9 @@
                 This test runs the same strategy with 20 settings (days to expiry × exit rule) and asks two questions:
                 does the best setting's Sharpe beat what the luckiest of 20 would show by chance (Deflated Sharpe), and
                 does the setting that looks best in one half of the history still rank well in the other half (the
-                probability of backtest overfitting, PBO)?</p>
-              <button type="button" class="btn" id="ob-sweep-run">Run the robustness test (20 backtests)</button>
+                probability of backtest overfitting, PBO)? It also reruns your own settings from five start dates a
+                week apart, because which days a strategy happens to roll on can swing its result by many points.</p>
+              <button type="button" class="btn" id="ob-sweep-run">Run the robustness test (25 backtests)</button>
               <p class="error-banner" id="ob-sweep-error" hidden></p>
               <div id="ob-sweep-out" hidden>
                 <p class="card-desc opt-verdict" id="ob-sweep-verdict"></p>
