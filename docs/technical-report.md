@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 19 REST endpoints, 278 automated tests in CI
+- 19 REST endpoints, 298 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -578,6 +578,47 @@ results are identical to the full search (tested on 300 random cases), and runs 
 2.5 times faster. Sweeps are limited to ten years of history to stay inside the server's
 request time.
 
+### 9.5 Entry rules, and how much of a result is the model
+
+**Entry rules.** A position can be made to open only when the VIX is in a range, when the
+underlying's IV rank (today's implied volatility against its past year) is in a range, or
+when the underlying is above or below its 200-day average. The rules gate entries only;
+a position that is open when a rule stops passing runs to its own exit. On the SPY window,
+no rule improved the plain cash-secured put:
+
+| Cash-secured put, only when… | CAGR | Sharpe | Max drawdown | Days allowed |
+|---|---:|---:|---:|---:|
+| (no rule) | +9.5% | 0.82 | −8.2% | 100% |
+| the VIX is 20 or higher | +8.2% | 0.65 | −8.0% | 33% |
+| the VIX is below 20 | +5.4% | 0.21 | −10.5% | 67% |
+| IV rank is 50 or higher | +6.1% | 0.30 | −11.7% | 49% |
+| SPY is above its 200-day average | +5.9% | 0.27 | −11.8% | 78% |
+| SPY is below its 200-day average | +6.0% | 0.39 | −6.6% | 22% |
+
+Selling puts only when the VIX was high kept most of the return in a third of the days, the
+one rule that came close. Each rule is also one more try in the sense of §9.4.
+
+**Model sensitivity.** Every backtest is rerun three more times with the volatility model
+changed: implied volatility 10% lower throughout, 10% higher, and without the skew.
+
+| Strategy | As run | IV 10% lower | IV 10% higher | No skew |
+|---|---:|---:|---:|---:|
+| Cash-secured put | +9.5% | +6.4% | +11.1% | +4.9% |
+| Covered call | +9.5% | +6.2% | +11.0% | +10.8% |
+| Iron condor | +3.4% | −1.7% | +11.0% | +12.5% |
+| Long call | +5.0% | +16.7% | −4.8% | +4.8% |
+| Long straddle | −6.8% | +4.6% | −15.3% | −6.9% |
+
+A 10% error in the volatility level is worth more than most of the differences between
+strategies: it turns the iron condor from a loss into an 11% a year winner and the long
+call the other way. Short-premium returns are, roughly, the gap between implied and
+realized volatility, and a 10% shift in implied volatility is a large share of that gap.
+This is why §9.1 matters: the PutWrite check pins the level well inside 10%, since a 0.5-point
+annual gap on the cash-secured put corresponds to an error of about 2% in volatility. The
+skew line is a reminder that out-of-the-money strikes rest on a modelled shape that the
+check does not cover. Each result shows the range next to its headline, flagged when it
+spans five points or more.
+
 ---
 
 ## 10. Reproducing
@@ -586,7 +627,7 @@ request time.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 278 tests
+pytest                     # 298 tests
 python app.py              # http://localhost:5000
 ```
 

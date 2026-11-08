@@ -68,7 +68,15 @@ function obSettings() {
     initial_capital: num('ob-capital'), dte: num('ob-dte'), alloc_pct: num('ob-alloc'),
     exit_dte: num('ob-exit-dte'), profit_take: num('ob-pt'), stop_loss: num('ob-sl'),
     commission: num('ob-commission'), spread_pct: num('ob-spread'), skew: el('ob-skew').checked,
+    entry: obEntry(num),
   }
+}
+
+function obEntry(num) {
+  const e = { vix_min: num('ob-vix-min'), vix_max: num('ob-vix-max'), ivr_min: num('ob-ivr-min'), ivr_max: num('ob-ivr-max'),
+    trend: el('ob-trend').value }
+  Object.keys(e).forEach(k => { if (e[k] == null || e[k] === 'any') delete e[k] })
+  return Object.keys(e).length ? e : null
 }
 
 // ── strategy picker and the "what this holds" box ──────────────────────────
@@ -201,6 +209,31 @@ async function obRun(presetKey) {
   obRenderResult(data)
 }
 
+// How much of the result is the volatility model? (the same backtest with IV nudged, and without skew)
+function obSensLine(r) {
+  const s = r.sensitivity
+  if (!s || !s.variants.length) return ''
+  const v = k => s.variants.find(x => x.label === k)
+  const lo = v('IV 10% lower'), hi = v('IV 10% higher')
+  const wide = s.cagr_range >= 5
+  return `<p class="summary-body opt-sens ${wide ? 'opt-sens-wide' : ''}"><strong>How much is the model?</strong>
+    With implied volatility 10% lower or higher throughout, the same backtest returns
+    ${lo ? fmtPct(lo.cagr, 1) : '—'} or ${hi ? fmtPct(hi.cagr, 1) : '—'} a year${wide
+    ? `: a spread of ${s.cagr_range.toFixed(1)} points, so read the headline as a range, not a number.` : '.'}
+    The check against Cboe's PutWrite index pins the volatility level to within about 2%.</p>`
+}
+
+function obSensTable(r) {
+  const s = r.sensitivity
+  if (!s || !s.variants.length) return ''
+  const m = r.metrics
+  const row = (label, x) => `<tr><td>${label}</td><td class="${clr(x.cagr)}">${fmtPct(x.cagr, 1)}</td><td>${fmtN(x.sharpe)}</td>
+    <td class="negative">${fmtPct(x.max_drawdown, 1)}</td></tr>`
+  return `<p class="card-desc"><strong>Sensitivity to the model.</strong> The same backtest with the volatility model changed:</p>
+    <div class="table-wrap"><table class="data-table opt-check-table"><thead><tr><th>Model</th><th>CAGR</th><th>Sharpe</th><th>Max drawdown</th></tr></thead>
+    <tbody>${row('As run', m)}${s.variants.map(x => row(x.label, x)).join('')}</tbody></table></div>`
+}
+
 const obMoney0 = n => n == null ? '—' : (n < 0 ? '−$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US')
 
 function obRenderResult(r) {
@@ -213,7 +246,7 @@ function obRenderResult(r) {
     <strong class="${clr(m.total_return)}">${fmtPct(m.total_return, 1)}</strong> (${fmtPct(m.cagr, 1)} a year) against
     ${fmtPct(b.total_return, 1)} for buying and holding ${r.ticker}, ${beat >= 0 ? 'ahead by' : 'behind by'}
     ${Math.abs(beat).toFixed(1)} points. ${m.trades} positions, ${m.win_rate ?? '—'}% of them profitable after costs;
-    worst drawdown ${fmtPct(m.max_drawdown, 1)} versus ${fmtPct(b.max_drawdown, 1)}.</p>`
+    worst drawdown ${fmtPct(m.max_drawdown, 1)} versus ${fmtPct(b.max_drawdown, 1)}.</p>${obSensLine(r)}`
 
   el('ob-legs-badge').textContent = `${s.legs_count} leg${s.legs_count > 1 ? 's' : ''}`
   el('ob-headline').textContent = s.headline
@@ -279,6 +312,7 @@ function obRenderResult(r) {
       fitted on ${obState.check.level.fit_window[0].slice(0, 4)}-${obState.check.level.fit_window[1].slice(0, 4)} only.</p>` : ''}
     <p class="card-desc"><strong>Costs.</strong> ${r.model.costs}. Stock legs pay 0.03% slippage. Options held to expiry settle at intrinsic value with no spread.</p>
     <p class="card-desc"><strong>Cash.</strong> Cash not tied up earns the Treasury-bill rate. Credit received stays in the account as collateral.</p>
+    ${obSensTable(r)}
     <ul class="opt-limits">${r.model.limits.map(x => `<li>${x}</li>`).join('')}</ul>`
   el('ob-notes').textContent = (r.notes || []).join(' ')
 }

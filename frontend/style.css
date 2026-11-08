@@ -1110,3 +1110,8 @@ main:focus { outline: none; }
 .opt-heat-best { outline: 2px solid var(--purple); outline-offset: -2px; }
 .opt-heat-sub { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
 #ob-sweep-run { margin-bottom: 14px; }
+
+/* Options: how much of a result is the volatility model. */
+.opt-sens { margin-top: 8px; font-size: 13.5px; color: var(--muted); }
+.opt-sens strong { color: var(--text); }
+.opt-sens-wide { border-left: 3px solid var(--yellow, #e3b341); padding-left: 10px; }

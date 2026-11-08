@@ -62,6 +62,10 @@ CURVE_TENORS = (9, 93, 183)         # days covered by the VIX9D, VIX3M and VIX6M
 CURVE_SYMBOLS = ('^VIX9D', '^VIX3M', '^VIX6M')
 UNBOUNDED_MOVE = 0.30               # cash reserved against an uncovered short call: a 30% rise
 MAX_LEGS = 6
+WARMUP_DAYS = 400                   # calendar days fetched before the window (200-day SMA, IV rank)
+TREND_DAYS = 200
+IVR_DAYS = 252
+TRENDS = ('any', 'above', 'below')
 MAX_YEARS = 15
 INDEX_ETFS = {'SPY', 'QQQ', 'IWM', 'DIA', 'GLD', 'TLT', 'SLV', 'XLF', 'XLE', 'XLK', 'EEM', 'HYG'}
 
@@ -333,6 +337,65 @@ def describe_strategy(name: str, legs: list, dte: int) -> dict:
 
 # ── Validation ────────────────────────────────────────────────────────────────
 
+def clean_entry(raw) -> dict | None:
+    """Validated entry rules, or None when there are none. Raises ValueError with a readable message.
+
+    vix_min / vix_max: open only when the VIX is in this range; ivr_min / ivr_max: only when
+    the underlying's IV rank (where today's IV sits in its past year, 0-100) is in this range;
+    trend: 'above' or 'below' its 200-day average.
+    """
+    if not raw:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError('Entry rules must be an object')
+    out = {}
+    for key, lo, hi, label in (('vix_min', 5, 150, 'Lowest VIX'), ('vix_max', 5, 150, 'Highest VIX'),
+                               ('ivr_min', 0, 100, 'Lowest IV rank'), ('ivr_max', 0, 100, 'Highest IV rank')):
+        v = raw.get(key)
+        if v in (None, ''):
+            continue
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            raise ValueError(f'{label} must be a number')
+        if not (lo <= v <= hi) or not math.isfinite(v):
+            raise ValueError(f'{label} must be between {lo} and {hi}')
+        out[key] = v
+    trend = str(raw.get('trend') or 'any').lower()
+    if trend not in TRENDS:
+        raise ValueError('Trend must be any, above or below')
+    if trend != 'any':
+        out['trend'] = trend
+    for a, b, label in (('vix_min', 'vix_max', 'VIX'), ('ivr_min', 'ivr_max', 'IV rank')):
+        if a in out and b in out and out[a] > out[b]:
+            raise ValueError(f'The lowest {label} is above the highest')
+    return out or None
+
+
+def describe_entry(entry: dict | None, ticker: str) -> str:
+    """'only when the VIX is 20 or higher and SPY is above its 200-day average', or ''."""
+    if not entry:
+        return ''
+    parts = []
+    lo, hi = entry.get('vix_min'), entry.get('vix_max')
+    if lo is not None and hi is not None:
+        parts.append(f'the VIX is between {lo:g} and {hi:g}')
+    elif lo is not None:
+        parts.append(f'the VIX is {lo:g} or higher')
+    elif hi is not None:
+        parts.append(f'the VIX is {hi:g} or lower')
+    lo, hi = entry.get('ivr_min'), entry.get('ivr_max')
+    if lo is not None and hi is not None:
+        parts.append(f'its IV rank is between {lo:g} and {hi:g}')
+    elif lo is not None:
+        parts.append(f'its IV rank is {lo:g} or higher')
+    elif hi is not None:
+        parts.append(f'its IV rank is {hi:g} or lower')
+    if entry.get('trend'):
+        parts.append(f"{ticker} is {entry['trend']} its {TREND_DAYS}-day average")
+    return 'only when ' + ' and '.join(parts)
+
+
 def clean_legs(raw) -> list:
     """Validate a user-built list of legs. Raises ValueError with a readable message."""
     if not isinstance(raw, list) or not raw:
@@ -483,7 +546,8 @@ def vix_curve(lo: str, hi: str) -> pd.DataFrame | None:
 
 def load_market(ticker: str, start: str, end: str) -> dict:
     """Closes for the ticker (and SPY), the VIX, its term structure and T-bill rates, with a warm-up."""
-    lo = (pd.Timestamp(start) - pd.Timedelta(days=60)).strftime('%Y-%m-%d')
+    # A year and more of warm-up: the 200-day average and a 252-day IV rank need it.
+    lo = (pd.Timestamp(start) - pd.Timedelta(days=WARMUP_DAYS)).strftime('%Y-%m-%d')
     df = feat.fetch_ohlcv(ticker, start=lo, end=end)
     if df is None or df.empty:
         return {'error': f'No price history for {ticker}'}
@@ -670,9 +734,11 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         dte: int = 30, initial_capital: float = 100_000, alloc_pct: float = 100,
         exit_dte: int | None = None, profit_take: float | None = None, stop_loss: float | None = None,
         spread_pct: float | None = None, commission: float = 0.65, stock_slip: float = 0.0003,
-        skew: bool = True, market: dict | None = None) -> dict:
+        skew: bool = True, market: dict | None = None, entry: dict | None = None,
+        iv_scale: float = 1.0) -> dict:
     """Backtest `legs` on `ticker` between start and end. See the module docstring."""
     ticker = ticker.upper()
+    rules = entry               # `entry` is reused below for the open position
     if spread_pct is None:
         spread_pct = default_spread(ticker)
     m = market or load_market(ticker, start, end)
@@ -680,6 +746,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         return m
     close = m['close']
     iv_all, iv_note = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'))
+    if iv_scale != 1.0:
+        iv_all = (iv_all * iv_scale).clip(*IV_CLIP)
     real_curve = m.get('curve')
     if real_curve is not None:
         real_curve = real_curve.reindex(close.index).ffill(limit=5)
@@ -741,6 +809,25 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     r_arr = r_all.reindex(days).fillna(0.03).to_numpy(dtype=float)
     iv_fill = float(iv_all.dropna().iloc[0]) if iv_all.notna().any() else 0.25
     cv_arr = real_curve.reindex(days).to_numpy(dtype=float) if real_curve is not None else None
+    allow = np.ones(len(days), dtype=bool)
+    if rules:
+        if 'vix_min' in rules or 'vix_max' in rules:
+            vx = m.get('vix')
+            vix_arr = (vx.reindex(close.index).ffill().reindex(days).to_numpy(dtype=float)
+                       if vx is not None and len(vx) else np.full(len(days), np.nan))
+            with np.errstate(invalid='ignore'):
+                allow &= vix_arr >= rules.get('vix_min', -np.inf)
+                allow &= vix_arr <= rules.get('vix_max', np.inf)
+        if 'ivr_min' in rules or 'ivr_max' in rules:
+            ivr = iv_all.rolling(IVR_DAYS, min_periods=IVR_DAYS // 2).rank(pct=True) * 100
+            ivr_arr = ivr.reindex(days).to_numpy(dtype=float)
+            with np.errstate(invalid='ignore'):
+                allow &= ivr_arr >= rules.get('ivr_min', -np.inf)
+                allow &= ivr_arr <= rules.get('ivr_max', np.inf)
+        if rules.get('trend'):
+            sma = close.rolling(TREND_DAYS, min_periods=TREND_DAYS).mean().reindex(days).to_numpy(dtype=float)
+            with np.errstate(invalid='ignore'):
+                allow &= (S_arr > sma) if rules['trend'] == 'above' else (S_arr < sma)
     for i, ts in enumerate(days):
         day = ts.date()
         S = float(S_arr[i])
@@ -778,7 +865,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 close_position(day, S, iv, r, cv, 'end of test')
 
         remaining = (last_day - day).days
-        if pos is None and day != last_day and remaining >= max(5, dte // 2):
+        if pos is None and day != last_day and remaining >= max(5, dte // 2) and allow[i]:
             eq_now = cash
             cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv)
             need, unbounded = capital_required(cand, S)
@@ -828,9 +915,22 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                      'a modelled slope where a point was missing; applied to every ticker.')
     else:
         term_note = 'A modelled slope (the VIX term structure was unavailable).'
+    if rules:
+        n_ok = int(allow[:len(equity)].sum())
+        notes.append(f'The entry rules allowed new positions on {n_ok} of {len(equity)} trading days '
+                     f'({n_ok / max(1, len(equity)) * 100:.0f}%).')
     out = _summarize(ticker, name, legs, dte, initial_capital, equity, trades, total_costs,
                      days_in, first_pos, notes, iv_note, alloc_pct, exit_dte, profit_take, stop_loss,
                      spread_pct, commission, skew, rf_daily)
+    if 'strategy' in out:
+        out['strategy']['entry'] = rules
+        when = describe_entry(rules, ticker)
+        if when:
+            out['strategy']['rules'] = out['strategy']['rules'].replace(
+                'Opens a new position the day the last one closes',
+                f'Opens a new position {when}, from the day the last one closes', 1)
+    if iv_scale != 1.0 and 'model' in out:
+        out['model']['iv_scale'] = iv_scale
     if 'model' in out:
         out['model']['term'] = term_note
         out['model']['rf_daily'] = round(rf_daily, 10)

@@ -51,6 +51,34 @@ def deflate(rows: list, returns: list) -> dict:
     return {'n': n, 'sharpe_bar': None if bar is None else round(bar, 2)}
 
 
+SENSITIVITY = (
+    ('IV 10% lower', {'iv_scale': 0.9}),
+    ('IV 10% higher', {'iv_scale': 1.1}),
+    ('No skew', {'skew': False}),
+)
+
+
+def model_sensitivity(run_kw: dict, base: dict) -> dict:
+    """Rerun a backtest with the volatility model nudged: how much of the result is the model?
+
+    run_kw are the arguments of the base run, market included. Returns each variant's
+    return figures and the spread of annual returns across all of them.
+    """
+    rows = []
+    for label, change in SENSITIVITY:
+        if change.get('skew') is False and not run_kw.get('skew', True):
+            continue
+        r = ob.run(**{**run_kw, **change})
+        if 'error' in r:
+            continue
+        m = r['metrics']
+        rows.append({'label': label, 'cagr': m['cagr'], 'sharpe': m['sharpe'],
+                     'max_drawdown': m['max_drawdown'], 'total_return': m['total_return']})
+    cagrs = [base['metrics']['cagr']] + [x['cagr'] for x in rows]
+    return {'variants': rows, 'cagr_low': min(cagrs), 'cagr_high': max(cagrs),
+            'cagr_range': round(max(cagrs) - min(cagrs), 2)}
+
+
 def _exit_args(code: str, dte: int) -> dict:
     if code == 'profit50':
         return {'profit_take': 50.0}
