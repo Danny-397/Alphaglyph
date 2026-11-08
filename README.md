@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-267%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="267 tests passing">
+  <img src="https://img.shields.io/badge/tests-278%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="278 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
@@ -259,6 +259,11 @@ to market each day, applies the exit rules, and rolls into the next position.
   exposures, and the remainder is shown as "other", so the parts add up to the P&L exactly.
   Every trade lists its biggest driver, and a chart shows delta, theta and vega over time.
   On SPY, 43% of the cash-secured put's profit was the T-bill interest on its collateral.
+- **Asks whether the edge is real.** The leaderboard deflates every Sharpe for the 19
+  strategies tried (on SPY the best, a short strangle, has a PSR of 98% alone but a Deflated
+  Sharpe of 64%: nothing passes). A robustness test reruns one strategy with 20 settings
+  (days to expiry × exit rule), runs CSCV on them for the probability of backtest
+  overfitting, and deflates the best setting's Sharpe for the 20 tries.
 - **Exit rules and costs:** hold to expiry or close N days before, profit targets and stop
   losses; $0.65 a contract plus a bid/ask cost per side (1% on index ETFs, 3% on single
   stocks by default). Cash earns the T-bill rate; sizing is by each position's worst case.
@@ -418,6 +423,7 @@ store. All are per-IP rate-limited.
 | `/api/compare` | POST | Run every strategy on the same inputs → ranked leaderboard |
 | `/api/options/backtest` | POST | Backtest one options strategy (a preset or up to six custom legs, stock included) on one underlying |
 | `/api/options/compare` | POST | Run all 19 preset options strategies on the same underlying and window → ranked leaderboard |
+| `/api/options/sweep` | POST | Robustness test: one strategy over 20 settings (days to expiry × exit rule), with PBO and a Deflated Sharpe |
 | `/api/options/presets` | GET | The preset options strategies, grouped by leg count, each with what its backtest holds |
 | `/api/predict` | GET | Multi-signal Predictor (price + earnings + sentiment); also logs the call to the forward ledger |
 | `/api/predict/calibration` | GET | Out-of-sample reliability of the ML forecaster (reliability diagram + Brier/skill scores) |
@@ -475,7 +481,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (267
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (278
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -485,7 +491,7 @@ tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 ```
 alphaglyph/
 ├── backend/                  (Flask API — stateless core + optional ledger store)
-│   ├── app.py           REST API — 18 endpoints
+│   ├── app.py           REST API — 19 endpoints
 │   ├── strategies.py    Signal generators + current-stance scanner
 │   ├── backtest.py      Simulation — walk-forward, Kelly, costs, regime tagging + conditional split
 │   ├── predictor.py     Multi-signal Predictor (price + earnings + sentiment blend)
@@ -506,7 +512,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           267 tests, fully offline
+│   └── tests/           278 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
@@ -535,7 +541,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 267 passing
+cd backend && pytest -q                    # 278 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)

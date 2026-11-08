@@ -507,6 +507,28 @@ def _sign(leg):
     return 1 if leg['side'] == 'long' else -1
 
 
+def _delta_strike(grid: list, kind: str, want: float, S: float, T: float, r: float,
+                  iv_atm: float, skew: bool, curve: tuple | None) -> float:
+    """The strike on a sorted grid whose |delta| is closest to `want`.
+
+    |delta| falls with the strike for calls and rises for puts, so a bisection finds the
+    crossing in a handful of prices; the strikes around it are then compared directly, so
+    the answer is the same as checking every strike, about twenty times faster.
+    """
+    def miss(k):
+        return abs(bs_delta(kind, S, k, T, r, skewed_iv(iv_atm, S, k, T, skew, curve))) - want
+    sign = -1.0 if kind == 'call' else 1.0          # make the miss increase with the strike
+    lo, hi = 0, len(grid) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if sign * miss(grid[mid]) < 0:
+            lo = mid
+        else:
+            hi = mid
+    near = grid[max(0, lo - 3):min(len(grid), hi + 4)]
+    return min(near, key=lambda k: abs(miss(k)))
+
+
 def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte: int,
                    ticker: str, skew: bool, curve: tuple | None = None) -> list:
     """Concrete legs (strike, expiry, entry price) for a position opened on `day` at price S."""
@@ -532,8 +554,7 @@ def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte
             want = s['value']
             grid = [round_strike(S * (1 + p / 200.0), step) for p in range(-100, 101)]
             grid = sorted(set(k for k in grid if k > 0))
-            K = min(grid, key=lambda k: abs(abs(bs_delta(leg['type'], S, k, T, r,
-                                                         skewed_iv(iv_atm, S, k, T, skew, curve))) - want))
+            K = _delta_strike(grid, leg['type'], want, S, T, r, iv_atm, skew, curve)
         iv = skewed_iv(iv_atm, S, K, T, skew, curve)
         built.append({**leg, 'strike': float(K), 'expiry': exp,
                       'price': bs_price(leg['type'], S, K, T, r, iv)})
@@ -714,19 +735,25 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         pos, units, entry = None, 0, None
 
     prev_day = None
-    for ts in days:
+    # Plain arrays for the daily loop (pandas lookups per day were a large share of the run time).
+    S_arr = close.reindex(days).to_numpy(dtype=float)
+    iv_arr = iv_all.reindex(days).to_numpy(dtype=float)
+    r_arr = r_all.reindex(days).fillna(0.03).to_numpy(dtype=float)
+    iv_fill = float(iv_all.dropna().iloc[0]) if iv_all.notna().any() else 0.25
+    cv_arr = real_curve.reindex(days).to_numpy(dtype=float) if real_curve is not None else None
+    for i, ts in enumerate(days):
         day = ts.date()
-        S = float(close[ts])
-        iv = float(iv_all.get(ts, np.nan))
-        r = float(r_all.get(ts, 0.03))
+        S = float(S_arr[i])
+        iv = float(iv_arr[i])
+        r = float(r_arr[i])
         if not np.isfinite(iv):
-            iv = float(iv_all.dropna().iloc[0]) if iv_all.notna().any() else 0.25
+            iv = iv_fill
         if prev_day is not None and cash > 0:
             earned = cash * r * (day - prev_day).days / 365.0    # idle cash earns the T-bill rate
             cash += earned
             interest += earned
         prev_day = day
-        real = tuple(real_curve.loc[ts]) if real_curve is not None and ts in real_curve.index else None
+        real = tuple(cv_arr[i]) if cv_arr is not None else None
         cv = day_curve(iv, real)
         curve_days += real is not None and bool(np.all(np.isfinite(real)))
 
@@ -806,6 +833,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                      spread_pct, commission, skew, rf_daily)
     if 'model' in out:
         out['model']['term'] = term_note
+        out['model']['rf_daily'] = round(rf_daily, 10)
         total = {k: round(sum(t['attribution'][k] for t in trades), 2) for k in ATTR_KEYS + ('costs',)}
         total['interest'] = round(interest, 2)
         out['attribution'] = total

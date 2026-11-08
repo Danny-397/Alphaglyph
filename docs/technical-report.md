@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 18 REST endpoints, 267 automated tests in CI
+- 19 REST endpoints, 278 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -535,6 +535,49 @@ collected $171k of time decay and gave back $160k on large moves, with its profi
 "other", the expiry-week terms the daily split resolves least well. And the straddle shows
 the long-volatility bargain: big moves paid $285k, but time decay cost $362k.
 
+### 9.4 Is an options edge real?
+
+The options lab is a new way to fool oneself, and the tools of §3 and §4 apply to it
+directly. They run on the options backtester's daily excess returns.
+
+**The leaderboard is 19 tries.** "Compare all strategies" runs every preset and ranks
+them, which is a selection from 19. On the SPY window, the luckiest of 19 strategies with no
+edge would show a Sharpe near 0.84 by chance. The top row, a short strangle with a Sharpe
+of 1.02, has a PSR of 98% on its own, which looks significant, but a Deflated Sharpe of 64%
+once judged as the best of 19. The cash-secured put falls from 96% to 48%. No row clears
+95%, and the leaderboard now shows the deflated figure next to each Sharpe.
+
+**Settings are tries too.** Options traders tune days to expiry and exit rules. The
+robustness test reruns one strategy at 7, 14, 30, 45 and 60 days, each held to expiry,
+closed at 50% profit, closed halfway to expiry, or stopped at a 100% loss: 20 backtests. It
+deflates the best setting's Sharpe for 20 tries and runs the CSCV procedure of §4 on the
+20 return streams (10 groups, 252 splits). On SPY, 2021-11 to 2026-11:
+
+| Strategy | Best of 20 settings | Its Sharpe | Deflated Sharpe | PBO | Best setting loses out of sample |
+|---|---|---:|---:|---:|---:|
+| Cash-secured put | 7 days, stop at a 100% loss | 1.90 | 97% | 2% | 0% of splits |
+| Covered call | 60 days, close halfway | 0.58 | 27% | 41% | 12% |
+| Iron condor | 45 days, hold to expiry | 0.49 | 22% | 38% | 59% |
+| Long straddle | 7 days, take 50% profit | 0.51 | 22% | 32% | 50% |
+
+For three of the four, picking a setting is close to a coin flip: the best-looking setting
+lands in the bottom half of the other half of history a third or more of the time, and
+the iron condor's best setting loses money out of sample in most splits. These PBO figures
+move with the window as §7 found for stocks: ending the same test two days later, on
+2026-11-08, puts the iron condor's PBO at 53% rather than 38%. The weekly
+cash-secured put with a stop is the exception on both tests. That result is also where the
+price model is weakest. Weekly options and a stop that is checked once a day at the close
+are the conditions under which §9.1 found the model understates sudden losses. The
+tests check the selection, not the prices, so the page says a pass is a reason to test
+with real quotes, not proof of an edge.
+
+Two engineering notes. A sweep is 20 full backtests in one web request, so the
+delta-strike search, which priced all 201 candidate strikes for every new position, now
+bisects (|delta| is monotone in the strike) and then compares the neighbouring strikes;
+results are identical to the full search (tested on 300 random cases), and runs are about
+2.5 times faster. Sweeps are limited to ten years of history to stay inside the server's
+request time.
+
 ---
 
 ## 10. Reproducing
@@ -543,7 +586,7 @@ the long-volatility bargain: big moves paid $285k, but time decay cost $362k.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 267 tests
+pytest                     # 278 tests
 python app.py              # http://localhost:5000
 ```
 
