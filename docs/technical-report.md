@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 18 REST endpoints, 254 automated tests in CI
+- 18 REST endpoints, 267 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -508,6 +508,33 @@ rule for each structure, no look-ahead (changing later prices leaves the first t
 unchanged), costs that only ever lower the result, and an exact accounting identity:
 final equity equals starting capital plus the sum of every trade's P&L.
 
+### 9.3 Where the P&L comes from
+
+A return figure doesn't say what earned it. Each day a position is open, the backtester
+splits its change in value with the previous close's Greeks: delta × the price move,
+½ gamma × the move squared, theta × the days elapsed, and, for each leg separately, vega ×
+the change in that leg's own implied volatility (legs move by different amounts because
+of the skew and the term structure). What the Taylor expansion misses is reported as
+"other": higher-order terms, rate moves, and above all the last days before expiry, when
+the Greeks change fastest. By construction the parts add to each trade's P&L, and with
+commissions, spreads and interest on idle cash they add to the account's (both are tested).
+
+On the same SPY window:
+
+| Strategy | Direction (delta) | Size of moves (gamma) | Time decay (theta) | Volatility (vega) | Other | Costs | Interest | Total |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Cash-secured put | +$27.3k | −$51.1k | +$69.2k | −$15.8k | +$3.6k | −$0.8k | +$24.7k | **+$57.1k** |
+| Covered call | +$48.4k | −$49.8k | +$57.5k | −$6.5k | +$9.7k | −$4.6k | +$2.4k | **+$57.1k** |
+| Iron condor | −$1.4k | −$160.3k | +$171.0k | −$48.3k | +$43.1k | −$6.2k | +$20.1k | **+$18.0k** |
+| Long straddle | −$25.2k | +$285.2k | −$362.5k | +$107.8k | −$46.8k | −$6.2k | +$18.2k | **−$29.4k** |
+
+Three readings the headline returns hide. The cash-secured put's +$57k includes $25k of
+T-bill interest on its collateral, 43% of the total: much of what put-selling "earns"
+is the cash yield, which a buy-and-hold comparison doesn't separate. The iron condor
+collected $171k of time decay and gave back $160k on large moves, with its profit resting on
+"other", the expiry-week terms the daily split resolves least well. And the straddle shows
+the long-volatility bargain: big moves paid $285k, but time decay cost $362k.
+
 ---
 
 ## 10. Reproducing
@@ -516,7 +543,7 @@ final equity equals starting capital plus the sum of every trade's P&L.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 254 tests
+pytest                     # 267 tests
 python app.py              # http://localhost:5000
 ```
 

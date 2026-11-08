@@ -104,6 +104,23 @@ def model_term_ratio(iv30: float, days: float) -> float:
     return (max(days, 1.0) / 30.0) ** beta
 
 
+def bs_greeks(kind: str, S: float, K: float, T: float, r: float, sigma: float) -> tuple:
+    """(delta, gamma, theta per year, vega per 1.00 of volatility) per share."""
+    if T <= 0 or sigma <= 0:
+        return (bs_delta(kind, S, K, T, r, sigma), 0.0, 0.0, 0.0)
+    sq = math.sqrt(T)
+    d1 = (math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sq)
+    d2 = d1 - sigma * sq
+    pdf = math.exp(-0.5 * d1 * d1) / math.sqrt(2 * math.pi)
+    gamma = pdf / (S * sigma * sq)
+    vega = S * pdf * sq
+    decay = -S * pdf * sigma / (2 * sq)
+    disc = r * K * math.exp(-r * T)
+    if kind == 'call':
+        return (_ncdf(d1), gamma, decay - disc * _ncdf(d2), vega)
+    return (_ncdf(d1) - 1.0, gamma, decay + disc * _ncdf(-d2), vega)
+
+
 def term_iv(iv30: float, T: float, curve: tuple | None = None) -> float:
     """ATM IV at maturity T (years) from the 30-day level.
 
@@ -533,6 +550,55 @@ def leg_value(leg: dict, day: date, S: float, iv_atm: float, r: float, skew: boo
                     skewed_iv(iv_atm, S, leg['strike'], T, skew, curve))
 
 
+def position_marks(pos: list, day: date, S: float, iv_atm: float, r: float, skew: bool,
+                   curve: tuple | None = None) -> dict:
+    """One unit's value and Greeks (dollars), plus each leg's IV, for P&L attribution.
+
+    delta, gamma: dollars per $1 move of the underlying (and per $1 squared); theta: dollars
+    per year; vega: dollars per 1.00 of volatility, kept per leg because each leg's IV moves
+    by a different amount (skew and term structure).
+    """
+    value = delta = gamma = theta = 0.0
+    legs = []
+    for leg in pos:
+        k = _sign(leg) * leg['qty'] * CONTRACT
+        if leg['type'] == 'stock':
+            value += k * S
+            delta += k
+            legs.append((None, 0.0))
+            continue
+        T = max(0.0, (leg['expiry'] - day).days / 365.0)
+        sig = skewed_iv(iv_atm, S, leg['strike'], T, skew, curve)
+        value += k * bs_price(leg['type'], S, leg['strike'], T, r, sig)
+        d, g, th, vg = bs_greeks(leg['type'], S, leg['strike'], T, r, sig)
+        delta += k * d
+        gamma += k * g
+        theta += k * th
+        legs.append((sig, k * vg))
+    return {'S': S, 'day': day, 'value': value, 'delta': delta, 'gamma': gamma, 'theta': theta,
+            'legs': legs}
+
+
+ATTR_KEYS = ('delta', 'gamma', 'theta', 'vega', 'other')
+
+
+def attribute(prev: dict, now: dict) -> dict:
+    """Split one unit's change in value between two marks with the earlier mark's Greeks.
+
+    delta x dS + 1/2 gamma x dS^2 + theta x dt + sum of each leg's vega x its own dIV; whatever
+    is left (higher-order terms, rate moves, the jump to intrinsic at expiry) is 'other', so
+    the parts always add up to the actual change.
+    """
+    dS = now['S'] - prev['S']
+    dt = (now['day'] - prev['day']).days / 365.0
+    vega = sum(v * ((s1 if s1 is not None else 0.0) - (s0 if s0 is not None else 0.0))
+               for (s0, v), (s1, _) in zip(prev['legs'], now['legs']) if s0 is not None)
+    out = {'delta': prev['delta'] * dS, 'gamma': 0.5 * prev['gamma'] * dS * dS,
+           'theta': prev['theta'] * dt, 'vega': vega}
+    out['other'] = (now['value'] - prev['value']) - sum(out.values())
+    return out
+
+
 def position_value(pos: list, day, S, iv_atm, r, skew, curve: tuple | None = None) -> float:
     """Value of one unit of the position (dollars), long legs positive, short negative."""
     return sum(_sign(leg) * leg['qty'] * CONTRACT * leg_value(leg, day, S, iv_atm, r, skew, curve)
@@ -613,6 +679,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     first_pos = None
     days_in = 0
     curve_days = 0
+    interest = 0.0
     bench_shares = initial_capital / float(close[days[0]])
     last_day = days[-1].date()
 
@@ -630,6 +697,9 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         cash += units * value - cost
         total_costs += cost
         pnl = units * (value - entry['value']) - cost - entry['cost']
+        attr = {k: round(units * v, 2) for k, v in entry['attr'].items()}
+        attr['costs'] = round(-(cost + entry['cost']), 2)
+        attr['other'] = round(attr['other'] + round(pnl, 2) - sum(attr.values()), 2)   # rounding
         trades.append({
             'opened': entry['day'].isoformat(), 'closed': day.isoformat(), 'reason': reason,
             'units': units, 'underlying_open': round(entry['S'], 2), 'underlying_close': round(S, 2),
@@ -639,6 +709,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             'net_open': round(units * entry['value'], 2), 'net_close': round(units * value, 2),
             'costs': round(cost + entry['cost'], 2), 'pnl': round(pnl, 2),
             'pnl_pct': round(pnl / entry['basis'] * 100, 2) if entry['basis'] else None,
+            'attribution': attr,
         })
         pos, units, entry = None, 0, None
 
@@ -651,7 +722,9 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         if not np.isfinite(iv):
             iv = float(iv_all.dropna().iloc[0]) if iv_all.notna().any() else 0.25
         if prev_day is not None and cash > 0:
-            cash *= 1 + r * (day - prev_day).days / 365.0    # idle cash earns the T-bill rate
+            earned = cash * r * (day - prev_day).days / 365.0    # idle cash earns the T-bill rate
+            cash += earned
+            interest += earned
         prev_day = day
         real = tuple(real_curve.loc[ts]) if real_curve is not None and ts in real_curve.index else None
         cv = day_curve(iv, real)
@@ -659,7 +732,11 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
 
         if pos is not None:
             first_exp = min(leg['expiry'] for leg in pos if leg['expiry'])
-            value = position_value(pos, day, S, iv, r, skew, cv)
+            mark = position_marks(pos, day, S, iv, r, skew, cv)
+            for k, v in attribute(entry['mark'], mark).items():
+                entry['attr'][k] += v
+            entry['mark'] = mark
+            value = mark['value']
             pnl = units * (value - entry['value'])
             ref = abs(entry['value']) * units or 1.0
             if day >= first_exp:
@@ -685,7 +762,9 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 cash -= n * open_value + cost
                 total_costs += cost
                 pos, units = cand, n
-                entry = {'day': day, 'S': S, 'value': open_value, 'cost': cost, 'basis': n * need}
+                entry = {'day': day, 'S': S, 'value': open_value, 'cost': cost, 'basis': n * need,
+                         'mark': position_marks(cand, day, S, iv, r, skew, cv),
+                         'attr': dict.fromkeys(ATTR_KEYS, 0.0)}
                 if first_pos is None:
                     first_pos = {'day': day.isoformat(), 'S': S, 'legs': cand, 'need': need,
                                  'unbounded': unbounded, 'units': n}
@@ -695,9 +774,20 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
 
         held = pos is not None
         days_in += held
-        val = cash + (units * position_value(pos, day, S, iv, r, skew, cv) if held else 0.0)
-        equity.append({'date': day.isoformat(), 'value': round(val, 2),
-                       'benchmark': round(bench_shares * S, 2), 'iv': round(iv * 100, 1)})
+        row = {'date': day.isoformat(), 'benchmark': round(bench_shares * S, 2), 'iv': round(iv * 100, 1)}
+        if held:
+            mk = entry['mark']
+            val = cash + units * mk['value']
+            vega_pt = sum(v for _, v in mk['legs']) / 100.0
+            # Exposures for the chart: dollars per 1% move, per calendar day, per volatility point.
+            row.update({'delta': round(units * mk['delta'] * S * 0.01, 2),
+                        'theta': round(units * mk['theta'] / 365.0, 2),
+                        'vega': round(units * vega_pt, 2)})
+        else:
+            val = cash
+            row.update({'delta': 0.0, 'theta': 0.0, 'vega': 0.0})
+        row['value'] = round(val, 2)
+        equity.append(row)
         if val <= 0:
             notes.append(f'The account was wiped out on {day.isoformat()}.')
             break
@@ -716,6 +806,9 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                      spread_pct, commission, skew, rf_daily)
     if 'model' in out:
         out['model']['term'] = term_note
+        total = {k: round(sum(t['attribution'][k] for t in trades), 2) for k in ATTR_KEYS + ('costs',)}
+        total['interest'] = round(interest, 2)
+        out['attribution'] = total
     return out
 
 

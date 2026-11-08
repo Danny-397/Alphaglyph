@@ -259,8 +259,9 @@ function obRenderResult(r) {
     <td>${fmt$(t.underlying_open)} → ${fmt$(t.underlying_close)}</td>
     <td>${t.net_open >= 0 ? 'paid ' + obMoney0(t.net_open) : 'collected ' + obMoney0(-t.net_open)}</td>
     <td>${obMoney0(t.net_close)}</td><td>${obMoney0(t.costs)}</td>
-    <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${t.reason}</td></tr>`).join('')
-    : '<tr><td colspan="9" class="empty-cell">No positions were opened.</td></tr>'
+    <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}</td></tr>`).join('')
+    : '<tr><td colspan="10" class="empty-cell">No positions were opened.</td></tr>'
+  obRenderWhy(r)
 
   const ck = obState.check && obState.check.test
   el('ob-model-body').innerHTML = `
@@ -276,6 +277,68 @@ function obRenderResult(r) {
     <p class="card-desc"><strong>Cash.</strong> Cash not tied up earns the Treasury-bill rate. Credit received stays in the account as collateral.</p>
     <ul class="opt-limits">${r.model.limits.map(x => `<li>${x}</li>`).join('')}</ul>`
   el('ob-notes').textContent = (r.notes || []).join(' ')
+}
+
+// ── Why it made or lost money: the P&L split by Greek ─────────────────────
+const OB_ATTR = [
+  ['delta', 'Direction (delta)'], ['gamma', 'Size of moves (gamma)'], ['theta', 'Time decay (theta)'],
+  ['vega', 'Volatility (vega)'], ['other', 'Other'], ['costs', 'Commissions and spreads'], ['interest', 'Interest on cash'],
+]
+const OB_GREEK_NOTE = {
+  delta: 'Dollars gained or lost for a 1% rise in the underlying, on each day a position was open.',
+  theta: 'Dollars of time decay per calendar day: positive when the position collects it, negative when it pays it.',
+  vega: 'Dollars gained or lost for a one-point rise in implied volatility.',
+}
+
+function obSigned(v) { return (v >= 0 ? '+' : '−') + obMoney0(Math.abs(v)) }
+
+function obDriver(a) {
+  if (!a) return '—'
+  const short = { delta: 'Direction', gamma: 'Big moves', theta: 'Time decay', vega: 'Volatility', other: 'Other', costs: 'Costs' }
+  const k = Object.keys(short).reduce((best, x) => Math.abs(a[x] || 0) > Math.abs(a[best] || 0) ? x : best, 'delta')
+  return `${short[k]} <span class="${clr(a[k])}">${obSigned(a[k])}</span>`
+}
+
+function obRenderWhy(r) {
+  const a = r.attribution
+  el('ob-why').classList.toggle('opt-why-empty', !a)
+  if (!a) { el('ob-why-lede').textContent = 'Run the backtest again to see the split (this server is older than the feature).'; return }
+  const rows = OB_ATTR.filter(([k]) => a[k] != null)
+  const total = rows.reduce((s, [k]) => s + a[k], 0)
+  const opt = rows.filter(([k]) => ['delta', 'gamma', 'theta', 'vega'].includes(k))
+  const best = opt.reduce((x, y) => a[y[0]] > a[x[0]] ? y : x)
+  const worst = opt.reduce((x, y) => a[y[0]] < a[x[0]] ? y : x)
+  el('ob-why-lede').innerHTML = `Every day a position was open, its change in value is split by Greek, using that day's
+    exposures. Over the whole test the account ${total >= 0 ? 'made' : 'lost'} <strong class="${clr(total)}">${obMoney0(Math.abs(total))}</strong>.
+    The biggest help was <strong>${best[1].replace(/ \(.*\)$/, '').toLowerCase()}</strong> (${obSigned(a[best[0]])}) and the biggest drag
+    <strong>${worst[1].replace(/ \(.*\)$/, '').toLowerCase()}</strong> (${obSigned(a[worst[0]])}); interest on idle cash added ${obSigned(a.interest || 0)}.
+    The parts add up to the total exactly.`
+  obState.charts.attr = destroyChart(obState.charts.attr)
+  obState.charts.attr = new Chart(el('ob-attr-chart'), {
+    type: 'bar',
+    data: { labels: rows.map(([, l]) => l), datasets: [{ data: rows.map(([k]) => a[k]),
+      backgroundColor: rows.map(([k]) => a[k] >= 0 ? 'rgba(63,185,80,0.75)' : 'rgba(248,81,73,0.75)'), borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: { x: { ticks: { callback: v => (v < 0 ? '−$' : '$') + Math.abs(v / 1000).toFixed(0) + 'k' } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => obSigned(c.parsed.x) } } } },
+  })
+  obDrawGreek(r, obState.greek || 'delta')
+}
+
+function obDrawGreek(r, g) {
+  obState.greek = g
+  document.querySelectorAll('#ob-greek-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.greek === g))
+  el('ob-greek-note').textContent = OB_GREEK_NOTE[g]
+  obState.charts.greek = destroyChart(obState.charts.greek)
+  if (r.equity[0][g] == null) return
+  obState.charts.greek = new Chart(el('ob-greek-chart'), {
+    type: 'line',
+    data: { labels: r.equity.map(e => e.date), datasets: [{ label: g, data: r.equity.map(e => e[g]), borderColor: '#a371f7',
+      backgroundColor: 'rgba(163,113,247,0.10)', borderWidth: 1.5, pointRadius: 0, fill: 'origin', stepped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { ticks: { callback: v => (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString() } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => obSigned(c.parsed.y) } } } },
+  })
 }
 
 function obDrawEquity(r) {
@@ -431,6 +494,10 @@ async function initOptionsBacktest() {
     if (obState.legs.length >= 6) return
     obState.legs.push({ type: 'call', side: 'long', qty: 1, strike: { mode: 'atm' } })
     obRenderLegs(); obRenderWhat()
+  })
+  el('ob-greek-seg').addEventListener('click', e => {
+    const b = e.target.closest('[data-greek]')
+    if (b && obState.result) obDrawGreek(obState.result, b.dataset.greek)
   })
   el('ob-run').addEventListener('click', () => obRun())
   el('ob-compare').addEventListener('click', obCompare)

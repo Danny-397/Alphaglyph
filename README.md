@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-254%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="254 tests passing">
+  <img src="https://img.shields.io/badge/tests-267%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="267 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
@@ -254,6 +254,11 @@ to market each day, applies the exit rules, and rolls into the next position.
 - **Says exactly what it tests.** Every run is spelled out: *"Protective collar: a
   three-leg backtest (long stock, long put, short call)"*, then each leg, the first
   position's actual strikes and expiries, and its payoff at expiry.
+- **Says why it made or lost money.** Each day a position is open, its change in value is
+  split by Greek (direction, size of moves, time decay, volatility) using that day's
+  exposures, and the remainder is shown as "other", so the parts add up to the P&L exactly.
+  Every trade lists its biggest driver, and a chart shows delta, theta and vega over time.
+  On SPY, 43% of the cash-secured put's profit was the T-bill interest on its collateral.
 - **Exit rules and costs:** hold to expiry or close N days before, profit targets and stop
   losses; $0.65 a contract plus a bid/ask cost per side (1% on index ETFs, 3% on single
   stocks by default). Cash earns the T-bill rate; sizing is by each position's worst case.
@@ -470,7 +475,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (254
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (267
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -501,7 +506,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           254 tests, fully offline
+│   └── tests/           267 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
@@ -530,7 +535,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 254 passing
+cd backend && pytest -q                    # 267 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)

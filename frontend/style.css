@@ -1092,3 +1092,12 @@ main:focus { outline: none; }
 .opt-check { margin-top: var(--s5); text-align: left; }
 .opt-check-table td:first-child { color: var(--muted); }
 .opt-check-table td:not(:first-child) { font-variant-numeric: tabular-nums; }
+
+/* Options: the P&L split by Greek. */
+.opt-attr-key { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.opt-attr-key strong { color: var(--text); font-weight: 600; }
+.seg { display: inline-flex; margin-left: 10px; border: 1px solid var(--border-lt); border-radius: 999px; overflow: hidden; vertical-align: middle; }
+.seg-btn { background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 12px; padding: 3px 11px; cursor: pointer; }
+.seg-btn + .seg-btn { border-left: 1px solid var(--border-lt); }
+.seg-btn.active { background: var(--purple-dim); color: var(--purple); }
+.seg-btn:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }

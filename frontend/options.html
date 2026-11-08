@@ -242,6 +242,7 @@
           <div class="card">
             <div class="tab-list" role="tablist">
               <button type="button" class="tab-btn active" data-tab="ob-perf">Performance</button>
+              <button type="button" class="tab-btn" data-tab="ob-why">Why it made or lost money</button>
               <button type="button" class="tab-btn" data-tab="ob-trades">Trades</button>
               <button type="button" class="tab-btn" data-tab="ob-model">How it's priced</button>
             </div>
@@ -249,10 +250,30 @@
               <div class="chart-wrap" style="height:320px;margin-bottom:20px;"><canvas id="ob-chart"></canvas></div>
               <div class="stats-grid" id="ob-bench-stats"></div>
             </div>
+            <div class="tab-panel" id="ob-why">
+              <p class="card-desc" id="ob-why-lede"></p>
+              <div class="chart-wrap" style="height:260px;margin-bottom:12px;"><canvas id="ob-attr-chart"></canvas></div>
+              <ul class="opt-attr-key">
+                <li><strong>Direction (delta):</strong> the gain or loss from the underlying's moves, at the position's exposure that day.</li>
+                <li><strong>Size of moves (gamma):</strong> how that exposure changed as the price moved. Option sellers lose here on big days; buyers gain.</li>
+                <li><strong>Time decay (theta):</strong> the value options lose each day as expiry approaches. Sellers collect it; buyers pay it.</li>
+                <li><strong>Volatility (vega):</strong> the change in implied volatility, each leg at its own strike and expiry.</li>
+                <li><strong>Other:</strong> what a daily Greek split can't capture, mostly the last days before expiry, when the Greeks change fastest, and rate moves.</li>
+              </ul>
+              <div class="opt-sub" style="margin-top:18px;">Exposure over time
+                <span class="seg" role="group" aria-label="Exposure shown" id="ob-greek-seg">
+                  <button type="button" class="seg-btn active" data-greek="delta">Delta</button>
+                  <button type="button" class="seg-btn" data-greek="theta">Theta</button>
+                  <button type="button" class="seg-btn" data-greek="vega">Vega</button>
+                </span>
+              </div>
+              <p class="fine" id="ob-greek-note"></p>
+              <div class="chart-wrap" style="height:220px;"><canvas id="ob-greek-chart"></canvas></div>
+            </div>
             <div class="tab-panel" id="ob-trades">
               <div class="scroll-box">
                 <table class="data-table">
-                  <thead><tr><th>Opened</th><th>Closed</th><th>Position</th><th>Underlying</th><th>Paid / collected</th><th>Closed at</th><th>Costs</th><th>P&amp;L</th><th>Why it closed</th></tr></thead>
+                  <thead><tr><th>Opened</th><th>Closed</th><th>Position</th><th>Underlying</th><th>Paid / collected</th><th>Closed at</th><th>Costs</th><th>P&amp;L</th><th>Biggest driver</th><th>Why it closed</th></tr></thead>
                   <tbody id="ob-trades-tbody"></tbody>
                 </table>
               </div>
