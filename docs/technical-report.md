@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 18 REST endpoints, 246 automated tests in CI
+- 18 REST endpoints, 254 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -397,8 +397,10 @@ price-only network, is unchanged.
   exposure profiles, rank-based comparison is less meaningful.
 - **Transaction costs are modelled, not measured.** Real fills, slippage and market
   impact are not simulated.
-- **Option prices in the options backtester are modelled.** Black-Scholes with a modelled
-  volatility level, skew and term structure, no dividends and no early assignment (§9).
+- **Option prices in the options backtester are modelled.** Black-Scholes with a fitted
+  volatility level, the real VIX term structure and a modelled skew, no dividends and no
+  early assignment. Checked against Cboe's PutWrite index, the model tracks it but
+  understates the worst months (§9.1).
 - **The forward record is young.** It accrues ten calls a trading day from November
   2026. Until it holds a few hundred graded calls, its hit rate and Brier skill are
   noise, and a single market regime dominates it.
@@ -418,43 +420,88 @@ so that each position's worst case at expiry (or, for uncovered short calls, the
 historical option quotes, so each leg is priced with Black-Scholes on that day's close.
 Three choices keep the prices close to real chains:
 
-1. *Level.* For SPY, at-the-money implied volatility is 0.87 × the VIX: the VIX is a
-   variance-swap rate that includes the skew, and 30-day at-the-money IV usually sits
-   about that far below it. Other tickers use their own 21-day realized volatility times
-   the market's implied-to-realized ratio that day (clipped to 0.8-2.0), so their IV rises
-   in fearful markets, as real IV does.
+1. *Level.* For SPY, at-the-money implied volatility is 0.835 × the VIX. The VIX is a
+   variance-swap rate that includes the skew, so 30-day at-the-money IV sits below it; the
+   factor is fitted to real option returns (§9.1). Other tickers use their own 21-day
+   realized volatility times the market's implied-to-realized ratio that day (clipped to
+   0.8-2.0), so their IV rises in fearful markets, as real IV does.
 2. *Skew.* IV changes with standardized moneyness, by 0.40 per standard deviation on the
    put side and 0.15 on the call side: a 16-delta put trades near 1.4 × at-the-money IV and
    a 16-delta call near 0.85 ×. An early version used the raw VIX with a mild symmetric
    skew and flattered short-premium trades badly: at the same sizing, an SPY iron condor
    showed a 26% CAGR over 2021-2025. With the VIX adjustment and the asymmetric skew it
    fell to about 12%.
-3. *Term structure.* IV at other maturities scales with (T / 30 days)^β, where β falls
-   from about +0.10 in calm markets to below zero in panics. Without it, a calendar spread
-   bought a 60-day option at the 30-day volatility and showed a 26% CAGR; with it, the
-   calendar roughly breaks even.
+3. *Term structure.* IV at other maturities comes from the real VIX curve that day: the
+   VIX9D, VIX, VIX3M and VIX6M give 9, 30, 93 and 183 days, interpolated linearly in total
+   variance, and the same ratios are applied to every ticker. Before 2011, when the VIX9D
+   starts, the short end falls back to a modelled slope, (T / 30 days)^β with β falling from
+   about +0.10 in calm markets to below zero in panics. That slope was the first version
+   of the term structure. Against the real curve it was right on average at 93 days (a
+   mean ratio of 1.113 against 1.111) but too steep at 9 days (0.888 against 0.946), and
+   it tracked the day-to-day shape loosely (correlations of 0.46 to 0.77). Without any
+   term structure, a calendar spread bought a 60-day option at the 30-day volatility and
+   showed a 26% CAGR; with the real curve, it loses 1.6% a year.
 
 Each of those corrections moved results toward what is known about these strategies,
-which is evidence the model is directionally right, but it is still a model. Calendars and
+but it is still a model. Calendars and
 far out-of-the-money wings depend most on the modelled shapes, so they are the least
 reliable results. Every result in the UI carries a "model-priced" banner and the
 volatility source.
+
+### 9.1 Checked against real option returns
+
+The model can be tested after all, because Cboe publishes the returns of real option
+strategies as indices. The S&P 500 PutWrite index (PUT) sells a one-month at-the-money put
+every month and holds the strike in Treasury bills; Yahoo carries its daily closes from 1996.
+The replica runs the same strategy in the backtester on SPY: a 30-day at-the-money put,
+held to expiry, fully collateralised, without costs (the index has none).
+
+The model has one free setting, the IV level as a share of the VIX. It was fitted on
+2007-2015 alone, choosing the value on a 0.75-0.95 grid whose replica matched the index's
+annual return (5.99% against 5.91%), which gave 0.835. Everything below is 2016 on, which
+the fit never saw (`tools/options_validation.py`, output in
+`frontend/data/options_validation.json`):
+
+| 2016-01-04 → 2026-11-06 (not used in the fit) | Model replica | Real PutWrite index |
+|---|---:|---:|
+| Return a year | 8.7% | 8.2% |
+| Volatility (monthly, annualised) | 8.6% | 9.4% |
+| Worst drawdown | −29.2% | −30.0% |
+| Worst month | −8.8% | −13.4% |
+| Monthly correlation | 0.87 (130 months) | |
+
+The previous model, 0.87 × the VIX with the modelled term structure, earned 9.7% a year on
+the same window, 1.5 points ahead of the index; the fitted level brings the gap to 0.5
+points. The replica tracks the index's direction (correlation 0.87, tracking error 4.6% a
+year) and its worst drawdown, but not its worst months. Real option prices jump further in
+a crash than a smooth volatility model allows, so the model **understates tail losses for
+short-volatility strategies**, and its results for them should be read as an upper bound.
+
+The replica and the index also differ by design. The index trades SPX options at Cboe's
+special opening quotation on the third Friday; the replica trades SPY options at the close
+every four to five weeks. The fitted level absorbs the average effect of those
+differences, so it is an effective level, not a measurement of implied volatility. The
+check covers one strategy, at-the-money puts; Cboe's call-writing and other indices are
+not on free feeds, so out-of-the-money strikes and calls rest on the modelled skew.
+
+### 9.2 Results on SPY
 
 On SPY over 2021-11-08 → 2026-11-06 (30 days to expiry, default sizing and costs):
 
 | Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
 |---|---:|---:|---:|---:|
-| Buy and hold SPY | +67.7% | +10.9% | 0.46 | −24.5% |
-| Cash-secured put (1) | +62.2% | +10.2% | 0.95 | −7.9% |
-| Covered call (2) | +61.3% | +10.1% | 0.52 | −17.4% |
-| Iron condor (4) | +31.7% | +5.7% | 0.18 | −21.9% |
-| Protective collar (3) | +10.5% | +2.0% | −0.17 | −22.0% |
-| Long call (1) | +4.2% | +0.8% | 0.12 | −50.3% |
-| Long straddle (2) | −42.1% | −10.4% | −0.43 | −50.7% |
+| Buy and hold SPY | +67.1% | +10.9% | 0.45 | −24.5% |
+| Cash-secured put (1) | +57.2% | +9.5% | 0.82 | −8.2% |
+| Covered call (2) | +57.1% | +9.5% | 0.47 | −17.5% |
+| Long call (1) | +27.4% | +5.0% | 0.22 | −48.8% |
+| Iron condor (4) | +18.1% | +3.4% | 0.03 | −24.9% |
+| Protective collar (3) | +15.4% | +2.9% | −0.07 | −21.9% |
+| Long straddle (2) | −29.4% | −6.7% | −0.26 | −48.9% |
 
-None beat buy-and-hold on return in a window where SPY rose 68%. The short-premium
-strategies earned most of the market's return with a third to two-thirds of its drawdown;
-the long-premium ones paid theta every month. The tests check the parts that do not
+None beat buy-and-hold on return in a window where SPY rose 67%. The cash-secured put and
+covered call earned most of the market's return with a third to two-thirds of its drawdown,
+though §9.1 says to read short-volatility results as an upper bound; the straddle paid
+theta every month. The tests check the parts that do not
 depend on the volatility model: Black-Scholes against a textbook value and put-call
 parity, expiries on Fridays, delta strikes, offsets that always form a spread, the capital
 rule for each structure, no look-ahead (changing later prices leaves the first trade
@@ -469,7 +516,7 @@ final equity equals starting capital plus the sum of every trade's P&L.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 246 tests
+pytest                     # 254 tests
 python app.py              # http://localhost:5000
 ```
 

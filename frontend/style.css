@@ -1087,3 +1087,8 @@ main:focus { outline: none; }
 .opt-title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin: 10px 0 6px; }
 .opt-lede { font-size: 14px; color: var(--muted); margin: 0; max-width: 760px; line-height: 1.6; }
 .opt-lede a { color: var(--purple); }
+
+/* Options: the out-of-sample check against Cboe's PutWrite index. */
+.opt-check { margin-top: var(--s5); text-align: left; }
+.opt-check-table td:first-child { color: var(--muted); }
+.opt-check-table td:not(:first-child) { font-variant-numeric: tabular-nums; }

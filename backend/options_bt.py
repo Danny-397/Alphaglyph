@@ -15,9 +15,13 @@ not traded quotes. Every price comes from Black-Scholes on that day's close:
   21-day realized volatility scaled by the market's implied-to-realized ratio
   that day (ATM-adjusted VIX / SPY realized volatility, clipped to 0.8-2.0),
   so IV rises in fearful markets as it does in real chains;
-- at-the-money IV of 0.87 x the VIX for SPY (the VIX includes the skew);
-- a term structure: longer-dated IV higher than 30-day IV in calm markets,
-  lower in panics;
+- at-the-money IV of VIX_TO_ATM x the VIX for SPY (the VIX includes the skew).
+  The factor is fitted so that a replica of Cboe's PutWrite index matches the
+  real index over 2007-2015, and checked on 2016 on (tools/options_validation.py);
+- a term structure from the real VIX curve that day: the VIX9D, VIX, VIX3M and
+  VIX6M give implied volatility at 9, 30, 93 and 183 days, interpolated in total
+  variance. Where a point is missing (the VIX9D starts in 2011), a modelled
+  slope fills in: upward in calm markets, inverted in panics;
 - a volatility skew: out-of-the-money puts priced richer and calls cheaper,
   steeper on the put side, by standardized moneyness (optional);
 - the risk-free rate from the 3-month Treasury bill (FRED DGS3MO);
@@ -53,7 +57,9 @@ IV_CLIP = (0.05, 2.5)
 # chains: a 16-delta put trades near 1.4x at-the-money IV, a 16-delta call near 0.85x.
 SKEW_PUT, SKEW_CALL = 0.40, 0.15
 SKEW_CLIP = (0.75, 2.0)
-VIX_TO_ATM = 0.87                   # the VIX includes the skew; 30-day ATM IV sits ~13% below it
+VIX_TO_ATM = 0.835                  # fitted on 2007-2015 against Cboe's PutWrite index (see the docstring)
+CURVE_TENORS = (9, 93, 183)         # days covered by the VIX9D, VIX3M and VIX6M
+CURVE_SYMBOLS = ('^VIX9D', '^VIX3M', '^VIX6M')
 UNBOUNDED_MOVE = 0.30               # cash reserved against an uncovered short call: a 30% rise
 MAX_LEGS = 6
 MAX_YEARS = 15
@@ -87,22 +93,56 @@ def bs_delta(kind: str, S: float, K: float, T: float, r: float, sigma: float) ->
     return _ncdf(d1) if kind == 'call' else _ncdf(d1) - 1.0
 
 
-def term_iv(iv30: float, T: float) -> float:
-    """ATM IV at maturity T from the 30-day level: upward sloping in calm markets, inverted in panics.
+def model_term_ratio(iv30: float, days: float) -> float:
+    """Modelled IV at `days` over 30-day IV, used where the real VIX curve is missing.
 
     The slope exponent falls as volatility rises (about +0.10 at 15% IV, flat near 40%,
     negative above), matching how the VIX term structure moves between contango and
     backwardation.
     """
+    beta = min(max(0.10 - 0.4 * (iv30 - 0.15), -0.15), 0.15)
+    return (max(days, 1.0) / 30.0) ** beta
+
+
+def term_iv(iv30: float, T: float, curve: tuple | None = None) -> float:
+    """ATM IV at maturity T (years) from the 30-day level.
+
+    `curve` is the day's term structure as ((days, IV / 30-day IV), ...) sorted by days,
+    including (30, 1.0); between points total variance is interpolated linearly, beyond
+    the ends the end ratio is held. Without a curve the modelled slope is used.
+    """
     if T <= 0:
         return iv30
-    beta = min(max(0.10 - 0.4 * (iv30 - 0.15), -0.15), 0.15)
-    return iv30 * (max(T, 1 / 365) / (30 / 365)) ** beta
+    days = max(T * 365.0, 1.0)
+    if not curve:
+        return iv30 * model_term_ratio(iv30, days)
+    if days <= curve[0][0]:
+        return iv30 * curve[0][1]
+    if days >= curve[-1][0]:
+        return iv30 * curve[-1][1]
+    for (d0, r0), (d1, r1) in zip(curve, curve[1:]):
+        if d0 <= days <= d1:
+            w0, w1 = r0 * r0 * d0, r1 * r1 * d1
+            w = max(w0 + (w1 - w0) * (days - d0) / (d1 - d0), 1e-12)
+            return iv30 * math.sqrt(w / days)
+    return iv30                                    # pragma: no cover - curve is sorted
 
 
-def skewed_iv(iv_atm: float, S: float, K: float, T: float, skew: bool = True) -> float:
+def day_curve(iv30: float, real: tuple | None) -> tuple:
+    """The day's curve points: real ratios where known, the modelled slope where not."""
+    pts = [(30.0, 1.0)]
+    for i, d in enumerate(CURVE_TENORS):
+        r = float(real[i]) if real is not None else float('nan')
+        if not (math.isfinite(r) and r > 0):
+            r = model_term_ratio(iv30, d)
+        pts.append((float(d), r))
+    return tuple(sorted(pts))
+
+
+def skewed_iv(iv_atm: float, S: float, K: float, T: float, skew: bool = True,
+              curve: tuple | None = None) -> float:
     """IV for strike K and maturity T: the term structure, then the skew by standardized moneyness."""
-    iv_atm = term_iv(iv_atm, T)
+    iv_atm = term_iv(iv_atm, T, curve)
     if not skew or T <= 0:
         return iv_atm
     m = math.log(K / S) / (iv_atm * math.sqrt(max(T, 1 / 365)))
@@ -353,13 +393,14 @@ def implied_vol_series(close: pd.Series, ticker: str, vix: pd.Series | None,
     if vix is not None and len(vix):
         v = (vix / 100.0 * VIX_TO_ATM).reindex(close.index).ffill()
         if ticker == 'SPY':
-            return v.clip(*IV_CLIP), '0.87 × the VIX (the VIX includes the skew, so at-the-money IV runs below it)'
+            return v.clip(*IV_CLIP), (f'{VIX_TO_ATM:g} × the VIX (the VIX includes the skew, so at-the-money '
+                                      'IV runs below it; the factor is fitted to Cboe’s PutWrite index)')
         if spy_close is not None and len(spy_close):
             rv_spy = realized_vol(spy_close.reindex(close.index).ffill())
             ratio = (v / rv_spy).clip(*VRP_CLIP)
             iv = (rv * ratio).clip(*IV_CLIP)
             return iv, (f'{ticker}’s 21-day realized volatility × the market’s implied-to-realized '
-                        'ratio that day (0.87 × VIX ÷ SPY realized volatility)')
+                        f'ratio that day ({VIX_TO_ATM:g} × VIX ÷ SPY realized volatility)')
     return (rv * 1.1).clip(*IV_CLIP), (f'{ticker}’s 21-day realized volatility × 1.1 '
                                        '(the VIX was unavailable)')
 
@@ -399,8 +440,32 @@ def _fred(series_id: str, lo, hi) -> pd.Series | None:
     return s[(s.index >= pd.Timestamp(lo)) & (s.index <= pd.Timestamp(hi))]
 
 
+def vix_curve(lo: str, hi: str) -> pd.DataFrame | None:
+    """Daily ratios of the VIX9D, VIX3M and VIX6M to the VIX (columns = CURVE_TENORS), or None."""
+    def closes(sym):
+        df = feat.fetch_ohlcv(sym, start=lo, end=hi)
+        if df is None or df.empty:
+            return None
+        c = df['Close'].astype(float)
+        c.index = pd.to_datetime(c.index).tz_localize(None).normalize()
+        return c
+    try:
+        vix = closes('^VIX')
+        if vix is None:
+            return None
+        cols = {}
+        for d, sym in zip(CURVE_TENORS, CURVE_SYMBOLS):
+            c = closes(sym)
+            cols[d] = (c / vix) if c is not None else pd.Series(np.nan, index=vix.index)
+        out = pd.DataFrame(cols).reindex(vix.index)
+        return out.where((out > 0.3) & (out < 3.0))   # drop bad prints
+    except Exception as exc:                          # pragma: no cover - network
+        logger.warning('VIX curve unavailable: %s', exc)
+        return None
+
+
 def load_market(ticker: str, start: str, end: str) -> dict:
-    """Closes for the ticker (and SPY), the VIX and T-bill rates, with a warm-up for volatility."""
+    """Closes for the ticker (and SPY), the VIX, its term structure and T-bill rates, with a warm-up."""
     lo = (pd.Timestamp(start) - pd.Timedelta(days=60)).strftime('%Y-%m-%d')
     df = feat.fetch_ohlcv(ticker, start=lo, end=end)
     if df is None or df.empty:
@@ -415,7 +480,8 @@ def load_market(ticker: str, start: str, end: str) -> dict:
             spy.index = pd.to_datetime(spy.index).tz_localize(None).normalize()
     vix = _fred('VIXCLS', lo, end)
     rate = _fred('DGS3MO', lo, end)
-    return {'close': close, 'spy': spy, 'vix': vix, 'rate': rate}
+    curve = vix_curve(lo, end)
+    return {'close': close, 'spy': spy, 'vix': vix, 'rate': rate, 'curve': curve}
 
 
 # ── Position mechanics ───────────────────────────────────────────────────────
@@ -425,7 +491,7 @@ def _sign(leg):
 
 
 def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte: int,
-                   ticker: str, skew: bool) -> list:
+                   ticker: str, skew: bool, curve: tuple | None = None) -> list:
     """Concrete legs (strike, expiry, entry price) for a position opened on `day` at price S."""
     step = strike_step(S, ticker)
     built = []
@@ -450,24 +516,27 @@ def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte
             grid = [round_strike(S * (1 + p / 200.0), step) for p in range(-100, 101)]
             grid = sorted(set(k for k in grid if k > 0))
             K = min(grid, key=lambda k: abs(abs(bs_delta(leg['type'], S, k, T, r,
-                                                         skewed_iv(iv_atm, S, k, T, skew))) - want))
-        iv = skewed_iv(iv_atm, S, K, T, skew)
+                                                         skewed_iv(iv_atm, S, k, T, skew, curve))) - want))
+        iv = skewed_iv(iv_atm, S, K, T, skew, curve)
         built.append({**leg, 'strike': float(K), 'expiry': exp,
                       'price': bs_price(leg['type'], S, K, T, r, iv)})
     return built
 
 
-def leg_value(leg: dict, day: date, S: float, iv_atm: float, r: float, skew: bool) -> float:
+def leg_value(leg: dict, day: date, S: float, iv_atm: float, r: float, skew: bool,
+              curve: tuple | None = None) -> float:
     """Per-share value of one leg on `day`."""
     if leg['type'] == 'stock':
         return S
     T = max(0.0, (leg['expiry'] - day).days / 365.0)
-    return bs_price(leg['type'], S, leg['strike'], T, r, skewed_iv(iv_atm, S, leg['strike'], T, skew))
+    return bs_price(leg['type'], S, leg['strike'], T, r,
+                    skewed_iv(iv_atm, S, leg['strike'], T, skew, curve))
 
 
-def position_value(pos: list, day, S, iv_atm, r, skew) -> float:
+def position_value(pos: list, day, S, iv_atm, r, skew, curve: tuple | None = None) -> float:
     """Value of one unit of the position (dollars), long legs positive, short negative."""
-    return sum(_sign(leg) * leg['qty'] * CONTRACT * leg_value(leg, day, S, iv_atm, r, skew) for leg in pos)
+    return sum(_sign(leg) * leg['qty'] * CONTRACT * leg_value(leg, day, S, iv_atm, r, skew, curve)
+               for leg in pos)
 
 
 def payoff_at_expiry(pos: list, x: float) -> float:
@@ -524,6 +593,9 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         return m
     close = m['close']
     iv_all, iv_note = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'))
+    real_curve = m.get('curve')
+    if real_curve is not None:
+        real_curve = real_curve.reindex(close.index).ffill(limit=5)
     rate = m.get('rate')
     r_all = ((rate / 100.0).reindex(close.index).ffill().bfill() if rate is not None and len(rate)
              else pd.Series(0.03, index=close.index))
@@ -540,13 +612,14 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     total_costs = 0.0
     first_pos = None
     days_in = 0
+    curve_days = 0
     bench_shares = initial_capital / float(close[days[0]])
     last_day = days[-1].date()
 
-    def close_position(day, S, iv, r, reason):
+    def close_position(day, S, iv, r, cv, reason):
         nonlocal cash, pos, units, entry, total_costs
         settle = reason == 'expiry'
-        prices = [leg_value(leg, day, S, iv, r, skew) for leg in pos]
+        prices = [leg_value(leg, day, S, iv, r, skew, cv) for leg in pos]
         value = sum(_sign(leg) * leg['qty'] * CONTRACT * p for leg, p in zip(pos, prices))
         # Expiring options settle at intrinsic; any longer-dated legs are sold at the model price.
         cost = 0.0
@@ -580,31 +653,34 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         if prev_day is not None and cash > 0:
             cash *= 1 + r * (day - prev_day).days / 365.0    # idle cash earns the T-bill rate
         prev_day = day
+        real = tuple(real_curve.loc[ts]) if real_curve is not None and ts in real_curve.index else None
+        cv = day_curve(iv, real)
+        curve_days += real is not None and bool(np.all(np.isfinite(real)))
 
         if pos is not None:
             first_exp = min(leg['expiry'] for leg in pos if leg['expiry'])
-            value = position_value(pos, day, S, iv, r, skew)
+            value = position_value(pos, day, S, iv, r, skew, cv)
             pnl = units * (value - entry['value'])
             ref = abs(entry['value']) * units or 1.0
             if day >= first_exp:
-                close_position(day, S, iv, r, 'expiry')
+                close_position(day, S, iv, r, cv, 'expiry')
             elif exit_dte is not None and (first_exp - day).days <= exit_dte:
-                close_position(day, S, iv, r, f'{exit_dte} days before expiry')
+                close_position(day, S, iv, r, cv, f'{exit_dte} days before expiry')
             elif profit_take is not None and pnl >= profit_take / 100.0 * ref:
-                close_position(day, S, iv, r, f'profit target ({profit_take:g}%)')
+                close_position(day, S, iv, r, cv, f'profit target ({profit_take:g}%)')
             elif stop_loss is not None and pnl <= -stop_loss / 100.0 * ref:
-                close_position(day, S, iv, r, f'stop loss ({stop_loss:g}%)')
+                close_position(day, S, iv, r, cv, f'stop loss ({stop_loss:g}%)')
             elif day == last_day:
-                close_position(day, S, iv, r, 'end of test')
+                close_position(day, S, iv, r, cv, 'end of test')
 
         remaining = (last_day - day).days
         if pos is None and day != last_day and remaining >= max(5, dte // 2):
             eq_now = cash
-            cand = build_position(legs, day, S, iv, r, dte, ticker, skew)
+            cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv)
             need, unbounded = capital_required(cand, S)
             n = int(max(0.0, eq_now) * alloc_pct / 100.0 // need)
             if n >= 1:
-                open_value = position_value(cand, day, S, iv, r, skew)
+                open_value = position_value(cand, day, S, iv, r, skew, cv)
                 cost = n * trade_cost(cand, [leg['price'] for leg in cand], spread_pct, commission, stock_slip)
                 cash -= n * open_value + cost
                 total_costs += cost
@@ -619,7 +695,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
 
         held = pos is not None
         days_in += held
-        val = cash + (units * position_value(pos, day, S, iv, r, skew) if held else 0.0)
+        val = cash + (units * position_value(pos, day, S, iv, r, skew, cv) if held else 0.0)
         equity.append({'date': day.isoformat(), 'value': round(val, 2),
                        'benchmark': round(bench_shares * S, 2), 'iv': round(iv * 100, 1)})
         if val <= 0:
@@ -627,9 +703,20 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             break
 
     rf_daily = float(r_all[days].mean()) / TRADING_DAYS
-    return _summarize(ticker, name, legs, dte, initial_capital, equity, trades, total_costs,
-                      days_in, first_pos, notes, iv_note, alloc_pct, exit_dte, profit_take, stop_loss,
-                      spread_pct, commission, skew, rf_daily)
+    share = curve_days / max(1, len(equity))
+    if share >= 0.99:
+        term_note = 'The real VIX term structure each day (VIX9D, VIX, VIX3M, VIX6M), applied to every ticker.'
+    elif share > 0:
+        term_note = (f'The real VIX term structure on {share * 100:.0f}% of days (VIX9D, VIX, VIX3M, VIX6M), '
+                     'a modelled slope where a point was missing; applied to every ticker.')
+    else:
+        term_note = 'A modelled slope (the VIX term structure was unavailable).'
+    out = _summarize(ticker, name, legs, dte, initial_capital, equity, trades, total_costs,
+                     days_in, first_pos, notes, iv_note, alloc_pct, exit_dte, profit_take, stop_loss,
+                     spread_pct, commission, skew, rf_daily)
+    if 'model' in out:
+        out['model']['term'] = term_note
+    return out
 
 
 def _metrics(values: np.ndarray, days: int, rf_daily: float = 0.0) -> dict:
