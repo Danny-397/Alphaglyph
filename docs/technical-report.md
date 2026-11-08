@@ -668,7 +668,14 @@ cd Alphaglyph/backend
 pip install -r requirements.txt
 pytest                     # 315 tests
 python app.py              # http://localhost:5000
+cd .. && node --test tests/js/*.test.cjs        # the page's link and CSV helpers
+python tools/options_validation.py              # refit and recheck against Cboe's indices
 ```
+
+Any options result can be reproduced from the page itself: "Copy link to this backtest"
+puts every setting (strategy or custom legs, dates, sizing, exits, costs, entry rules,
+expiries) in the URL, and opening the link reruns the same backtest. The trades, with each
+one's P&L split by Greek, and the daily account values download as CSV files.
 
 Architecture: the browser holds all UI state and the backend is a stateless compute
 layer; the ML model is trained offline and shipped as a portable ONNX artifact. Data

@@ -299,6 +299,7 @@ function obRenderResult(r) {
     <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}</td></tr>`).join('')
     : '<tr><td colspan="10" class="empty-cell">No positions were opened.</td></tr>'
   obRenderWhy(r)
+  el('ob-share-msg').textContent = ''
   el('ob-sweep-out').hidden = true
   el('ob-sweep-error').hidden = true
   el('ob-sweep-run').textContent = 'Run the robustness test (25 backtests)'
@@ -585,25 +586,78 @@ async function obLoadCheck() {
 function obApplyImport() {
   if (typeof obParseImport !== 'function') return
   const imp = obParseImport(location.search)
-  if (!imp) return
+  const set = obParseSettings(location.search)
+  const preset = set.preset && obState.byKey[set.preset] ? set.preset : null
+  if (!imp && !preset) return
   const box = el('ob-import')
-  if (imp.error) {
+  if (imp && imp.error) {
     box.innerHTML = `<strong>That link could not be imported.</strong> ${obEsc(imp.error)}`
     box.hidden = false
     return
   }
-  el('ob-ticker').value = imp.ticker
-  el('ob-dte').value = imp.dte
-  el('ob-name').value = imp.name
-  obState.legs = imp.legs
-  el('ob-strategy').value = 'custom'
+  if (imp) {
+    el('ob-name').value = imp.name
+    obState.legs = imp.legs
+    el('ob-strategy').value = 'custom'
+  } else {
+    el('ob-strategy').value = preset
+  }
   obPickStrategy()
-  obRenderLegs()
+  // Every other setting the link carries (a shared backtest), over the strategy's defaults.
+  const put = (id, v) => { if (v != null) el(id).value = v }
+  put('ob-ticker', set.ticker || (imp && imp.ticker))
+  put('ob-dte', set.dte != null ? set.dte : imp && imp.dte)
+  put('ob-start', set.start_date); put('ob-end', set.end_date)
+  put('ob-capital', set.initial_capital); put('ob-alloc', set.alloc_pct)
+  put('ob-exit-dte', set.exit_dte); put('ob-pt', set.profit_take); put('ob-sl', set.stop_loss)
+  put('ob-commission', set.commission); put('ob-spread', set.spread_pct)
+  if (set.skew === false) el('ob-skew').checked = false
+  if (set.expiries) el('ob-expiries').value = set.expiries
+  const e = set.entry || {}
+  put('ob-vix-min', e.vix_min); put('ob-vix-max', e.vix_max); put('ob-ivr-min', e.ivr_min); put('ob-ivr-max', e.ivr_max)
+  if (e.trend) el('ob-trend').value = e.trend
+  if (set.entry) el('ob-entry').open = true
+  if (set.exit_dte != null || set.profit_take != null || set.stop_loss != null) el('ob-exits').open = true
+  if (imp) obRenderLegs()
   obRenderWhat()
-  box.innerHTML = `<p>${obEsc(obImportSummary(imp))}</p>` +
-    (imp.notes.length ? `<ul>${imp.notes.map(n => `<li>${obEsc(n)}</li>`).join('')}</ul>` : '')
+  if (imp) {
+    box.innerHTML = `<p>${obEsc(obImportSummary(imp))}</p>` +
+      (imp.notes.length ? `<ul>${imp.notes.map(n => `<li>${obEsc(n)}</li>`).join('')}</ul>` : '')
+  } else {
+    box.innerHTML = `<p>${obEsc(`Opened from a shared link: ${obState.byKey[preset].name} on ${el('ob-ticker').value}, with the settings it was run with.`)}</p>`
+  }
   box.hidden = false
-  if (imp.run) obRun()
+  if ((imp && imp.run) || set.run) obRun()
+}
+
+// ── Share and export the result on screen ─────────────────────────────────────
+function obShareUrl() {
+  return `${location.origin}${location.pathname}?${obShareQuery(obState.lastBody)}`
+}
+
+async function obCopyLink() {
+  if (!obState.lastBody) return
+  const url = obShareUrl()
+  const msg = el('ob-share-msg')
+  try {
+    await navigator.clipboard.writeText(url)
+    msg.textContent = 'Link copied. Anyone who opens it reruns this exact backtest.'
+  } catch (e) {
+    msg.textContent = url                      // no clipboard access: show it to copy by hand
+  }
+}
+
+function obDownload(kind) {
+  const r = obState.result
+  if (!r) return
+  const csv = kind === 'trades' ? obCsv(r.trades, OB_TRADE_COLS) : obCsv(r.equity, OB_EQUITY_COLS)
+  const name = `${r.ticker}-${(r.strategy.name || 'options').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${kind}.csv`
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 0)
 }
 
 async function initOptionsBacktest() {
@@ -653,6 +707,9 @@ async function initOptionsBacktest() {
     if (b && obState.result) obDrawGreek(obState.result, b.dataset.greek)
   })
   el('ob-sweep-run').addEventListener('click', obSweep)
+  el('ob-share-link').addEventListener('click', obCopyLink)
+  el('ob-csv-trades').addEventListener('click', () => obDownload('trades'))
+  el('ob-csv-equity').addEventListener('click', () => obDownload('equity'))
   el('ob-run').addEventListener('click', () => obRun())
   el('ob-compare').addEventListener('click', obCompare)
   el('ob-cmp-tbody').addEventListener('click', e => {
