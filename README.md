@@ -251,6 +251,10 @@ to market each day, applies the exit rules, and rolls into the next position.
   puts, vertical spreads, straddles, strangles, a calendar, collars, butterflies, iron
   condors and iron butterflies. Or build your own legs (stock included), with strikes at the
   money, a percent from the price, a target delta, or an offset from another leg's strike.
+- **Takes strategies from Tradeski.** [Tradeski](https://github.com/Danny-397/Tradeski) plans a trade on today's
+  chain; its "Backtest this in AlphaGlyph" button opens the Options page with the same legs (strikes as a percent
+  from the price, the expiry as days to expiry) and runs it. Any link in that form works
+  ([`options-import.js`](frontend/options-import.js), tested with `node --test tests/js/*.test.cjs`).
 - **Says exactly what it tests.** Every run is spelled out: *"Protective collar: a
   three-leg backtest (long stock, long put, short call)"*, then each leg, the first
   position's actual strikes and expiries, and its payoff at expiry.

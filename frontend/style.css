@@ -1115,3 +1115,8 @@ main:focus { outline: none; }
 .opt-sens { margin-top: 8px; font-size: 13.5px; color: var(--muted); }
 .opt-sens strong { color: var(--text); }
 .opt-sens-wide { border-left: 3px solid var(--yellow, #e3b341); padding-left: 10px; }
+
+/* Options: a strategy imported from a link (Tradeski). */
+.opt-import { background: var(--purple-dim); border: 1px solid var(--purple); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.5; color: var(--text); }
+.opt-import p { margin: 0; }
+.opt-import ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }

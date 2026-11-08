@@ -234,6 +234,8 @@ function obSensTable(r) {
     <tbody>${row('As run', m)}${s.variants.map(x => row(x.label, x)).join('')}</tbody></table></div>`
 }
 
+const obEsc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
 const obMoney0 = n => n == null ? '—' : (n < 0 ? '−$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US')
 
 function obRenderResult(r) {
@@ -242,7 +244,7 @@ function obRenderResult(r) {
   el('ob-model-line').textContent = `Option prices are reconstructed with Black-Scholes from each day's close; implied volatility is ${r.model.iv}. Not real quotes.`
   const first = r.equity[0].date, last = r.equity[r.equity.length - 1].date
   const beat = m.total_return - b.total_return
-  el('ob-summary').innerHTML = `<p class="summary-body"><strong>${s.name} on ${r.ticker}</strong>, ${first} to ${last}:
+  el('ob-summary').innerHTML = `<p class="summary-body"><strong>${obEsc(s.name)} on ${obEsc(r.ticker)}</strong>, ${first} to ${last}:
     <strong class="${clr(m.total_return)}">${fmtPct(m.total_return, 1)}</strong> (${fmtPct(m.cagr, 1)} a year) against
     ${fmtPct(b.total_return, 1)} for buying and holding ${r.ticker}, ${beat >= 0 ? 'ahead by' : 'behind by'}
     ${Math.abs(beat).toFixed(1)} points. ${m.trades} positions, ${m.win_rate ?? '—'}% of them profitable after costs;
@@ -545,6 +547,32 @@ async function obLoadCheck() {
   el('ob-check').hidden = false
 }
 
+// A strategy handed over in the URL (from Tradeski's planner): fill the form, say how it was
+// translated, and run it when asked to.
+function obApplyImport() {
+  if (typeof obParseImport !== 'function') return
+  const imp = obParseImport(location.search)
+  if (!imp) return
+  const box = el('ob-import')
+  if (imp.error) {
+    box.innerHTML = `<strong>That link could not be imported.</strong> ${obEsc(imp.error)}`
+    box.hidden = false
+    return
+  }
+  el('ob-ticker').value = imp.ticker
+  el('ob-dte').value = imp.dte
+  el('ob-name').value = imp.name
+  obState.legs = imp.legs
+  el('ob-strategy').value = 'custom'
+  obPickStrategy()
+  obRenderLegs()
+  obRenderWhat()
+  box.innerHTML = `<p>${obEsc(obImportSummary(imp))}</p>` +
+    (imp.notes.length ? `<ul>${imp.notes.map(n => `<li>${obEsc(n)}</li>`).join('')}</ul>` : '')
+  box.hidden = false
+  if (imp.run) obRun()
+}
+
 async function initOptionsBacktest() {
   obLoadCheck()
   el('ob-start').value = daysAgo(5 * 365)
@@ -562,6 +590,7 @@ async function initOptionsBacktest() {
   }).join('') + '<optgroup label="Your own"><option value="custom">Custom (build the legs)</option></optgroup>'
   sel.value = obState.byKey.collar ? 'collar' : sel.options[0].value
   obPickStrategy()
+  obApplyImport()
 
   sel.addEventListener('change', obPickStrategy)
   el('ob-dte').addEventListener('input', obRenderWhat)
