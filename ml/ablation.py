@@ -21,7 +21,7 @@ the 5-day labels overlap, so resampling rows would make every interval far too
 narrow. Arms are compared on the same resampled dates (paired).
 
     python ml/dataset.py          # first, if ml/data/dataset.npz is missing
-    python ml/ablation.py         # ~1-3 h on a laptop CPU; writes ml/ablation.json
+    python ml/ablation.py         # hours to days on a laptop CPU; writes ml/ablation.json
 
 Optional: ABLATION_SEEDS=1,2,3 (default), ABLATION_BOOT=1000.
 """
@@ -181,8 +181,11 @@ def main():
         }
 
     chosen = max(ARMS, key=lambda a: report[a]['mean_val_auc'])
+    # Coverage on the RAW features: after z-scoring, a missing (zero) value is no
+    # longer zero, so counting non-zeros in `feats` would always give 100%.
     news_cols = [stats['features'].index(c) for c in mlf.SENTI_FEATURES]
-    news_cover = float(np.mean([np.any(feats[t][end][news_cols] != 0)
+    raw = np.load(tr.DATA_FILE, allow_pickle=False)
+    news_cover = float(np.mean([np.any(raw[f'f_{t}'][end][news_cols] != 0)
                                 for t, end in idx['test']]))
     out = {
         'generated': time.strftime('%Y-%m-%d'),

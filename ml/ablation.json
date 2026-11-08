@@ -1,0 +1,149 @@
+{
+  "generated": "2026-11-08",
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "bootstrap": {
+    "resamples": 1000,
+    "block_days": 20,
+    "unit": "test dates"
+  },
+  "splits": {
+    "train_end": "2020-12-23",
+    "val_end": "2023-11-29",
+    "purge_days": 10,
+    "windows": {
+      "train": 182575,
+      "val": 61795,
+      "test": 60945
+    }
+  },
+  "test_base_rate_up": 0.542,
+  "test_news_coverage": 0.6706,
+  "arms": {
+    "price": {
+      "runs": [
+        {
+          "seed": 1,
+          "val_auc": 0.5222,
+          "test_auc": 0.5096
+        },
+        {
+          "seed": 2,
+          "val_auc": 0.5297,
+          "test_auc": 0.51
+        },
+        {
+          "seed": 3,
+          "val_auc": 0.5226,
+          "test_auc": 0.508
+        }
+      ],
+      "mean_val_auc": 0.5248,
+      "mean_test_auc": 0.5092,
+      "ensemble_test_auc": 0.5092,
+      "test_auc_ci95": [
+        0.4922,
+        0.527
+      ],
+      "p_auc_le_half": 0.182
+    },
+    "price + macro": {
+      "runs": [
+        {
+          "seed": 1,
+          "val_auc": 0.5273,
+          "test_auc": 0.5094
+        },
+        {
+          "seed": 2,
+          "val_auc": 0.5281,
+          "test_auc": 0.4941
+        },
+        {
+          "seed": 3,
+          "val_auc": 0.531,
+          "test_auc": 0.5052
+        }
+      ],
+      "mean_val_auc": 0.5288,
+      "mean_test_auc": 0.5029,
+      "ensemble_test_auc": 0.5017,
+      "test_auc_ci95": [
+        0.4774,
+        0.5266
+      ],
+      "p_auc_le_half": 0.438
+    },
+    "price + macro + news": {
+      "runs": [
+        {
+          "seed": 1,
+          "val_auc": 0.5255,
+          "test_auc": 0.5114
+        },
+        {
+          "seed": 2,
+          "val_auc": 0.5231,
+          "test_auc": 0.5086
+        },
+        {
+          "seed": 3,
+          "val_auc": 0.5276,
+          "test_auc": 0.5042
+        }
+      ],
+      "mean_val_auc": 0.5254,
+      "mean_test_auc": 0.5081,
+      "ensemble_test_auc": 0.5084,
+      "test_auc_ci95": [
+        0.4866,
+        0.5322
+      ],
+      "p_auc_le_half": 0.217
+    },
+    "logistic regression": {
+      "val_auc": 0.5279,
+      "ensemble_test_auc": 0.5134,
+      "test_auc_ci95": [
+        0.4934,
+        0.5374
+      ],
+      "p_auc_le_half": 0.09
+    }
+  },
+  "paired_differences": {
+    "price + macro minus price": {
+      "auc_difference": -0.0075,
+      "ci95": [
+        -0.027,
+        0.0154
+      ]
+    },
+    "price + macro + news minus price + macro": {
+      "auc_difference": 0.0067,
+      "ci95": [
+        -0.0067,
+        0.0203
+      ]
+    },
+    "price + macro + news minus price": {
+      "auc_difference": -0.0008,
+      "ci95": [
+        -0.0147,
+        0.0174
+      ]
+    },
+    "price + macro + news minus logistic regression": {
+      "auc_difference": -0.005,
+      "ci95": [
+        -0.0242,
+        0.0126
+      ]
+    }
+  },
+  "chosen_by_validation": "price + macro",
+  "minutes": 2722.0
+}
