@@ -27,6 +27,7 @@ import features  # noqa: F401 — imported so startup errors surface early
 import ledger
 import ml_runtime
 import options_bt
+import options_robust
 import pead as pead_study
 import portfolio as portopt
 import predictor as predictor_engine
@@ -739,21 +740,60 @@ def options_compare():
     market = options_bt.load_market(args['ticker'], args['start'], args['end'])
     if 'error' in market:
         return jsonify(market), 422
-    rows, bench = [], None
+    rows, rets, bench = [], [], None
     for key, p in options_bt.PRESETS.items():
         r = options_bt.run(legs=p['legs'], name=p['name'], alloc_pct=p['alloc'], market=market, **args)
         if 'error' in r:
             continue
         bench = r['benchmark']
+        rets.append(options_robust.excess_returns(r))
         m = r['metrics']
         rows.append({'key': key, 'name': p['name'], 'group': p['group'], 'legs_count': len(p['legs']),
                      'headline': r['strategy']['headline'], 'alloc_pct': p['alloc'],
                      **{k: m[k] for k in ('total_return', 'cagr', 'sharpe', 'max_drawdown', 'win_rate',
                                           'trades', 'psr', 'total_costs')},
                      'equity': [e['value'] for e in r['equity']][::5]})
+    deflation = options_robust.deflate(rows, rets)
     rows.sort(key=lambda r: -(r['total_return'] or -1e9))
     return jsonify({'ticker': args['ticker'], 'start_date': args['start'], 'end_date': args['end'],
-                    'dte': args['dte'], 'benchmark': bench, 'results': rows})
+                    'dte': args['dte'], 'benchmark': bench, 'results': rows, 'deflation': deflation})
+
+
+@app.route('/api/options/sweep', methods=['POST'])
+@limiter.limit('10 per hour')
+def options_sweep():
+    """One strategy across days to expiry x exit rules, with PBO and a Deflated Sharpe for the best."""
+    data = request.get_json() or {}
+    try:
+        args = _options_args(data)
+        s_dt = datetime.strptime(args['start'], '%Y-%m-%d')
+        e_dt = datetime.strptime(args['end'], '%Y-%m-%d')
+        if (e_dt - s_dt).days > options_robust.SWEEP_MAX_YEARS * 366:
+            raise ValueError(f'The robustness test runs on at most {options_robust.SWEEP_MAX_YEARS} years')
+        if (e_dt - s_dt).days < 365:
+            raise ValueError('The robustness test needs at least a year of history')
+        preset = data.get('preset')
+        if preset:
+            if preset not in options_bt.PRESETS:
+                raise ValueError('Unknown strategy')
+            p = options_bt.PRESETS[preset]
+            legs, name = p['legs'], p['name']
+            alloc = _num(data, 'alloc_pct', p['alloc'], 1, 100, 'Capital per position')
+        else:
+            legs = options_bt.clean_legs(data.get('legs'))
+            name = str(data.get('name') or 'Custom strategy').strip()[:60] or 'Custom strategy'
+            alloc = _num(data, 'alloc_pct', 10, 1, 100, 'Capital per position')
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    market = options_bt.load_market(args['ticker'], args['start'], args['end'])
+    if 'error' in market:
+        return jsonify(market), 422
+    current = args['dte']
+    result = options_robust.sweep(legs=legs, name=name, alloc_pct=alloc, market=market,
+                                  current_dte=current, **args)
+    if 'error' in result:
+        return jsonify(result), 422
+    return jsonify(result)
 
 
 # ── Portfolio optimization ─────────────────────────────────────────────────────

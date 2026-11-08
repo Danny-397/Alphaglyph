@@ -208,10 +208,11 @@
             <div class="chart-wrap" style="height:280px;margin-bottom:16px;"><canvas id="ob-cmp-chart"></canvas></div>
             <div class="table-wrap">
               <table class="data-table">
-                <thead><tr><th>#</th><th>Strategy</th><th>Legs</th><th>Return</th><th>CAGR</th><th>Sharpe</th><th>Max drawdown</th><th>Win rate</th><th>Trades</th></tr></thead>
+                <thead><tr><th>#</th><th>Strategy</th><th>Legs</th><th>Return</th><th>CAGR</th><th>Sharpe</th><th>Max drawdown</th><th>Win rate</th><th>Trades</th><th title="Probability the Sharpe beats what the luckiest of the strategies tried would show by chance">Deflated Sharpe</th></tr></thead>
                 <tbody id="ob-cmp-tbody"></tbody>
               </table>
             </div>
+            <p class="fine" id="ob-cmp-deflation"></p>
           </div>
         </div>
 
@@ -243,6 +244,7 @@
             <div class="tab-list" role="tablist">
               <button type="button" class="tab-btn active" data-tab="ob-perf">Performance</button>
               <button type="button" class="tab-btn" data-tab="ob-why">Why it made or lost money</button>
+              <button type="button" class="tab-btn" data-tab="ob-robust">Is the edge real?</button>
               <button type="button" class="tab-btn" data-tab="ob-trades">Trades</button>
               <button type="button" class="tab-btn" data-tab="ob-model">How it's priced</button>
             </div>
@@ -269,6 +271,21 @@
               </div>
               <p class="fine" id="ob-greek-note"></p>
               <div class="chart-wrap" style="height:220px;"><canvas id="ob-greek-chart"></canvas></div>
+            </div>
+            <div class="tab-panel" id="ob-robust">
+              <p class="card-desc">A good backtest can be luck, and every setting you try is another chance to find some.
+                This test runs the same strategy with 20 settings (days to expiry × exit rule) and asks two questions:
+                does the best setting's Sharpe beat what the luckiest of 20 would show by chance (Deflated Sharpe), and
+                does the setting that looks best in one half of the history still rank well in the other half (the
+                probability of backtest overfitting, PBO)?</p>
+              <button type="button" class="btn" id="ob-sweep-run">Run the robustness test (20 backtests)</button>
+              <p class="error-banner" id="ob-sweep-error" hidden></p>
+              <div id="ob-sweep-out" hidden>
+                <p class="card-desc opt-verdict" id="ob-sweep-verdict"></p>
+                <div class="stats-grid" id="ob-sweep-stats" style="margin-bottom:14px;"></div>
+                <div class="opt-sub">Sharpe ratio by setting <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(outlined: the best; ▸ marks your days to expiry)</span></div>
+                <div class="table-wrap"><table class="data-table opt-heat" id="ob-heat"></table></div>
+              </div>
             </div>
             <div class="tab-panel" id="ob-trades">
               <div class="scroll-box">

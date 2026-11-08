@@ -193,6 +193,7 @@ async function obRun(presetKey) {
   el('ob-loading-title').firstChild.textContent = 'Running options backtest '
   obShow('loading')
   el('ob-run').disabled = el('ob-compare').disabled = true
+  obState.lastBody = body
   const data = await obPost('/api/options/backtest', body)
   el('ob-run').disabled = el('ob-compare').disabled = false
   if (!data || data.error) { obError(failMsg(data, 'The backtest could not run. Try again in a moment.')); return }
@@ -262,6 +263,9 @@ function obRenderResult(r) {
     <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}</td></tr>`).join('')
     : '<tr><td colspan="10" class="empty-cell">No positions were opened.</td></tr>'
   obRenderWhy(r)
+  el('ob-sweep-out').hidden = true
+  el('ob-sweep-error').hidden = true
+  el('ob-sweep-run').textContent = 'Run the robustness test (20 backtests)'
 
   const ck = obState.check && obState.check.test
   el('ob-model-body').innerHTML = `
@@ -341,6 +345,52 @@ function obDrawGreek(r, g) {
   })
 }
 
+// ── Is the edge real? A settings sweep with PBO and a Deflated Sharpe ─────
+async function obSweep() {
+  const body = obState.lastBody
+  if (!body) return
+  const btn = el('ob-sweep-run')
+  btn.disabled = true
+  btn.textContent = 'Running 20 backtests…'
+  el('ob-sweep-error').hidden = true
+  const data = await obPost('/api/options/sweep', body)
+  btn.disabled = false
+  btn.textContent = 'Run the robustness test again'
+  if (!data || data.error) {
+    el('ob-sweep-error').textContent = failMsg(data, 'The robustness test could not run. Try again in a moment.')
+    el('ob-sweep-error').hidden = false
+    return
+  }
+  obRenderSweep(data)
+}
+
+function obRenderSweep(d) {
+  el('ob-sweep-out').hidden = false
+  el('ob-sweep-verdict').textContent = d.verdict
+  const p = d.pbo
+  el('ob-sweep-stats').innerHTML = [
+    statCard('Overfitting probability (PBO)', p ? (p.pbo * 100).toFixed(0) + '%' : '—', p ? (p.pbo >= 0.5 ? 'negative' : p.pbo < 0.25 ? 'positive' : '') : ''),
+    statCard('Best setting: Deflated Sharpe', d.best_dsr == null ? '—' : d.best_dsr.toFixed(0) + '%', d.best_dsr >= 95 ? 'positive' : ''),
+    statCard('Sharpe luck alone could reach', d.sharpe_bar == null ? '—' : fmtN(d.sharpe_bar)),
+    statCard('Best setting loses out of sample', p ? (p.prob_oos_loss * 100).toFixed(0) + '% of splits' : '—'),
+  ].join('')
+  const sh = d.cells.map(c => c.sharpe)
+  const lo = Math.min(...sh), hi = Math.max(...sh)
+  const tint = v => {
+    if (v >= 0) return `rgba(63,185,80,${(0.12 + 0.6 * (hi > 0 ? v / hi : 0)).toFixed(2)})`
+    return `rgba(248,81,73,${(0.12 + 0.6 * (lo < 0 ? v / lo : 0)).toFixed(2)})`
+  }
+  const head = `<thead><tr><th>Days to expiry</th>${d.exits.map(x => `<th>${x.label}</th>`).join('')}</tr></thead>`
+  const body = d.dte.map(dte => `<tr><th scope="row">${dte === d.current_dte ? '▸ ' : ''}${dte} days</th>${d.exits.map(x => {
+    const i = d.cells.findIndex(c => c.dte === dte && c.exit === x.code)
+    const c = d.cells[i]
+    return `<td class="opt-heat-cell${i === d.best ? ' opt-heat-best' : ''}" style="background:${tint(c.sharpe)}"
+      title="CAGR ${fmtPct(c.cagr, 1)} · max drawdown ${fmtPct(c.max_drawdown, 1)} · ${c.trades} positions">${fmtN(c.sharpe)}
+      <span class="opt-heat-sub">${fmtPct(c.cagr, 1)} a year</span></td>`
+  }).join('')}</tr>`).join('')
+  el('ob-heat').innerHTML = head + '<tbody>' + body + '</tbody>'
+}
+
 function obDrawEquity(r) {
   obState.charts.eq = destroyChart(obState.charts.eq)
   const labels = r.equity.map(e => e.date)
@@ -393,7 +443,14 @@ async function obCompare() {
     <td><span class="badge">${r.legs_count}</span></td>
     <td class="${clr(r.total_return)}">${fmtPct(r.total_return, 1)}</td><td class="${clr(r.cagr)}">${fmtPct(r.cagr, 1)}</td>
     <td>${fmtN(r.sharpe)}</td><td class="negative">${fmtPct(r.max_drawdown, 1)}</td>
-    <td>${r.win_rate == null ? '—' : r.win_rate + '%'}</td><td>${r.trades}</td></tr>`).join('')
+    <td>${r.win_rate == null ? '—' : r.win_rate + '%'}</td><td>${r.trades}</td>
+    <td class="${r.dsr != null && r.dsr >= 95 ? 'positive' : ''}">${r.dsr == null ? '—' : r.dsr.toFixed(0) + '%'}</td></tr>`).join('')
+  const df = data.deflation
+  el('ob-cmp-deflation').textContent = df && df.sharpe_bar != null
+    ? `Deflated Sharpe: ${df.n} strategies were tried here, and the luckiest of ${df.n} with no edge at all would show a Sharpe near
+       ${df.sharpe_bar.toFixed(2)} over this window by chance. Each row's figure is the probability its Sharpe beats that bar; 95% is
+       the usual line. It tests the selection, not the model prices.`
+    : ''
   obState.charts.cmp = destroyChart(obState.charts.cmp)
   const top = data.results.slice(0, 5)
   const palette = ['#3fb950', '#c4a5f5', '#e3b341', '#58a6ff', '#e3913b']
@@ -499,6 +556,7 @@ async function initOptionsBacktest() {
     const b = e.target.closest('[data-greek]')
     if (b && obState.result) obDrawGreek(obState.result, b.dataset.greek)
   })
+  el('ob-sweep-run').addEventListener('click', obSweep)
   el('ob-run').addEventListener('click', () => obRun())
   el('ob-compare').addEventListener('click', obCompare)
   el('ob-cmp-tbody').addEventListener('click', e => {
