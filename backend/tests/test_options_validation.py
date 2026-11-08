@@ -1,0 +1,111 @@
+"""
+The real VIX term structure in the options pricer, and the checks against
+Cboe's PutWrite index. Fully offline: every series is synthetic.
+"""
+
+import math
+import os
+import sys
+
+import numpy as np
+import pandas as pd
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+import options_bt as ob            # noqa: E402
+import options_validation as ov    # noqa: E402
+
+CURVE = ((9.0, 0.9), (30.0, 1.0), (93.0, 1.1), (183.0, 1.2))
+
+
+def test_curve_reproduces_its_points_and_holds_the_ends():
+    for days, ratio in CURVE:
+        assert ob.term_iv(0.2, days / 365, CURVE) == pytest.approx(0.2 * ratio)
+    assert ob.term_iv(0.2, 3 / 365, CURVE) == pytest.approx(0.2 * 0.9)     # before the first point
+    assert ob.term_iv(0.2, 400 / 365, CURVE) == pytest.approx(0.2 * 1.2)   # after the last
+
+
+def test_curve_interpolates_total_variance_linearly():
+    d = 60.0
+    w30, w93 = 1.0 ** 2 * 30, 1.1 ** 2 * 93
+    want = 0.2 * math.sqrt((w30 + (w93 - w30) * (d - 30) / 63) / d)
+    assert ob.term_iv(0.2, d / 365, CURVE) == pytest.approx(want)
+    # and monotone between points when the curve slopes up
+    vals = [ob.term_iv(0.2, x / 365, CURVE) for x in range(30, 184, 7)]
+    assert vals == sorted(vals)
+
+
+def test_missing_curve_points_fall_back_to_the_modelled_slope():
+    cv = ob.day_curve(0.15, (float('nan'), 1.1, float('nan')))
+    pts = dict(cv)
+    assert pts[30.0] == 1.0 and pts[93.0] == 1.1
+    assert pts[9.0] == pytest.approx(ob.model_term_ratio(0.15, 9))
+    assert pts[183.0] == pytest.approx(ob.model_term_ratio(0.15, 183))
+    assert dict(ob.day_curve(0.15, None))[93.0] == pytest.approx(ob.model_term_ratio(0.15, 93))
+    # no curve at all: the old modelled term structure, unchanged
+    assert ob.term_iv(0.15, 90 / 365) == pytest.approx(0.15 * ob.model_term_ratio(0.15, 90))
+
+
+def _market(n=160, curve=True):
+    idx = pd.bdate_range('2022-01-03', periods=n)
+    close = pd.Series(100 * np.exp(np.linspace(0, 0.1, n)), index=idx)
+    m = {'close': close, 'spy': close, 'vix': pd.Series(20.0, index=idx),
+         'rate': pd.Series(0.0, index=idx)}
+    if curve:
+        m['curve'] = pd.DataFrame({9: 0.9, 93: 1.1, 183: 1.2}, index=idx)
+    return m
+
+
+def test_backtest_says_which_term_structure_it_used():
+    legs = ob.PRESETS['calendar_call']['legs']
+    m = _market()
+    start, end = m['close'].index[25].date().isoformat(), m['close'].index[-1].date().isoformat()
+    real = ob.run('SPY', start, end, legs, market=m, alloc_pct=10)
+    flat = ob.run('SPY', start, end, legs, market={**m, 'curve': None}, alloc_pct=10)
+    assert real['model']['term'].startswith('The real VIX term structure each day')
+    assert flat['model']['term'].startswith('A modelled slope')
+    # a calendar depends on the curve, so the two must differ
+    assert real['metrics']['final_value'] != flat['metrics']['final_value']
+
+
+def test_vix_curve_is_built_from_ratios_and_drops_bad_prints(monkeypatch):
+    idx = pd.bdate_range('2024-01-02', periods=5)
+    data = {'^VIX': [20, 20, 20, 20, 20], '^VIX9D': [18, 18, 18, 18, 90],
+            '^VIX3M': [22, 22, 22, 22, 22], '^VIX6M': [24, 24, 24, 24, 24]}
+    monkeypatch.setattr(ob.feat, 'fetch_ohlcv',
+                        lambda sym, start=None, end=None: pd.DataFrame({'Close': data[sym]}, index=idx))
+    cv = ob.vix_curve('2024-01-01', '2024-01-10')
+    assert cv[93].tolist() == pytest.approx([1.1] * 5)
+    assert cv[9].iloc[0] == pytest.approx(0.9)
+    assert np.isnan(cv[9].iloc[-1])                  # 4.5x the VIX is a bad print
+
+
+def test_compare_identical_series_is_a_perfect_match():
+    idx = pd.bdate_range('2020-01-01', periods=600)
+    rng = np.random.default_rng(0)
+    s = pd.Series(100 * np.cumprod(1 + rng.normal(0.0003, 0.01, len(idx))), index=idx)
+    c = ov.compare(s, s)
+    assert c['cagr_gap'] == 0 and c['monthly_corr'] == 1.0 and c['tracking_error'] == 0
+    assert c['beta'] == pytest.approx(1.0)
+    assert c['model'] == c['real']
+
+
+def test_compare_sees_a_model_that_earns_more():
+    idx = pd.bdate_range('2020-01-01', periods=600)
+    rng = np.random.default_rng(1)
+    real = pd.Series(100 * np.cumprod(1 + rng.normal(0.0002, 0.01, len(idx))), index=idx)
+    model = real * np.exp(np.arange(len(idx)) * 0.0002)          # about +5% a year on top
+    c = ov.compare(model, real)
+    assert 4 < c['cagr_gap'] < 7
+    assert c['monthly_corr'] > 0.95
+
+
+def test_replica_restores_the_level_it_borrows():
+    keep = ob.VIX_TO_ATM
+    m = _market()
+    start, end = m['close'].index[25].date().isoformat(), m['close'].index[-1].date().isoformat()
+    lo = ov.replica(start, end, m, level=0.75)
+    hi = ov.replica(start, end, m, level=0.95)
+    assert ob.VIX_TO_ATM == keep
+    assert hi.iloc[-1] > lo.iloc[-1]          # richer puts, more premium in a rising market

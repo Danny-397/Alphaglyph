@@ -262,11 +262,16 @@ function obRenderResult(r) {
     <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${t.reason}</td></tr>`).join('')
     : '<tr><td colspan="9" class="empty-cell">No positions were opened.</td></tr>'
 
+  const ck = obState.check && obState.check.test
   el('ob-model-body').innerHTML = `
     <p class="card-desc"><strong>Prices.</strong> Free historical option quotes don't exist, so every option is priced with Black-Scholes on
-      that day's close. Implied volatility is ${r.model.iv}; longer expiries carry a term structure (higher than 30-day IV in calm markets,
-      lower in panics)${r.model.skew ? ', and out-of-the-money puts are priced richer and calls cheaper, as real chains do' : ', with the skew turned off'}.
+      that day's close. Implied volatility is ${r.model.iv}. Term structure: ${(r.model.term || 'a modelled slope.').replace(/^./, c => c.toLowerCase())}
+      ${r.model.skew ? 'Out-of-the-money puts are priced richer and calls cheaper, as real chains do.' : 'The skew is turned off.'}
       The rate is the 3-month Treasury bill.</p>
+    ${ck ? `<p class="card-desc"><strong>Checked against real returns.</strong> A replica of Cboe's PutWrite index (sell a one-month
+      at-the-money put every month) earned ${ck.model.cagr.toFixed(1)}% a year with these prices from ${ck.window[0].slice(0, 4)} on, against
+      ${ck.real.cagr.toFixed(1)}% for the real index; monthly returns correlate at ${ck.monthly_corr.toFixed(2)}. The volatility level was
+      fitted on ${obState.check.level.fit_window[0].slice(0, 4)}-${obState.check.level.fit_window[1].slice(0, 4)} only.</p>` : ''}
     <p class="card-desc"><strong>Costs.</strong> ${r.model.costs}. Stock legs pay 0.03% slippage. Options held to expiry settle at intrinsic value with no spread.</p>
     <p class="card-desc"><strong>Cash.</strong> Cash not tied up earns the Treasury-bill rate. Credit received stays in the account as collateral.</p>
     <ul class="opt-limits">${r.model.limits.map(x => `<li>${x}</li>`).join('')}</ul>`
@@ -342,7 +347,52 @@ async function obCompare() {
 
 // ── init ───────────────────────────────────────────────────────────────────
 
+// How close the model gets to Cboe's real PutWrite index (tools/options_validation.py).
+async function obLoadCheck() {
+  let d
+  try {
+    const res = await fetch('/data/options_validation.json', { cache: 'no-cache' })
+    if (!res.ok) return
+    d = await res.json()
+  } catch (e) { return }
+  obState.check = d
+  const t = d.test, f = d.fit, p = d.previous_model_test
+  const y = s => s.slice(0, 4)
+  el('ob-check-lede').innerHTML = `There are no free historical option quotes to check against, but Cboe publishes the real
+    returns of option strategies. Its <strong>PutWrite index</strong> sells a one-month at-the-money S&amp;P 500 put every month and
+    keeps the strike in Treasury bills. Run the same strategy here on SPY and the two can be compared. The model's one free
+    setting, the implied-volatility level, was fitted on ${y(f.window[0])}-${y(f.window[1])}; everything below is
+    ${y(t.window[0])} on, which the fit never saw.`
+  const row = (k, a, b, fmt) => `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td></tr>`
+  const pct = v => v.toFixed(1) + '%'
+  el('ob-check-tbody').innerHTML = [
+    row('Return a year', t.model.cagr, t.real.cagr, pct),
+    row('Volatility (monthly, annualised)', t.model.monthly_vol, t.real.monthly_vol, pct),
+    row('Worst drawdown', t.model.max_drawdown, t.real.max_drawdown, pct),
+    row('Worst month', t.model.worst_month, t.real.worst_month, pct),
+  ].join('') + `<tr><td>Monthly correlation</td><td colspan="2">${t.monthly_corr.toFixed(2)} over ${t.months} months</td></tr>`
+  el('ob-check-fine').textContent = `The model earns ${Math.abs(t.cagr_gap).toFixed(1)} points a year
+    ${t.cagr_gap >= 0 ? 'more' : 'less'} than the real index (the previous version, at 0.87 × the VIX with a modelled
+    term structure, was ${p.cagr_gap.toFixed(1)} points ahead) and understates the worst months: real option prices jump
+    further in a crash than a smooth volatility model allows. The replica trades SPY at the close every four to five weeks;
+    the index trades S&P 500 options at the open on the third Friday. Updated ${d.generated}.`
+  obState.charts.check = destroyChart(obState.charts.check)
+  obState.charts.check = new Chart(el('ob-check-chart'), {
+    type: 'line',
+    data: { labels: d.chart.months, datasets: [
+      { label: 'Model replica (SPY)', data: d.chart.model, borderColor: '#a371f7', borderWidth: 2, pointRadius: 0, tension: 0.15 },
+      { label: 'Real Cboe PutWrite index', data: d.chart.real, borderColor: '#9ba49f', borderDash: [5, 4], borderWidth: 1.5,
+        pointRadius: 0, tension: 0.15 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { ticks: { callback: v => v.toFixed(0) } } },
+      plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(1)}` } } } },
+  })
+  el('ob-check').hidden = false
+}
+
 async function initOptionsBacktest() {
+  obLoadCheck()
   el('ob-start').value = daysAgo(5 * 365)
   el('ob-end').value = today()
   initTabs(document.body)

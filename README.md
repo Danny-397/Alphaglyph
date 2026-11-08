@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-246%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="246 tests passing">
+  <img src="https://img.shields.io/badge/tests-254%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="254 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
@@ -257,24 +257,44 @@ to market each day, applies the exit rules, and rolls into the next position.
 - **Exit rules and costs:** hold to expiry or close N days before, profit targets and stop
   losses; $0.65 a contract plus a bid/ask cost per side (1% on index ETFs, 3% on single
   stocks by default). Cash earns the T-bill rate; sizing is by each position's worst case.
-- **Model-priced, and labelled so.** Free historical option quotes don't exist, so prices are
-  Black-Scholes on each day's close with implied volatility from the VIX (0.87 × VIX for SPY;
-  other tickers scale their realized volatility by the market's implied-to-realized ratio),
-  a term structure, and a put-heavy skew. The UI says this above every result.
+- **Model-priced, labelled so, and checked against real returns.** Free historical option
+  quotes don't exist, so prices are Black-Scholes on each day's close. At-the-money IV is
+  0.835 × the VIX for SPY (other tickers scale their realized volatility by the market's
+  implied-to-realized ratio), the term structure is the real VIX curve that day (VIX9D,
+  VIX, VIX3M, VIX6M), and the skew is put-heavy. The UI says this above every result.
 
 On SPY over five years (2021-11-08 → 2026-11-06, 30 days to expiry, default settings),
 none of the 19 beat buying and holding on return, which is what a strong bull market does
-to option overlays. Selling premium cut the drawdown; buying it bled:
+to option overlays. Selling premium cut the drawdown; buying volatility bled:
 
 | Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
 |---|---:|---:|---:|---:|
-| Buy and hold SPY | +67.7% | +10.9% | 0.46 | −24.5% |
-| Cash-secured put (1) | +62.2% | +10.2% | 0.95 | −7.9% |
-| Covered call (2) | +61.3% | +10.1% | 0.52 | −17.4% |
-| Iron condor (4) | +31.7% | +5.7% | 0.18 | −21.9% |
-| Protective collar (3) | +10.5% | +2.0% | −0.17 | −22.0% |
-| Long call (1) | +4.2% | +0.8% | 0.12 | −50.3% |
-| Long straddle (2) | −42.1% | −10.4% | −0.43 | −50.7% |
+| Buy and hold SPY | +67.1% | +10.9% | 0.45 | −24.5% |
+| Cash-secured put (1) | +57.2% | +9.5% | 0.82 | −8.2% |
+| Covered call (2) | +57.1% | +9.5% | 0.47 | −17.5% |
+| Long call (1) | +27.4% | +5.0% | 0.22 | −48.8% |
+| Iron condor (4) | +18.1% | +3.4% | 0.03 | −24.9% |
+| Protective collar (3) | +15.4% | +2.9% | −0.07 | −21.9% |
+| Long straddle (2) | −29.4% | −6.7% | −0.26 | −48.9% |
+
+**How close are the model prices to real ones?** Cboe publishes the real returns of a
+put-selling strategy: its PutWrite index sells a one-month at-the-money S&P 500 put every
+month. [`tools/options_validation.py`](tools/options_validation.py) runs the same strategy
+here on SPY. The model's one free setting, the IV level, is fitted on 2007-2015 only; the
+check is everything after:
+
+| 2016-01-04 → 2026-11-06 (not used in the fit) | Model replica | Real PutWrite index |
+|---|---:|---:|
+| Return a year | 8.7% | 8.2% |
+| Volatility (monthly, annualised) | 8.6% | 9.4% |
+| Worst drawdown | −29.2% | −30.0% |
+| Worst month | −8.8% | −13.4% |
+| Monthly correlation | 0.87 (130 months) | |
+
+The fitted level cut the gap from +1.5 points a year (the earlier 0.87 × VIX with a
+modelled term structure) to +0.5. Drawdowns match; the worst months don't, because real
+option prices jump further in a crash than a smooth volatility model allows. The Options
+page shows this comparison, and the script rewrites it.
 
 ### Statistical validation (after every backtest)
 - **Skill test vs. random timing** — 1,000 "monkey" traders long the benchmark on a random subset of days, matched to the strategy's exposure; the real "beats random?" test (a bootstrap of a strategy's *own* returns sits at ~the 50th percentile by construction and can't separate skill from luck).
@@ -450,7 +470,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (246
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (254
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -481,7 +501,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           246 tests, fully offline
+│   └── tests/           254 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
@@ -510,7 +530,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 246 passing
+cd backend && pytest -q                    # 254 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)
