@@ -575,7 +575,8 @@ Two engineering notes. A sweep is 20 full backtests in one web request, so the
 delta-strike search, which priced all 201 candidate strikes for every new position, now
 bisects (|delta| is monotone in the strike) and then compares the neighbouring strikes;
 results are identical to the full search (tested on 300 random cases), and runs are about
-2.5 times faster. Sweeps are limited to ten years of history to stay inside the server's
+2.5 times faster. Even so, a five-year sweep takes about a minute on the free hosting tier, so
+sweeps are limited to five years of history to stay inside the server's
 request time.
 
 ### 9.5 Entry rules, and how much of a result is the model
