@@ -125,11 +125,13 @@ def auc_score(y_true: np.ndarray, y_prob: np.ndarray) -> float:
 
 
 @torch.no_grad()
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, zero_blocks=()):
     model.eval()
     probs, rets, dirs, losses = [], [], [], []
     for X, y_dir, y_ret, y_vol in loader:
         X, y_dir, y_ret, y_vol = (v.to(device) for v in (X, y_dir, y_ret, y_vol))
+        for sl in zero_blocks:
+            X[:, :, sl] = 0.0
         d, q, v = model(X)
         loss, _ = multitask_loss(d, q, v, y_dir, y_ret, y_vol)
         losses.append(loss.item())
@@ -167,23 +169,25 @@ def calibrate_thresholds(probs: np.ndarray, rets: np.ndarray) -> dict:
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
-def main():
-    torch.manual_seed(SEED)
-    np.random.seed(SEED)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'device: {device}')
-
-    feats, labels, idx, stats = load_splits()
-    n_features = len(stats['features'])
-
-    loaders = {
+def make_loaders(feats, labels, idx, num_workers=2):
+    return {
         k: DataLoader(WindowDataset(feats, labels, v), batch_size=BATCH_SIZE,
-                      shuffle=(k == 'train'), num_workers=2, drop_last=(k == 'train'))
+                      shuffle=(k == 'train'), num_workers=num_workers,
+                      drop_last=(k == 'train'))
         for k, v in idx.items()
     }
 
+
+def fit(loaders, n_features, device, seed=SEED, zero_blocks=(), verbose=True):
+    """Train one model with early stopping on validation loss; returns it with
+    the best weights loaded. `zero_blocks` (slices into the feature axis) are
+    held at zero in every split, which is how ml/ablation.py trains a model
+    without the macro or news inputs."""
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     model = MultiModalTransformer(n_features=n_features, seq_len=mlf.SEQ_LEN).to(device)
-    print(f'parameters: {model.count_params():,}')
+    if verbose:
+        print(f'parameters: {model.count_params():,}')
     optim = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, factor=0.5, patience=3)
 
@@ -194,6 +198,8 @@ def main():
         model.train()
         for X, y_dir, y_ret, y_vol in loaders['train']:
             X, y_dir, y_ret, y_vol = (v.to(device) for v in (X, y_dir, y_ret, y_vol))
+            for sl in zero_blocks:
+                X[:, :, sl] = 0.0
 
             # Modality dropout: per-sample, zero an entire block so the model
             # learns to function when a live data source is down.
@@ -208,7 +214,7 @@ def main():
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()
 
-        val, _, _ = evaluate(model, loaders['val'], device)
+        val, _, _ = evaluate(model, loaders['val'], device, zero_blocks)
         sched.step(val['loss'])
         marker = ''
         if val['loss'] < best_val - 1e-4:
@@ -217,13 +223,28 @@ def main():
             marker = '  ← best'
         else:
             stale += 1
-        print(f"epoch {epoch:>2}  val loss {val['loss']:.4f}  AUC {val['auc']:.3f}  "
-              f"acc {val['acc']:.3f}{marker}")
+        if verbose:
+            print(f"epoch {epoch:>2}  val loss {val['loss']:.4f}  AUC {val['auc']:.3f}  "
+                  f"acc {val['acc']:.3f}{marker}", flush=True)
         if stale >= PATIENCE:
-            print(f'early stop (no improvement for {PATIENCE} epochs)')
+            if verbose:
+                print(f'early stop (no improvement for {PATIENCE} epochs)')
             break
 
     model.load_state_dict(best_state)
+    return model
+
+
+def main():
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'device: {device}')
+
+    feats, labels, idx, stats = load_splits()
+    n_features = len(stats['features'])
+    loaders = make_loaders(feats, labels, idx)
+
+    model = fit(loaders, n_features, device)
+    best_state = model.state_dict()
 
     # Persist the trained weights immediately, BEFORE the (occasionally fragile)
     # ONNX export — so a missing export dependency never wastes a training run.

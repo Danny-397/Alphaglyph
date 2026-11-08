@@ -108,6 +108,13 @@ class TestWindows:
         out = mlf.normalize(X, means=[1.0, 1.0], stds=[0.0, 1.0])
         assert np.isfinite(out).all()
 
+    def test_feature_constant_in_training_gets_its_training_value(self):
+        # The shipped model saw macro/news as zeros (std 0). A live VIX of 15
+        # must not reach it as +5 sigma.
+        X   = np.array([[[15.0, 2.0]]], dtype=np.float32)
+        out = mlf.normalize(X, means=[0.0, 1.0], stds=[0.0, 0.5], clip=5.0)
+        assert out[0, 0, 0] == 0.0 and out[0, 0, 1] == 2.0
+
 
 # ── Labels ─────────────────────────────────────────────────────────────────────
 

@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-245%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="245 tests passing">
+  <img src="https://img.shields.io/badge/tests-246%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="246 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
@@ -154,6 +154,38 @@ of "60% up" is worthless unless the market actually rises ~60% of the time it's 
 every real prediction the moment it's made and grades it once the horizon elapses, so
 the forward hit rate can't be fitted in hindsight.*
 
+### Does it use its macro and news inputs? (a modality ablation)
+
+The architecture takes three input blocks, but the shipped checkpoint had been trained
+with macro and news zero-filled. [`ml/ablation.py`](ml/ablation.py) retrains the same
+model on three input sets, three seeds each, plus a logistic-regression baseline, and
+scores every arm on the untouched test split: 85 tickers, 5-day direction, 60,945 test
+windows from Dec 2023 on, 54.2% of them up. Confidence intervals come from a 20-day
+block bootstrap over test *dates* (1,000 resamples), because the tickers on one day share
+a market. News is GDELT tone, lagged a day, and covers 57 of the 85 tickers (67% of test
+windows). Full output: [`ml/ablation.json`](ml/ablation.json).
+
+| Inputs | Test AUC (3-seed ensemble) | 95% CI | Resamples with AUC ≤ 0.5 | Validation AUC |
+|---|---:|---:|---:|---:|
+| Price only | 0.509 | 0.492 – 0.527 | 18% | 0.525 |
+| Price + macro | 0.502 | 0.477 – 0.527 | 44% | 0.529 |
+| Price + macro + news | 0.508 | 0.487 – 0.532 | 22% | 0.525 |
+| Logistic regression (last day's features) | 0.513 | 0.493 – 0.537 | 9% | 0.528 |
+
+| Comparison (same resampled dates) | AUC difference | 95% CI |
+|---|---:|---:|
+| Adding macro to price | −0.008 | −0.027 – +0.015 |
+| Adding news to price + macro | +0.007 | −0.007 – +0.020 |
+| All three vs price only | −0.001 | −0.015 – +0.017 |
+| Transformer (all three) vs logistic regression | −0.005 | −0.024 – +0.013 |
+
+*Takeaway: nothing here predicts better than chance with confidence: every interval
+includes 0.5, and no input set beats another. Macro and news add nothing measurable, and the transformer does no
+better than a logistic regression. Validation picked "price + macro", which then scored
+worst on test, a small case of the selection noise this project measures. The shipped
+model is unchanged: no arm cleared the bar of a test interval clear of the price-only
+model.*
+
 ---
 
 ## Feature overview
@@ -206,7 +238,7 @@ visitors' predictions, but on Render's free tier it resets on every redeploy.
 - **RSI Mean Reversion** — buy oversold dips *only within an uptrend*; no falling knives.
 - **MACD Momentum** — long while the MACD line is above zero (far less churn than the signal-line cross).
 - **Dip Buyer (52-week value)** — buys more as price falls toward its 52-week low, averages down, keeps dry powder, sells on recovery.
-- **ML Transformer** — multi-modal architecture (price + macro + news blocks with modality dropout), served via ONNX. *Honest note: the shipped checkpoint was trained with macro/news zero-filled, so it currently predicts from price alone — the plumbing is real and tested; a retrain activates the extra channels with no code change.*
+- **ML Transformer** — multi-modal architecture (price + macro + news blocks with modality dropout), served via ONNX. *Honest note: the shipped checkpoint predicts from price alone. A modality ablation retrained it with the macro and news blocks switched on; neither helped, so it stays price-only (see [Does it use its macro and news inputs?](#does-it-use-its-macro-and-news-inputs-a-modality-ablation)).*
 - **Custom (no-code rule builder)** — BUY/SELL from indicators (price, SMAs, RSI, MACD, volume, returns, 52-week range) with below / above / crosses-above / crosses-below, combined with ALL/ANY.
 - **Adaptive Mode** — detects the current SPY regime and auto-selects the fitting strategy.
 
@@ -418,7 +450,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (245
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (246
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -449,7 +481,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           245 tests, fully offline
+│   └── tests/           246 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
@@ -478,7 +510,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 245 passing
+cd backend && pytest -q                    # 246 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)
@@ -556,10 +588,11 @@ engine does — and, just as importantly, what it does **not** claim.
 - **The ML model is roughly a coin flip (test AUC ≈ 0.51).** Not a bug to hide —
   next-week direction is close to unpredictable. The value is the rigour of the
   evaluation (chronological 60/20/20 splits, out-of-sample gating, DSR, PBO), not an edge.
-- **The shipped model is currently price-only.** The architecture is multi-modal, but
-  the committed checkpoint was trained with the macro/news blocks zero-filled (FRED/GDELT
-  were unavailable during that run). The macro/news entries in `ml_model_meta.json` have
-  mean/std of exactly `0.0` — verify it yourself. A retrain activates them, no code change.
+- **The shipped model is price-only, on purpose.** The architecture is multi-modal, but
+  the committed checkpoint was trained with the macro/news blocks zero-filled (their
+  entries in `ml_model_meta.json` have mean/std of exactly `0.0`). The modality ablation
+  retrained it with them switched on and found no measurable gain, so it was not replaced.
+  News covers only 57 of the 85 tickers, so a fuller news history could still change that.
 - **The forward ledger resets on redeploy without `DATABASE_URL`.** Without a Postgres
   connection string it lives in ephemeral SQLite and is wiped whenever Render redeploys.
   Set `DATABASE_URL` for the track record to genuinely accumulate over time.
