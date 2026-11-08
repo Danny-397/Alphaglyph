@@ -693,7 +693,15 @@ def _options_args(data: dict) -> dict:
         'commission': _num(data, 'commission', 0.65, 0, 10, 'Commission per contract'),
         'skew': bool(data.get('skew', True)),
         'entry': options_bt.clean_entry(data.get('entry')),
+        'expiries': _expiries(data.get('expiries')),
     }
+
+
+def _expiries(v) -> str:
+    v = str(v or 'weekly').lower()
+    if v not in ('weekly', 'monthly'):
+        raise ValueError('Expiries must be weekly or monthly')
+    return v
 
 
 @app.route('/api/options/presets')

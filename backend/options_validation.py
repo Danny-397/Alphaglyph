@@ -106,11 +106,14 @@ def compare(model: pd.Series, real: pd.Series) -> dict:
 
 
 def replica(start: str, end: str, market: dict, level: float | None = None,
-            use_curve: bool = True, legs: list | None = None, skew: tuple | None = None) -> pd.Series:
+            use_curve: bool = True, legs: list | None = None, skew: tuple | None = None,
+            schedule: str = 'monthly') -> pd.Series:
     """A Cboe index replica's equity curve on SPY (PutWrite by default), without costs.
 
-    Sized by notional, one unit per 100 shares' worth of SPY, as the indices are. `level`
-    and `skew` (put, call) temporarily replace the model's settings, for fitting.
+    Sized by notional, one unit per 100 shares' worth of SPY, and rolled on the third-Friday
+    monthly expiries, as the indices are (schedule='weekly' rolls every four to five weeks
+    instead, for comparison). `level` and `skew` (put, call) temporarily replace the
+    model's settings, for fitting.
     """
     keep = (ob.VIX_TO_ATM, ob.SKEW_PUT, ob.SKEW_CALL)
     if level is not None:
@@ -121,7 +124,7 @@ def replica(start: str, end: str, market: dict, level: float | None = None,
         m = market if use_curve else {**market, 'curve': None}
         r = ob.run('SPY', start, end, legs or PUTWRITE_LEGS, name='Cboe index replica', dte=30, alloc_pct=100,
                    initial_capital=10_000_000, spread_pct=0.0, commission=0.0, stock_slip=0.0, market=m,
-                   sizing='notional')
+                   sizing='notional', expiries=schedule)
     finally:
         ob.VIX_TO_ATM, ob.SKEW_PUT, ob.SKEW_CALL = keep
     if 'error' in r:
@@ -164,8 +167,12 @@ def index_checks(market: dict, indices: dict, start: str, end: str, before: tupl
         prev = None
         if before is not None:
             prev = compare(replica(start, end, market, legs=spec['legs'], skew=before), real)['cagr_gap']
+        wk = compare(replica(start, end, market, legs=spec['legs'], schedule='weekly'), real)
         out.append({'code': code, 'name': spec['name'], 'what': spec['what'], **compare(eq, real),
                     'cagr_gap_before_skew_fit': prev,
+                    'weekly_schedule': {'cagr_gap': wk['cagr_gap'], 'monthly_corr': wk['monthly_corr'],
+                                        'tracking_error': wk['tracking_error'],
+                                        'worst_month': wk['model']['worst_month']},
                     'chart': {'model': monthly_index(eq),
                               'real': monthly_index(real.reindex(eq.index).ffill().bfill())}})
     return out

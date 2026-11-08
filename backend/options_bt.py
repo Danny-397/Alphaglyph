@@ -58,9 +58,9 @@ IV_CLIP = (0.05, 2.5)
 # (PPUT, puts 5% out of the money) and 30-delta covered-call (BXMD) indices and checked on 2016
 # on (tools/options_validation.py): a 5%-out-of-the-money 30-day put trades near 1.2x
 # at-the-money IV, a 30-delta call near 0.8x.
-SKEW_PUT, SKEW_CALL = 0.175, 0.40
+SKEW_PUT, SKEW_CALL = 0.20, 0.35
 SKEW_CLIP = (0.75, 2.0)
-VIX_TO_ATM = 0.845                  # fitted on 2007-2015 against Cboe's PutWrite index (see the docstring)
+VIX_TO_ATM = 0.885                  # fitted on 2007-2015 against Cboe's PutWrite index (see the docstring)
 CURVE_TENORS = (9, 93, 183)         # days covered by the VIX9D, VIX3M and VIX6M
 CURVE_SYMBOLS = ('^VIX9D', '^VIX3M', '^VIX6M')
 UNBOUNDED_MOVE = 0.30               # cash reserved against an uncovered short call: a 30% rise
@@ -206,6 +206,27 @@ def expiry_for(day: date, dte: int) -> date:
     if back > day and (target - back) < (friday - target):
         friday = back
     return friday
+
+
+def third_friday(year: int, month: int) -> date:
+    first = date(year, month, 1)
+    return first + timedelta(days=(4 - first.weekday()) % 7 + 14)
+
+
+def monthly_expiry_for(day: date, dte: int) -> date:
+    """The standard monthly expiry (third Friday) nearest to day + dte, always after day.
+
+    Cboe's strategy indices roll on these dates; weekly expiries (expiry_for) let a backtest
+    roll every four to five weeks instead, which drifts off the monthly cycle.
+    """
+    target = day + timedelta(days=max(1, dte))
+    cands = []
+    for k in (-1, 0, 1):
+        y, m = target.year, target.month + k
+        y, m = (y - 1, 12) if m < 1 else ((y + 1, 1) if m > 12 else (y, m))
+        cands.append(third_friday(y, m))
+    later = [c for c in cands if c > day]
+    return min(later, key=lambda c: (abs((c - target).days), c))
 
 
 # ── Strategy definitions ──────────────────────────────────────────────────────
@@ -597,7 +618,7 @@ def _delta_strike(grid: list, kind: str, want: float, S: float, T: float, r: flo
 
 
 def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte: int,
-                   ticker: str, skew: bool, curve: tuple | None = None) -> list:
+                   ticker: str, skew: bool, curve: tuple | None = None, monthly: bool = False) -> list:
     """Concrete legs (strike, expiry, entry price) for a position opened on `day` at price S."""
     step = strike_step(S, ticker)
     built = []
@@ -605,7 +626,7 @@ def build_position(legs: list, day: date, S: float, iv_atm: float, r: float, dte
         if leg['type'] == 'stock':
             built.append({**leg, 'strike': None, 'expiry': None, 'price': S})
             continue
-        exp = expiry_for(day, leg.get('dte') or dte)
+        exp = (monthly_expiry_for if monthly else expiry_for)(day, leg.get('dte') or dte)
         T = (exp - day).days / 365.0
         s = leg['strike']
         if s['mode'] == 'atm':
@@ -738,7 +759,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         exit_dte: int | None = None, profit_take: float | None = None, stop_loss: float | None = None,
         spread_pct: float | None = None, commission: float = 0.65, stock_slip: float = 0.0003,
         skew: bool = True, market: dict | None = None, entry: dict | None = None,
-        iv_scale: float = 1.0, sizing: str = 'risk') -> dict:
+        iv_scale: float = 1.0, sizing: str = 'risk', expiries: str = 'weekly') -> dict:
     """Backtest `legs` on `ticker` between start and end. See the module docstring."""
     ticker = ticker.upper()
     rules = entry               # `entry` is reused below for the open position
@@ -870,7 +891,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         remaining = (last_day - day).days
         if pos is None and day != last_day and remaining >= max(5, dte // 2) and allow[i]:
             eq_now = cash
-            cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv)
+            cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv, monthly=expiries == 'monthly')
             need, unbounded = capital_required(cand, S)
             # 'risk' sizes by each position's worst case; 'notional' holds one unit per 100 shares'
             # worth of the underlying, as Cboe's strategy indices do (used to replicate them).
@@ -935,6 +956,10 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             out['strategy']['rules'] = out['strategy']['rules'].replace(
                 'Opens a new position the day the last one closes',
                 f'Opens a new position {when}, from the day the last one closes', 1)
+    if expiries == 'monthly' and 'strategy' in out:
+        out['strategy']['rules'] = out['strategy']['rules'].replace(
+            f'{dte} days to expiry', f'on the monthly (third-Friday) expiry nearest {dte} days out', 1)
+        out['strategy']['expiries'] = 'monthly'
     if iv_scale != 1.0 and 'model' in out:
         out['model']['iv_scale'] = iv_scale
     if 'model' in out:
