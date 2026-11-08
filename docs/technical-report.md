@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 19 REST endpoints, 298 automated tests in CI
+- 19 REST endpoints, 302 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -398,9 +398,9 @@ price-only network, is unchanged.
 - **Transaction costs are modelled, not measured.** Real fills, slippage and market
   impact are not simulated.
 - **Option prices in the options backtester are modelled.** Black-Scholes with a fitted
-  volatility level, the real VIX term structure and a modelled skew, no dividends and no
-  early assignment. Checked against Cboe's PutWrite index, the model tracks it but
-  understates the worst months (§9.1).
+  volatility level and skew and the real VIX term structure, no dividends and no early
+  assignment. Checked against six Cboe strategy indices out of sample, it is within about a
+  point a year of each but understates the worst months for option sellers (§9.1).
 - **The forward record is young.** It accrues ten calls a trading day from November
   2026. Until it holds a few hundred graded calls, its hit rate and Brier skill are
   noise, and a single market regime dominates it.
@@ -418,19 +418,19 @@ so that each position's worst case at expiry (or, for uncovered short calls, the
 
 **Prices are modelled, and this is the central limitation.** No free source has
 historical option quotes, so each leg is priced with Black-Scholes on that day's close.
-Three choices keep the prices close to real chains:
+Three choices set the prices, and §9.1 checks them against real option returns:
 
-1. *Level.* For SPY, at-the-money implied volatility is 0.835 × the VIX. The VIX is a
-   variance-swap rate that includes the skew, so 30-day at-the-money IV sits below it; the
-   factor is fitted to real option returns (§9.1). Other tickers use their own 21-day
-   realized volatility times the market's implied-to-realized ratio that day (clipped to
-   0.8-2.0), so their IV rises in fearful markets, as real IV does.
-2. *Skew.* IV changes with standardized moneyness, by 0.40 per standard deviation on the
-   put side and 0.15 on the call side: a 16-delta put trades near 1.4 × at-the-money IV and
-   a 16-delta call near 0.85 ×. An early version used the raw VIX with a mild symmetric
-   skew and flattered short-premium trades badly: at the same sizing, an SPY iron condor
-   showed a 26% CAGR over 2021-2025. With the VIX adjustment and the asymmetric skew it
-   fell to about 12%.
+1. *Level.* For SPY, at-the-money implied volatility is 0.845 × the VIX. The VIX is a
+   variance-swap rate that includes the skew, so 30-day at-the-money IV sits below it.
+   Other tickers use their own 21-day realized volatility times the market's
+   implied-to-realized ratio that day (clipped to 0.8-2.0), so their IV rises in fearful
+   markets, as real IV does.
+2. *Skew.* IV changes with standardized moneyness, by 0.175 per standard deviation on the
+   put side and 0.40 on the call side, floored at 0.75 × at-the-money: a 30-day put 5% out
+   of the money trades near 1.2 × at-the-money IV and a 30-delta call near 0.8 ×. An early
+   version used the raw VIX with a mild symmetric skew and showed an SPY iron condor at a
+   26% CAGR over 2021-2025; the next used 0.40 on puts and 0.15 on calls. Both were wrong
+   in ways §9.1 measured.
 3. *Term structure.* IV at other maturities comes from the real VIX curve that day: the
    VIX9D, VIX, VIX3M and VIX6M give 9, 30, 93 and 183 days, interpolated linearly in total
    variance, and the same ratios are applied to every ticker. Before 2011, when the VIX9D
@@ -438,51 +438,60 @@ Three choices keep the prices close to real chains:
    about +0.10 in calm markets to below zero in panics. That slope was the first version
    of the term structure. Against the real curve it was right on average at 93 days (a
    mean ratio of 1.113 against 1.111) but too steep at 9 days (0.888 against 0.946), and
-   it tracked the day-to-day shape loosely (correlations of 0.46 to 0.77). Without any
-   term structure, a calendar spread bought a 60-day option at the 30-day volatility and
-   showed a 26% CAGR; with the real curve, it loses 1.6% a year.
+   it tracked the day-to-day shape loosely (correlations of 0.46 to 0.77).
 
-Each of those corrections moved results toward what is known about these strategies,
-but it is still a model. Calendars and
-far out-of-the-money wings depend most on the modelled shapes, so they are the least
-reliable results. Every result in the UI carries a "model-priced" banner and the
-volatility source.
+Calendars depend most on shapes no index checks (the term structure between two
+maturities, at moving strikes), so they are the least reliable results: the SPY calendar
+loses 16.7% a year on the window of §9.2. Every result in the UI carries a "model-priced"
+banner and the volatility source.
 
 ### 9.1 Checked against real option returns
 
 The model can be tested after all, because Cboe publishes the returns of real option
-strategies as indices. The S&P 500 PutWrite index (PUT) sells a one-month at-the-money put
-every month and holds the strike in Treasury bills; Yahoo carries its daily closes from 1996.
-The replica runs the same strategy in the backtester on SPY: a 30-day at-the-money put,
-held to expiry, fully collateralised, without costs (the index has none).
+strategies as indices: the PutWrite index on Yahoo (daily closes from 1996) and five more
+as CSV files on Cboe's site. Each is replicated in the backtester on SPY, by its published
+method, simplified: same legs, one-month options held to expiry (the collar's three-month
+put is rolled monthly), one unit per 100 shares' worth of SPY as the indices are sized, and
+no costs, since the indices have none.
 
-The model has one free setting, the IV level as a share of the VIX. It was fitted on
-2007-2015 alone, choosing the value on a 0.75-0.95 grid whose replica matched the index's
-annual return (5.99% against 5.91%), which gave 0.835. Everything below is 2016 on, which
-the fit never saw (`tools/options_validation.py`, output in
-`frontend/data/options_validation.json`):
+**Fitted on 2007-2015 only.** The model's free settings were chosen on that window, each on
+a grid, so that a replica's annual return matched its index: the volatility level against
+the PutWrite index (5.86% against 5.91%, giving 0.845), then the put-side skew against the
+put-protection index PPUT, whose puts are 5% out of the money, and the call-side skew
+against the 30-delta buy-write index BXMD. Everything below is 2016-01-04 to 2026-11-06,
+which the fit never saw; BXM, CLL and CNDR were not used at all
+(`tools/options_validation.py`, output in `frontend/data/options_validation.json`):
 
-| 2016-01-04 → 2026-11-06 (not used in the fit) | Model replica | Real PutWrite index |
-|---|---:|---:|
-| Return a year | 8.7% | 8.2% |
-| Volatility (monthly, annualised) | 8.6% | 9.4% |
-| Worst drawdown | −29.2% | −30.0% |
-| Worst month | −8.8% | −13.4% |
-| Monthly correlation | 0.87 (130 months) | |
+| Index | Strategy | Model | Real | Gap | Gap before the skew fit | Monthly correlation |
+|---|---|---:|---:|---:|---:|---:|
+| PUT | sell a one-month at-the-money put | 8.7% | 8.2% | +0.6 | +0.7 | 0.87 |
+| BXM | own the index, sell a one-month at-the-money call | 8.7% | 7.6% | +1.1 | +1.2 | 0.87 |
+| BXMD | own the index, sell a one-month 30-delta call | 10.1% | 10.3% | −0.3 | +2.9 | 0.93 |
+| PPUT | own the index, buy a one-month put 5% out of the money | 12.2% | 11.7% | +0.5 | −3.4 | 0.95 |
+| CLL | own the index, buy a three-month 5% put, sell a one-month 10% call | 9.9% | 10.8% | −0.8 | −0.9 | 0.87 |
+| CNDR | sell 20-delta puts and calls, buy 5-delta wings | 0.1% | 0.8% | −0.7 | +4.7 | 0.45 |
 
-The previous model, 0.87 × the VIX with the modelled term structure, earned 9.7% a year on
-the same window, 1.5 points ahead of the index; the fitted level brings the gap to 0.5
-points. The replica tracks the index's direction (correlation 0.87, tracking error 4.6% a
-year) and its worst drawdown, but not its worst months. Real option prices jump further in
-a crash than a smooth volatility model allows, so the model **understates tail losses for
-short-volatility strategies**, and its results for them should be read as an upper bound.
+The gaps are the model's annual return minus the real index's, in points. Before the
+skew fit, with 0.40 on puts and 0.15 on calls, the model priced out-of-the-money puts too
+richly and out-of-the-money calls too richly as well: protective puts cost 3.4 points a
+year too much, 30-delta call writing earned 2.9 too much, and the iron condor, which
+neither fit used, earned 4.7 points a year too much. After the fit every index is within
+about a point a year, the condor included, which is the out-of-sample evidence that the
+new skew is closer to real chains.
 
-The replica and the index also differ by design. The index trades SPX options at Cboe's
-special opening quotation on the third Friday; the replica trades SPY options at the close
-every four to five weeks. The fitted level absorbs the average effect of those
-differences, so it is an effective level, not a measurement of implied volatility. The
-check covers one strategy, at-the-money puts; Cboe's call-writing and other indices are
-not on free feeds, so out-of-the-money strikes and calls rest on the modelled skew.
+What it does not fix: **the worst months**. The PutWrite replica's worst month was −8.4%
+against the index's −13.4%, and BXM's −8.4% against −14.9%. Real option prices jump
+further in a crash than a smooth volatility model allows, so the model **understates tail
+losses for option sellers**, and its results for them should be read as an upper bound.
+The condor's monthly correlation of 0.45 is also low: a four-legged position near its
+strikes is where small pricing differences matter most.
+
+The replicas and the indices also differ by design. The indices trade SPX options at
+Cboe's special opening quotation on the third Friday; the replicas trade SPY options at the
+close every four to five weeks. The fitted settings absorb the average effect of those
+differences, so they are effective values, not measurements of implied volatility. Cboe's
+files are used for these figures only; the repository commits the derived results, not
+the files.
 
 ### 9.2 Results on SPY
 
@@ -491,22 +500,23 @@ On SPY over 2021-11-08 → 2026-11-06 (30 days to expiry, default sizing and cos
 | Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
 |---|---:|---:|---:|---:|
 | Buy and hold SPY | +67.1% | +10.9% | 0.45 | −24.5% |
-| Cash-secured put (1) | +57.2% | +9.5% | 0.82 | −8.2% |
-| Covered call (2) | +57.1% | +9.5% | 0.47 | −17.5% |
-| Long call (1) | +27.4% | +5.0% | 0.22 | −48.8% |
-| Iron condor (4) | +18.1% | +3.4% | 0.03 | −24.9% |
-| Protective collar (3) | +15.4% | +2.9% | −0.07 | −21.9% |
-| Long straddle (2) | −29.4% | −6.7% | −0.26 | −48.9% |
+| Cash-secured put (1) | +38.1% | +6.7% | 0.40 | −9.9% |
+| Covered call (2) | +29.5% | +5.3% | 0.16 | −19.0% |
+| Protective collar (3) | +28.2% | +5.1% | 0.15 | −20.2% |
+| Long call (1) | +22.1% | +4.1% | 0.20 | −49.4% |
+| Iron condor (4) | −5.0% | −1.0% | −0.18 | −34.1% |
+| Long straddle (2) | −29.8% | −6.9% | −0.28 | −47.6% |
 
-None beat buy-and-hold on return in a window where SPY rose 67%. The cash-secured put and
-covered call earned most of the market's return with a third to two-thirds of its drawdown,
-though §9.1 says to read short-volatility results as an upper bound; the straddle paid
-theta every month. The tests check the parts that do not
-depend on the volatility model: Black-Scholes against a textbook value and put-call
-parity, expiries on Fridays, delta strikes, offsets that always form a spread, the capital
-rule for each structure, no look-ahead (changing later prices leaves the first trade
-unchanged), costs that only ever lower the result, and an exact accounting identity:
-final equity equals starting capital plus the sum of every trade's P&L.
+None beat buy-and-hold on return in a window where SPY rose 67%. The cash-secured put kept
+its drawdown to two-fifths of the market's while earning six-tenths of its return; the iron
+condor lost money; the straddle paid theta every month. These figures are lower for option
+sellers than an earlier version of this report showed (a 9.5% CAGR for the cash-secured
+put), because the skew fit of §9.1 made out-of-the-money options cheaper to sell. The tests
+check the parts that do not depend on the volatility model: Black-Scholes against a
+textbook value and put-call parity, expiries on Fridays, delta strikes, offsets that always
+form a spread, the capital rule for each structure, no look-ahead (changing later prices
+leaves the first trade unchanged), costs that only ever lower the result, and an exact
+accounting identity: final equity equals starting capital plus the sum of every trade's P&L.
 
 ### 9.3 Where the P&L comes from
 
@@ -523,17 +533,16 @@ On the same SPY window:
 
 | Strategy | Direction (delta) | Size of moves (gamma) | Time decay (theta) | Volatility (vega) | Other | Costs | Interest | Total |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Cash-secured put | +$27.3k | −$51.1k | +$69.2k | −$15.8k | +$3.6k | −$0.8k | +$24.7k | **+$57.1k** |
-| Covered call | +$48.4k | −$49.8k | +$57.5k | −$6.5k | +$9.7k | −$4.6k | +$2.4k | **+$57.1k** |
-| Iron condor | −$1.4k | −$160.3k | +$171.0k | −$48.3k | +$43.1k | −$6.2k | +$20.1k | **+$18.0k** |
-| Long straddle | −$25.2k | +$285.2k | −$362.5k | +$107.8k | −$46.8k | −$6.2k | +$18.2k | **−$29.4k** |
+| Cash-secured put | +$21.6k | −$48.5k | +$44.8k | −$1.8k | −$0.6k | −$0.6k | +$23.2k | **+$38.1k** |
+| Covered call | +$31.3k | −$43.1k | +$41.0k | −$7.4k | +$6.8k | −$3.6k | +$4.5k | **+$29.5k** |
+| Iron condor | −$9.1k | −$171.1k | +$138.2k | −$24.0k | +$48.1k | −$4.5k | +$17.3k | **−$5.0k** |
+| Long straddle | −$22.6k | +$284.6k | −$290.9k | +$12.5k | −$25.4k | −$6.1k | +$18.0k | **−$29.8k** |
 
-Three readings the headline returns hide. The cash-secured put's +$57k includes $25k of
-T-bill interest on its collateral, 43% of the total: much of what put-selling "earns"
-is the cash yield, which a buy-and-hold comparison doesn't separate. The iron condor
-collected $171k of time decay and gave back $160k on large moves, with its profit resting on
-"other", the expiry-week terms the daily split resolves least well. And the straddle shows
-the long-volatility bargain: big moves paid $285k, but time decay cost $362k.
+Three readings the headline returns hide. The cash-secured put's +$38k includes $23k of
+T-bill interest on its collateral, 61% of the total: most of what put-selling "earned"
+here is the cash yield, which a buy-and-hold comparison doesn't separate. The iron condor
+collected $138k of time decay and gave back $171k on large moves. And the straddle shows the
+long-volatility bargain: big moves paid $285k, and time decay took $291k.
 
 ### 9.4 Is an options edge real?
 
@@ -542,10 +551,9 @@ directly. They run on the options backtester's daily excess returns.
 
 **The leaderboard is 19 tries.** "Compare all strategies" runs every preset and ranks
 them, which is a selection from 19. On the SPY window, the luckiest of 19 strategies with no
-edge would show a Sharpe near 0.84 by chance. The top row, a short strangle with a Sharpe
-of 1.02, has a PSR of 98% on its own, which looks significant, but a Deflated Sharpe of 64%
-once judged as the best of 19. The cash-secured put falls from 96% to 48%. No row clears
-95%, and the leaderboard now shows the deflated figure next to each Sharpe.
+edge would show a Sharpe near 0.84 by chance. The best row, a bull put spread with a Sharpe
+of 0.41 and a PSR of 82% on its own, has a Deflated Sharpe of 17% once judged as the best of
+19. No row comes near 95%, and the leaderboard shows the deflated figure next to each Sharpe.
 
 **Settings are tries too.** Options traders tune days to expiry and exit rules. The
 robustness test reruns one strategy at 7, 14, 30, 45 and 60 days, each held to expiry,
@@ -555,21 +563,19 @@ deflates the best setting's Sharpe for 20 tries and runs the CSCV procedure of �
 
 | Strategy | Best of 20 settings | Its Sharpe | Deflated Sharpe | PBO | Best setting loses out of sample |
 |---|---|---:|---:|---:|---:|
-| Cash-secured put | 7 days, stop at a 100% loss | 1.90 | 97% | 2% | 0% of splits |
-| Covered call | 60 days, close halfway | 0.58 | 27% | 41% | 12% |
-| Iron condor | 45 days, hold to expiry | 0.49 | 22% | 38% | 59% |
-| Long straddle | 7 days, take 50% profit | 0.51 | 22% | 32% | 50% |
+| Cash-secured put | 60 days, close halfway | 0.77 | 43% | 64% | 19% of splits |
+| Covered call | 45 days, hold to expiry | 0.43 | 18% | 4% | 16% |
+| Iron condor | 60 days, take 50% profit | 0.19 | 7% | 23% | 76% |
+| Long straddle | 7 days, hold to expiry | 0.43 | 17% | 18% | 50% |
 
-For three of the four, picking a setting is close to a coin flip: the best-looking setting
-lands in the bottom half of the other half of history a third or more of the time, and
-the iron condor's best setting loses money out of sample in most splits. These PBO figures
-move with the window as §7 found for stocks: ending the same test two days later, on
-2026-11-08, puts the iron condor's PBO at 53% rather than 38%. The weekly
-cash-secured put with a stop is the exception on both tests. That result is also where the
-price model is weakest. Weekly options and a stop that is checked once a day at the close
-are the conditions under which §9.1 found the model understates sudden losses. The
-tests check the selection, not the prices, so the page says a pass is a reason to test
-with real quotes, not proof of an edge.
+No best setting has a Deflated Sharpe near 95%. The two tests answer different questions.
+The covered call's settings rank consistently (a PBO of 4%), but its best Sharpe is no more
+than 20 tries of luck would produce. The cash-secured put's best setting has the highest
+Sharpe and the worst PBO, 64%: the setting that looks best in one half of the history
+usually doesn't in the other. These PBO figures move with the window as §7 found for
+stocks: ending the same test two days later, on 2026-11-08, puts the iron condor's PBO at
+25% rather than 23%. A pass on either test would check the selection, not the prices, so
+the page says a pass is a reason to test with real quotes, not proof of an edge.
 
 Two engineering notes. A sweep is 20 full backtests in one web request, so the
 delta-strike search, which priced all 201 candidate strikes for every new position, now
@@ -589,36 +595,37 @@ no rule improved the plain cash-secured put:
 
 | Cash-secured put, only when… | CAGR | Sharpe | Max drawdown | Days allowed |
 |---|---:|---:|---:|---:|
-| (no rule) | +9.5% | 0.82 | −8.2% | 100% |
-| the VIX is 20 or higher | +8.2% | 0.65 | −8.0% | 33% |
-| the VIX is below 20 | +5.4% | 0.21 | −10.5% | 67% |
-| IV rank is 50 or higher | +6.1% | 0.30 | −11.7% | 49% |
-| SPY is above its 200-day average | +5.9% | 0.27 | −11.8% | 78% |
-| SPY is below its 200-day average | +6.0% | 0.39 | −6.6% | 22% |
+| (no rule) | +6.7% | 0.40 | −9.9% | 100% |
+| the VIX is 20 or higher | +6.6% | 0.39 | −8.4% | 33% |
+| the VIX is below 20 | +4.2% | 0.05 | −11.9% | 67% |
+| IV rank is 50 or higher | +4.3% | 0.06 | −13.1% | 49% |
+| SPY is above its 200-day average | +5.1% | 0.17 | −11.4% | 78% |
+| SPY is below its 200-day average | +5.3% | 0.24 | −7.3% | 22% |
 
-Selling puts only when the VIX was high kept most of the return in a third of the days, the
-one rule that came close. Each rule is also one more try in the sense of §9.4.
+Selling puts only when the VIX was 20 or higher kept almost all of the return with a smaller
+drawdown, in a third of the days, the one rule that came close. Each rule is also one more
+try in the sense of §9.4.
 
 **Model sensitivity.** Every backtest is rerun three more times with the volatility model
 changed: implied volatility 10% lower throughout, 10% higher, and without the skew.
 
 | Strategy | As run | IV 10% lower | IV 10% higher | No skew |
 |---|---:|---:|---:|---:|
-| Cash-secured put | +9.5% | +6.4% | +11.1% | +4.9% |
-| Covered call | +9.5% | +6.2% | +11.0% | +10.8% |
-| Iron condor | +3.4% | −1.7% | +11.0% | +12.5% |
-| Long call | +5.0% | +16.7% | −4.8% | +4.8% |
-| Long straddle | −6.8% | +4.6% | −15.3% | −6.9% |
+| Cash-secured put | +6.7% | +4.7% | +9.4% | +5.4% |
+| Covered call | +5.3% | +4.9% | +9.1% | +11.1% |
+| Iron condor | −1.0% | −5.5% | +4.7% | +13.0% |
+| Long call | +4.1% | +15.8% | −6.1% | +2.0% |
+| Long straddle | −6.9% | +2.4% | −15.7% | −8.0% |
 
 A 10% error in the volatility level is worth more than most of the differences between
-strategies: it turns the iron condor from a loss into an 11% a year winner and the long
-call the other way. Short-premium returns are, roughly, the gap between implied and
+strategies: it moves the iron condor between −5.5% and +4.7% a year and the long call
+between −6.1% and +15.8%. Short-premium returns are, roughly, the gap between implied and
 realized volatility, and a 10% shift in implied volatility is a large share of that gap.
-This is why §9.1 matters: the PutWrite check pins the level well inside 10%, since a 0.5-point
-annual gap on the cash-secured put corresponds to an error of about 2% in volatility. The
-skew line is a reminder that out-of-the-money strikes rest on a modelled shape that the
-check does not cover. Each result shows the range next to its headline, flagged when it
-spans five points or more.
+This is why §9.1 matters: the PutWrite check pins the level well inside 10%, since a
+0.6-point annual gap on the PutWrite replica corresponds to an error of about 2 to 3% in
+volatility. The skew line shows why the skew fit mattered: without a skew the covered call
+and the condor look far better than with it. Each result shows the range next to its
+headline, flagged when it spans five points or more.
 
 ---
 
@@ -628,7 +635,7 @@ spans five points or more.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 298 tests
+pytest                     # 302 tests
 python app.py              # http://localhost:5000
 ```
 

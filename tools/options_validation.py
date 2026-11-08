@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Check the options backtester's model prices against Cboe's real PutWrite index.
+"""Check the options backtester's model prices against Cboe's real strategy indices.
 
-Fits VIX_TO_ATM on 2007-2015, tests on 2016 to today, checks the modelled term
-structure against the real VIX curve, and writes frontend/data/options_validation.json,
-which the Options page shows. See backend/options_validation.py for the method.
+Fits VIX_TO_ATM on 2007-2015 against the PutWrite index (Yahoo: ^PUT), then the skew
+against Cboe's PPUT and BXMD indices (CSV files from Cboe's site), tests all six indices
+on 2016 to today, checks the modelled term structure against the real VIX curve, and
+writes frontend/data/options_validation.json, which the Options page shows. Only these
+derived figures are committed, not Cboe's files. See backend/options_validation.py.
 
 USAGE
     python tools/options_validation.py
@@ -26,6 +28,24 @@ import options_bt as ob                  # noqa: E402
 import options_validation as ov          # noqa: E402
 
 OUT = ROOT / 'frontend' / 'data' / 'options_validation.json'
+CBOE_CSV = 'https://cdn.cboe.com/api/global/us_indices/daily_prices/{}_History.csv'
+
+
+def cboe(code: str) -> pd.Series | None:
+    """One Cboe index's daily closes from Cboe's published history file, or None."""
+    import io
+
+    import requests
+    try:
+        r = requests.get(CBOE_CSV.format(code), timeout=30,
+                         headers={'User-Agent': 'Mozilla/5.0 (AlphaGlyph model validation)'})
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text))
+        s = pd.Series(df.iloc[:, 1].astype(float).values, index=pd.to_datetime(df.iloc[:, 0], format='%m/%d/%Y'))
+        return s[s > 0].sort_index()
+    except Exception as exc:                       # network, or the file moved
+        print(f'  {code}: not available ({exc})')
+        return None
 
 
 def closes(sym: str, start: str, end: str) -> pd.Series:
@@ -48,6 +68,18 @@ def main() -> None:
     print(f'fitted VIX_TO_ATM on {ov.FIT[0]}..{ov.FIT[1]}: {fitted} (code uses {ob.VIX_TO_ATM})')
     if abs(fitted - ob.VIX_TO_ATM) > 1e-9:
         print('  -> update VIX_TO_ATM in backend/options_bt.py and rerun')
+    indices = {'PUT': put}
+    for code in ov.INDICES:
+        if code != 'PUT':
+            got = cboe(code)
+            if got is not None:
+                indices[code] = got
+    skew = ov.fit_skew(market, indices) if {'PPUT', 'BXMD'} <= set(indices) else None
+    if skew:
+        print(f"fitted skew on {ov.FIT[0]}..{ov.FIT[1]}: put {skew['put']}, call {skew['call']} "
+              f"(code uses {ob.SKEW_PUT}, {ob.SKEW_CALL})")
+        if (skew['put'], skew['call']) != (ob.SKEW_PUT, ob.SKEW_CALL):
+            print('  -> update SKEW_PUT, SKEW_CALL in backend/options_bt.py and rerun')
 
     test = ov.replica(ov.TEST_START, end, market)
     real = put.reindex(test.index).ffill().bfill()
@@ -66,6 +98,10 @@ def main() -> None:
         'chart': {'months': [d.strftime('%Y-%m') for d in test.resample('ME').last().index],
                   'model': ov.monthly_index(test), 'real': ov.monthly_index(real)},
         'term_structure': ov.term_check(closes('^VIX', ov.FIT[0], end), market['curve'], ob.VIX_TO_ATM),
+        'skew': {'fitted': skew, 'used': {'put': ob.SKEW_PUT, 'call': ob.SKEW_CALL},
+                 'previous': {'put': 0.40, 'call': 0.15}, 'fit_window': list(ov.FIT),
+                 'fit_against': {'put': 'PPUT', 'call': 'BXMD'}},
+        'indices': ov.index_checks(market, indices, ov.TEST_START, end, before=(0.40, 0.15)),
     }
     OUT.write_text(json.dumps(out, indent=1) + '\n', encoding='utf-8')
     t = out['test']
@@ -75,6 +111,10 @@ def main() -> None:
     print(f"previous model on the same window: gap {p['cagr_gap']:+}, corr {p['monthly_corr']}")
     for r in out['term_structure']:
         print('term', r)
+    for r in out['indices']:
+        print(f"{r['code']:5} model {r['model']['cagr']:6}% real {r['real']['cagr']:6}% gap {r['cagr_gap']:+6} "
+              f"(before skew fit {r['cagr_gap_before_skew_fit']:+}) corr {r['monthly_corr']} "
+              f"worst month {r['model']['worst_month']} vs {r['real']['worst_month']}")
     print(f'wrote {OUT.relative_to(ROOT)}')
 
 

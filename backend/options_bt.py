@@ -22,8 +22,9 @@ not traded quotes. Every price comes from Black-Scholes on that day's close:
   VIX6M give implied volatility at 9, 30, 93 and 183 days, interpolated in total
   variance. Where a point is missing (the VIX9D starts in 2011), a modelled
   slope fills in: upward in calm markets, inverted in panics;
-- a volatility skew: out-of-the-money puts priced richer and calls cheaper,
-  steeper on the put side, by standardized moneyness (optional);
+- a volatility skew: out-of-the-money puts priced richer and calls cheaper, by
+  standardized moneyness, fitted on 2007-2015 against Cboe's PPUT and BXMD
+  indices and checked on 2016 on with four more (optional);
 - the risk-free rate from the 3-month Treasury bill (FRED DGS3MO);
 - no dividends, and European exercise (no early assignment).
 
@@ -53,11 +54,13 @@ TRADING_DAYS = 252
 RV_WINDOW = 21                      # trading days in the realized-vol estimate
 VRP_CLIP = (0.8, 2.0)               # implied/realized ratio bounds
 IV_CLIP = (0.05, 2.5)
-# Skew per unit of standardized moneyness, steeper on the put side, as in index
-# chains: a 16-delta put trades near 1.4x at-the-money IV, a 16-delta call near 0.85x.
-SKEW_PUT, SKEW_CALL = 0.40, 0.15
+# Skew per unit of standardized moneyness, fitted on 2007-2015 against Cboe's protective-put
+# (PPUT, puts 5% out of the money) and 30-delta covered-call (BXMD) indices and checked on 2016
+# on (tools/options_validation.py): a 5%-out-of-the-money 30-day put trades near 1.2x
+# at-the-money IV, a 30-delta call near 0.8x.
+SKEW_PUT, SKEW_CALL = 0.175, 0.40
 SKEW_CLIP = (0.75, 2.0)
-VIX_TO_ATM = 0.835                  # fitted on 2007-2015 against Cboe's PutWrite index (see the docstring)
+VIX_TO_ATM = 0.845                  # fitted on 2007-2015 against Cboe's PutWrite index (see the docstring)
 CURVE_TENORS = (9, 93, 183)         # days covered by the VIX9D, VIX3M and VIX6M
 CURVE_SYMBOLS = ('^VIX9D', '^VIX3M', '^VIX6M')
 UNBOUNDED_MOVE = 0.30               # cash reserved against an uncovered short call: a 30% rise
@@ -735,7 +738,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         exit_dte: int | None = None, profit_take: float | None = None, stop_loss: float | None = None,
         spread_pct: float | None = None, commission: float = 0.65, stock_slip: float = 0.0003,
         skew: bool = True, market: dict | None = None, entry: dict | None = None,
-        iv_scale: float = 1.0) -> dict:
+        iv_scale: float = 1.0, sizing: str = 'risk') -> dict:
     """Backtest `legs` on `ticker` between start and end. See the module docstring."""
     ticker = ticker.upper()
     rules = entry               # `entry` is reused below for the open position
@@ -869,7 +872,10 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             eq_now = cash
             cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv)
             need, unbounded = capital_required(cand, S)
-            n = int(max(0.0, eq_now) * alloc_pct / 100.0 // need)
+            # 'risk' sizes by each position's worst case; 'notional' holds one unit per 100 shares'
+            # worth of the underlying, as Cboe's strategy indices do (used to replicate them).
+            per_unit = S * CONTRACT if sizing == 'notional' else need
+            n = int(max(0.0, eq_now) * alloc_pct / 100.0 // per_unit)
             if n >= 1:
                 open_value = position_value(cand, day, S, iv, r, skew, cv)
                 cost = n * trade_cost(cand, [leg['price'] for leg in cand], spread_pct, commission, stock_slip)

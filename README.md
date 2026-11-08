@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/last-commit/Danny-397/Alphaglyph?style=flat-square&color=555" alt="Last commit">
   <img src="https://img.shields.io/github/license/Danny-397/Alphaglyph?style=flat-square&color=3fb950" alt="License: MIT">
   <br>
-  <img src="https://img.shields.io/badge/tests-298%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="298 tests passing">
+  <img src="https://img.shields.io/badge/tests-302%20passing-3fb950?style=flat-square&logo=pytest&logoColor=white" alt="302 tests passing">
   <img src="https://img.shields.io/badge/validation-PSR·DSR·PBO·Fama–French-5b73e8?style=flat-square" alt="Statistical validation">
   <img src="https://img.shields.io/badge/ML-ONNX%20transformer-5b73e8?style=flat-square&logo=onnx&logoColor=white" alt="ONNX transformer">
   <img src="https://img.shields.io/badge/overfitting-CSCV%20%2B%20PBO-3fb950?style=flat-square" alt="CSCV + PBO">
@@ -262,58 +262,62 @@ to market each day, applies the exit rules, and rolls into the next position.
   split by Greek (direction, size of moves, time decay, volatility) using that day's
   exposures, and the remainder is shown as "other", so the parts add up to the P&L exactly.
   Every trade lists its biggest driver, and a chart shows delta, theta and vega over time.
-  On SPY, 43% of the cash-secured put's profit was the T-bill interest on its collateral.
+  On SPY, 61% of the cash-secured put's profit was the T-bill interest on its collateral.
 - **Asks whether the edge is real.** The leaderboard deflates every Sharpe for the 19
-  strategies tried (on SPY the best, a short strangle, has a PSR of 98% alone but a Deflated
-  Sharpe of 64%: nothing passes). A robustness test reruns one strategy with 20 settings
+  strategies tried (on SPY the best Sharpe, a bull put spread's, has a PSR of 82% alone but a
+  Deflated Sharpe of 17%: nothing passes). A robustness test reruns one strategy with 20 settings
   (days to expiry × exit rule), runs CSCV on them for the probability of backtest
   overfitting, and deflates the best setting's Sharpe for the 20 tries.
 - **Entry rules.** Open new positions only when the VIX, the underlying's IV rank, or its
   trend versus the 200-day average passes a rule; open positions are never closed by them.
 - **Shows how much of a result is the model.** Every backtest is rerun with implied
   volatility 10% lower and higher and without the skew. The spread is large (an SPY iron
-  condor goes from −1.7% to +11.0% a year), so results are shown as a range.
+  condor goes from −5.5% to +4.7% a year), so results are shown as a range.
 - **Exit rules and costs:** hold to expiry or close N days before, profit targets and stop
   losses; $0.65 a contract plus a bid/ask cost per side (1% on index ETFs, 3% on single
   stocks by default). Cash earns the T-bill rate; sizing is by each position's worst case.
 - **Model-priced, labelled so, and checked against real returns.** Free historical option
   quotes don't exist, so prices are Black-Scholes on each day's close. At-the-money IV is
-  0.835 × the VIX for SPY (other tickers scale their realized volatility by the market's
+  0.845 × the VIX for SPY (other tickers scale their realized volatility by the market's
   implied-to-realized ratio), the term structure is the real VIX curve that day (VIX9D,
-  VIX, VIX3M, VIX6M), and the skew is put-heavy. The UI says this above every result.
+  VIX, VIX3M, VIX6M), and the skew is fitted to Cboe's indices. The UI says this above
+  every result.
 
 On SPY over five years (2021-11-08 → 2026-11-06, 30 days to expiry, default settings),
 none of the 19 beat buying and holding on return, which is what a strong bull market does
-to option overlays. Selling premium cut the drawdown; buying volatility bled:
+to option overlays. The cash-secured put cut the drawdown most; the condor and the
+straddle lost money:
 
 | Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
 |---|---:|---:|---:|---:|
 | Buy and hold SPY | +67.1% | +10.9% | 0.45 | −24.5% |
-| Cash-secured put (1) | +57.2% | +9.5% | 0.82 | −8.2% |
-| Covered call (2) | +57.1% | +9.5% | 0.47 | −17.5% |
-| Long call (1) | +27.4% | +5.0% | 0.22 | −48.8% |
-| Iron condor (4) | +18.1% | +3.4% | 0.03 | −24.9% |
-| Protective collar (3) | +15.4% | +2.9% | −0.07 | −21.9% |
-| Long straddle (2) | −29.4% | −6.7% | −0.26 | −48.9% |
+| Cash-secured put (1) | +38.1% | +6.7% | 0.40 | −9.9% |
+| Covered call (2) | +29.5% | +5.3% | 0.16 | −19.0% |
+| Protective collar (3) | +28.2% | +5.1% | 0.15 | −20.2% |
+| Long call (1) | +22.1% | +4.1% | 0.20 | −49.4% |
+| Iron condor (4) | −5.0% | −1.0% | −0.18 | −34.1% |
+| Long straddle (2) | −29.8% | −6.9% | −0.28 | −47.6% |
 
-**How close are the model prices to real ones?** Cboe publishes the real returns of a
-put-selling strategy: its PutWrite index sells a one-month at-the-money S&P 500 put every
-month. [`tools/options_validation.py`](tools/options_validation.py) runs the same strategy
-here on SPY. The model's one free setting, the IV level, is fitted on 2007-2015 only; the
-check is everything after:
+**How close are the model prices to real ones?** Cboe publishes the real returns of option
+strategies as indices. [`tools/options_validation.py`](tools/options_validation.py) runs six
+of them here on SPY by their published methods. The volatility level and the skew were
+fitted on 2007-2015 only (against PUT, PPUT and BXMD); the check is 2016 on, and BXM, CLL
+and CNDR weren't used at all:
 
-| 2016-01-04 → 2026-11-06 (not used in the fit) | Model replica | Real PutWrite index |
-|---|---:|---:|
-| Return a year | 8.7% | 8.2% |
-| Volatility (monthly, annualised) | 8.6% | 9.4% |
-| Worst drawdown | −29.2% | −30.0% |
-| Worst month | −8.8% | −13.4% |
-| Monthly correlation | 0.87 (130 months) | |
+| Index | Strategy | Model | Real | Gap | Gap before the skew fit | Monthly correlation |
+|---|---|---:|---:|---:|---:|---:|
+| PUT | sell a one-month at-the-money put | 8.7% | 8.2% | +0.6 | +0.7 | 0.87 |
+| BXM | own the index, sell a one-month at-the-money call | 8.7% | 7.6% | +1.1 | +1.2 | 0.87 |
+| BXMD | own the index, sell a one-month 30-delta call | 10.1% | 10.3% | −0.3 | +2.9 | 0.93 |
+| PPUT | own the index, buy a one-month put 5% out of the money | 12.2% | 11.7% | +0.5 | −3.4 | 0.95 |
+| CLL | own the index, buy a three-month 5% put, sell a one-month 10% call | 9.9% | 10.8% | −0.8 | −0.9 | 0.87 |
+| CNDR | sell 20-delta puts and calls, buy 5-delta wings | 0.1% | 0.8% | −0.7 | +4.7 | 0.45 |
 
-The fitted level cut the gap from +1.5 points a year (the earlier 0.87 × VIX with a
-modelled term structure) to +0.5. Drawdowns match; the worst months don't, because real
-option prices jump further in a crash than a smooth volatility model allows. The Options
-page shows this comparison, and the script rewrites it.
+Before the skew fit, protective puts cost 3.4 points a year too much and the iron condor
+earned 4.7 too much; now every index is within about a point a year. The worst months
+still don't match (the PutWrite replica's was −8.4% against −13.4%): real option prices
+jump further in a crash than a smooth volatility model allows, so results for option
+sellers are an upper bound. The Options page shows this table and charts each index.
 
 ### Statistical validation (after every backtest)
 - **Skill test vs. random timing** — 1,000 "monkey" traders long the benchmark on a random subset of days, matched to the strategy's exposure; the real "beats random?" test (a bootstrap of a strategy's *own* returns sits at ~the 50th percentile by construction and can't separate skill from luck).
@@ -490,7 +494,7 @@ RSI, MACD, ADX, Bollinger Bands) is implemented from first principles — no TA-
 **Frontend** — vanilla HTML5 / CSS3 / ES2022 + Chart.js 4.4 (with the annotation
 plugin). No React, no build step — open any `.html` in a browser.
 
-**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (298
+**CI/CD** — GitHub Actions: `py_compile` syntax check, flake8 lint, **pytest (302
 tests)**, and a DB/simulator smoke test; a non-blocking pip-audit security job.
 
 ---
@@ -521,7 +525,7 @@ alphaglyph/
 │   ├── features.py      Indicator engineering — from scratch
 │   ├── risk.py          Risk profiles: trailing stop, Kelly caps, daily limits
 │   ├── database.py      SQLite/Postgres layer (backs the ledger)
-│   └── tests/           298 tests, fully offline
+│   └── tests/           302 tests, fully offline
 ├── ml/                       (offline training — Colab, not on the server)
 │   ├── dataset.py · model.py · train.py   (12y dataset · transformer · ONNX export)
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
@@ -550,7 +554,7 @@ python backend/app.py                      # → http://localhost:5000  (health:
 python -m http.server 3000 -d frontend     # → http://localhost:3000
 
 # 5) Run the tests (fully offline, deterministic)
-cd backend && pytest -q                    # 298 passing
+cd backend && pytest -q                    # 302 passing
 ```
 
 No API keys or brokerage account are needed. A free [Tiingo](https://www.tiingo.com)

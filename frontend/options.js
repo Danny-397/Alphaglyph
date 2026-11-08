@@ -512,38 +512,64 @@ async function obLoadCheck() {
     d = await res.json()
   } catch (e) { return }
   obState.check = d
-  const t = d.test, f = d.fit, p = d.previous_model_test
+  const t = d.test, f = d.fit
   const y = s => s.slice(0, 4)
-  el('ob-check-lede').innerHTML = `There are no free historical option quotes to check against, but Cboe publishes the real
-    returns of option strategies. Its <strong>PutWrite index</strong> sells a one-month at-the-money S&amp;P 500 put every month and
-    keeps the strike in Treasury bills. Run the same strategy here on SPY and the two can be compared. The model's one free
-    setting, the implied-volatility level, was fitted on ${y(f.window[0])}-${y(f.window[1])}; everything below is
-    ${y(t.window[0])} on, which the fit never saw.`
-  const row = (k, a, b, fmt) => `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td></tr>`
+  const fitYears = `${y(f.window[0])}-${y(f.window[1])}`
+  const idx = d.indices && d.indices.length ? d.indices : null
+  el('ob-check-lede').innerHTML = idx
+    ? `There are no free historical option quotes to check against, but Cboe publishes the real returns of option
+      strategies as indices. Each one below is run here on SPY with the model's prices and compared with the real index.
+      The model's settings were fitted on ${fitYears} only: the volatility level against the PutWrite index and the skew
+      against the put-protection and 30-delta buy-write indices. Everything shown is ${y(t.window[0])} on, which the
+      fit never saw; the other indices weren't used at all. Click a row to chart it.`
+    : `Cboe's <strong>PutWrite index</strong> sells a one-month at-the-money S&amp;P 500 put every month. Run the same
+      strategy here on SPY and the two can be compared. The volatility level was fitted on ${fitYears}; everything
+      below is ${y(t.window[0])} on.`
   const pct = v => v.toFixed(1) + '%'
-  el('ob-check-tbody').innerHTML = [
-    row('Return a year', t.model.cagr, t.real.cagr, pct),
-    row('Volatility (monthly, annualised)', t.model.monthly_vol, t.real.monthly_vol, pct),
-    row('Worst drawdown', t.model.max_drawdown, t.real.max_drawdown, pct),
-    row('Worst month', t.model.worst_month, t.real.worst_month, pct),
-  ].join('') + `<tr><td>Monthly correlation</td><td colspan="2">${t.monthly_corr.toFixed(2)} over ${t.months} months</td></tr>`
-  el('ob-check-fine').textContent = `The model earns ${Math.abs(t.cagr_gap).toFixed(1)} points a year
-    ${t.cagr_gap >= 0 ? 'more' : 'less'} than the real index (the previous version, at 0.87 × the VIX with a modelled
-    term structure, was ${p.cagr_gap.toFixed(1)} points ahead) and understates the worst months: real option prices jump
-    further in a crash than a smooth volatility model allows. The replica trades SPY at the close every four to five weeks;
-    the index trades S&P 500 options at the open on the third Friday. Updated ${d.generated}.`
-  obState.charts.check = destroyChart(obState.charts.check)
-  obState.charts.check = new Chart(el('ob-check-chart'), {
-    type: 'line',
-    data: { labels: d.chart.months, datasets: [
-      { label: 'Model replica (SPY)', data: d.chart.model, borderColor: '#a371f7', borderWidth: 2, pointRadius: 0, tension: 0.15 },
-      { label: 'Real Cboe PutWrite index', data: d.chart.real, borderColor: '#9ba49f', borderDash: [5, 4], borderWidth: 1.5,
-        pointRadius: 0, tension: 0.15 },
-    ] },
-    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-      scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { ticks: { callback: v => v.toFixed(0) } } },
-      plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(1)}` } } } },
-  })
+  const gap = v => v == null ? '—' : `<span class="${Math.abs(v) <= 1 ? 'positive' : Math.abs(v) <= 2 ? '' : 'negative'}">${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}</span>`
+  const rows = idx || [{ code: 'PUT', name: 'PutWrite', what: 'sell a one-month at-the-money put', ...t, chart: d.chart }]
+  el('ob-check-idx').hidden = !idx
+  if (idx) {
+    el('ob-check-idx-tbody').innerHTML = rows.map((r, i) => `<tr class="opt-check-row" data-i="${i}" tabindex="0">
+      <td><strong>${r.code}</strong> <span class="text-muted">${r.name}</span></td><td>${r.what}</td>
+      <td>${pct(r.model.cagr)}</td><td>${pct(r.real.cagr)}</td><td>${gap(r.cagr_gap)}</td>
+      <td>${gap(r.cagr_gap_before_skew_fit)}</td><td>${r.monthly_corr.toFixed(2)}</td></tr>`).join('')
+  }
+  const show = i => {
+    const r = rows[i]
+    document.querySelectorAll('.opt-check-row').forEach(tr => tr.classList.toggle('active', Number(tr.dataset.i) === i))
+    const row = (k, a, b) => `<tr><td>${k}</td><td>${pct(a)}</td><td>${pct(b)}</td></tr>`
+    el('ob-check-tbody').innerHTML = [
+      row('Return a year', r.model.cagr, r.real.cagr),
+      row('Volatility (monthly, annualised)', r.model.monthly_vol, r.real.monthly_vol),
+      row('Worst drawdown', r.model.max_drawdown, r.real.max_drawdown),
+      row('Worst month', r.model.worst_month, r.real.worst_month),
+    ].join('') + `<tr><td>Monthly correlation</td><td colspan="2">${r.monthly_corr.toFixed(2)} over ${r.months} months</td></tr>`
+    el('ob-check-which').textContent = `${r.code}: ${r.what}`
+    obState.charts.check = destroyChart(obState.charts.check)
+    obState.charts.check = new Chart(el('ob-check-chart'), {
+      type: 'line',
+      data: { labels: d.chart.months.slice(0, r.chart.model.length), datasets: [
+        { label: `Model replica (SPY)`, data: r.chart.model, borderColor: '#a371f7', borderWidth: 2, pointRadius: 0, tension: 0.15 },
+        { label: `Real Cboe ${r.code} index`, data: r.chart.real, borderColor: '#9ba49f', borderDash: [5, 4], borderWidth: 1.5,
+          pointRadius: 0, tension: 0.15 },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { ticks: { callback: v => v.toFixed(0) } } },
+        plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(1)}` } } } },
+    })
+  }
+  if (idx) {
+    el('ob-check-idx-tbody').addEventListener('click', e => { const tr = e.target.closest('[data-i]'); if (tr) show(Number(tr.dataset.i)) })
+    el('ob-check-idx-tbody').addEventListener('keydown', e => {
+      const tr = e.target.closest('[data-i]'); if (tr && e.key === 'Enter') show(Number(tr.dataset.i))
+    })
+  }
+  show(0)
+  el('ob-check-fine').textContent = `Gaps are the model's annual return minus the real index's, in points; "before" is the same
+    check with the skew used before this fit. The model still understates the worst months of the option-selling indices:
+    real option prices jump further in a crash than a smooth volatility model allows. Replicas trade SPY at the close every
+    four to five weeks; the indices trade S&P 500 options at Cboe's opening quotation on the third Friday. Updated ${d.generated}.`
   el('ob-check').hidden = false
 }
 
