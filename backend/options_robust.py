@@ -17,6 +17,7 @@ strategies, applied to options.
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 
 import options_bt as ob
 import stats as st
@@ -29,6 +30,7 @@ SWEEP_EXITS = (
     ('half', 'Close halfway to expiry'),
     ('stop100', 'Stop at a 100% loss'),
 )
+START_SHIFTS = (0, 5, 10, 15, 20)  # trading days: the same settings, started a week apart
 SWEEP_MAX_YEARS = 5                 # 20 backtests must finish inside the server's 120 s timeout
 PBO_GROUPS = 10
 
@@ -79,6 +81,29 @@ def model_sensitivity(run_kw: dict, base: dict) -> dict:
             'cagr_range': round(max(cagrs) - min(cagrs), 2)}
 
 
+def start_dates(run_kw: dict, shifts=START_SHIFTS) -> dict:
+    """The same backtest started on several nearby days: how much of the result is roll-date luck.
+
+    A strategy that rolls monthly opens its positions on different days depending on where the
+    test starts, and in a sharp move the day an option was sold can decide most of the loss.
+    run_kw are a run's arguments, market included; the end date stays fixed.
+    """
+    close = run_kw['market']['close']
+    days = close.index[(close.index >= pd.Timestamp(run_kw['start'])) & (close.index <= pd.Timestamp(run_kw['end']))]
+    rows = []
+    for sh in shifts:
+        if sh >= len(days) - 60:
+            break
+        start = days[sh].strftime('%Y-%m-%d')
+        r = ob.run(**{**run_kw, 'start': start})
+        if 'error' in r:
+            continue
+        rows.append({'shift': sh, 'start': start, 'cagr': r['metrics']['cagr'], 'sharpe': r['metrics']['sharpe']})
+    cagrs = [x['cagr'] for x in rows]
+    return {'runs': rows, 'cagr_low': min(cagrs) if cagrs else None, 'cagr_high': max(cagrs) if cagrs else None,
+            'cagr_range': round(max(cagrs) - min(cagrs), 2) if cagrs else None}
+
+
 def _exit_args(code: str, dte: int) -> dict:
     if code == 'profit50':
         return {'profit_take': 50.0}
@@ -95,6 +120,7 @@ def sweep(ticker: str, start: str, end: str, legs: list, name: str, alloc_pct: f
 
     kw carries the shared settings (capital, costs, skew); the sweep sets dte and the exits.
     """
+    yours = {k: kw.get(k) for k in ('exit_dte', 'profit_take', 'stop_loss')}   # for the start-date check
     for k in ('dte', 'exit_dte', 'profit_take', 'stop_loss'):
         kw.pop(k, None)
     cells, cols = [], []
@@ -128,6 +154,9 @@ def sweep(ticker: str, start: str, end: str, legs: list, name: str, alloc_pct: f
     else:
         out['pbo'] = None
         out['pbo_reason'] = pbo.get('reason')
+    out['start_dates'] = start_dates({'ticker': ticker, 'start': start, 'end': end, 'legs': legs, 'name': name,
+                                      'alloc_pct': alloc_pct, 'market': market, 'dte': current_dte or 30,
+                                      **yours, **kw})
     out['verdict'] = verdict(out)
     return out
 
@@ -157,6 +186,12 @@ def verdict(s: dict) -> str:
         head += tail
     elif s.get('pbo_reason'):
         head += f" Overfitting test skipped: {s['pbo_reason']}"
+    sd = s.get('start_dates')
+    if sd and sd.get('cagr_range') is not None and len(sd['runs']) > 1:
+        head += (f" Started on {len(sd['runs'])} different days a week apart, your settings returned between "
+                 f"{sd['cagr_low']:.1f}% and {sd['cagr_high']:.1f}% a year"
+                 + (': most of a single result can be the luck of which days it rolled on.'
+                    if sd['cagr_range'] >= 5 else '.'))
     if s['best_dsr'] is not None and s['best_dsr'] >= 95:
         head += (" These tests check how the setting was chosen, not the prices: the model understates "
                  "sudden losses for option sellers (see the price check), so a pass is a reason to test "

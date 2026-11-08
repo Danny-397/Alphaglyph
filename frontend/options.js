@@ -301,7 +301,7 @@ function obRenderResult(r) {
   obRenderWhy(r)
   el('ob-sweep-out').hidden = true
   el('ob-sweep-error').hidden = true
-  el('ob-sweep-run').textContent = 'Run the robustness test (20 backtests)'
+  el('ob-sweep-run').textContent = 'Run the robustness test (25 backtests)'
 
   const ck = obState.check && obState.check.test
   el('ob-model-body').innerHTML = `
@@ -313,6 +313,7 @@ function obRenderResult(r) {
       at-the-money put every month) earned ${ck.model.cagr.toFixed(1)}% a year with these prices from ${ck.window[0].slice(0, 4)} on, against
       ${ck.real.cagr.toFixed(1)}% for the real index; monthly returns correlate at ${ck.monthly_corr.toFixed(2)}. The volatility level was
       fitted on ${obState.check.level.fit_window[0].slice(0, 4)}-${obState.check.level.fit_window[1].slice(0, 4)} only.</p>` : ''}
+    ${r.model.dividends ? `<p class="card-desc"><strong>Dividends.</strong> ${r.model.dividends}</p>` : ''}
     <p class="card-desc"><strong>Costs.</strong> ${r.model.costs}. Stock legs pay 0.03% slippage. Options held to expiry settle at intrinsic value with no spread.</p>
     <p class="card-desc"><strong>Cash.</strong> Cash not tied up earns the Treasury-bill rate. Credit received stays in the account as collateral.</p>
     ${obSensTable(r)}
@@ -323,7 +324,8 @@ function obRenderResult(r) {
 // ── Why it made or lost money: the P&L split by Greek ─────────────────────
 const OB_ATTR = [
   ['delta', 'Direction (delta)'], ['gamma', 'Size of moves (gamma)'], ['theta', 'Time decay (theta)'],
-  ['vega', 'Volatility (vega)'], ['other', 'Other'], ['costs', 'Commissions and spreads'], ['interest', 'Interest on cash'],
+  ['vega', 'Volatility (vega)'], ['other', 'Other'], ['costs', 'Commissions and spreads'], ['dividends', 'Dividends'],
+  ['interest', 'Interest on cash'],
 ]
 const OB_GREEK_NOTE = {
   delta: 'Dollars gained or lost for a 1% rise in the underlying, on each day a position was open.',
@@ -344,7 +346,7 @@ function obRenderWhy(r) {
   const a = r.attribution
   el('ob-why').classList.toggle('opt-why-empty', !a)
   if (!a) { el('ob-why-lede').textContent = 'Run the backtest again to see the split (this server is older than the feature).'; return }
-  const rows = OB_ATTR.filter(([k]) => a[k] != null)
+  const rows = OB_ATTR.filter(([k]) => a[k] != null && !(k === 'dividends' && !a[k]))
   const total = rows.reduce((s, [k]) => s + a[k], 0)
   const opt = rows.filter(([k]) => ['delta', 'gamma', 'theta', 'vega'].includes(k))
   const best = opt.reduce((x, y) => a[y[0]] > a[x[0]] ? y : x)
@@ -388,7 +390,7 @@ async function obSweep() {
   if (!body) return
   const btn = el('ob-sweep-run')
   btn.disabled = true
-  btn.textContent = 'Running 20 backtests…'
+  btn.textContent = 'Running 25 backtests…'
   el('ob-sweep-error').hidden = true
   const data = await obPost('/api/options/sweep', body)
   btn.disabled = false
@@ -410,6 +412,8 @@ function obRenderSweep(d) {
     statCard('Best setting: Deflated Sharpe', d.best_dsr == null ? '—' : d.best_dsr.toFixed(0) + '%', d.best_dsr >= 95 ? 'positive' : ''),
     statCard('Sharpe luck alone could reach', d.sharpe_bar == null ? '—' : fmtN(d.sharpe_bar)),
     statCard('Best setting loses out of sample', p ? (p.prob_oos_loss * 100).toFixed(0) + '% of splits' : '—'),
+    ...(d.start_dates && d.start_dates.cagr_range != null ? [statCard('Your settings, 5 start dates',
+      `${fmtPct(d.start_dates.cagr_low, 1)} to ${fmtPct(d.start_dates.cagr_high, 1)}`, d.start_dates.cagr_range >= 5 ? 'negative' : '')] : []),
   ].join('')
   const sh = d.cells.map(c => c.sharpe)
   const lo = Math.min(...sh), hi = Math.max(...sh)
