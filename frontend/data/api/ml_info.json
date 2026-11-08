@@ -1,0 +1,40 @@
+{
+ "architecture": "multi-modal transformer encoder (3 layers, d_model 64, 4 heads, multi-task heads)",
+ "features": [
+  "f_log_ret",
+  "f_hl_range",
+  "f_oc_ret",
+  "f_vol_z",
+  "f_rsi",
+  "f_macd",
+  "f_sma_ratio",
+  "f_ret_5d",
+  "f_vix",
+  "f_term_spread",
+  "f_fedfunds",
+  "f_news_tone",
+  "f_tone_mom"
+ ],
+ "horizon": 5,
+ "loaded": true,
+ "n_params": 105735,
+ "seq_len": 60,
+ "test_metrics": {
+  "acc": 0.5403,
+  "auc": 0.5118,
+  "buy_avg_fwd_logret": 0.00491,
+  "buy_coverage": 0.2515,
+  "loss": 0.7072227954864502
+ },
+ "thresholds": {
+  "buy_prob": 0.56,
+  "sell_prob": 0.45
+ },
+ "trained_at": "2026-06-12T16:43:08.511494",
+ "val_metrics": {
+  "acc": 0.515,
+  "auc": 0.5367,
+  "loss": 0.7132380169923188
+ },
+ "version": "20260612-1643"
+}

@@ -1,0 +1,631 @@
+{
+ "presets": [
+  {
+   "alloc": 10,
+   "description": [
+    "long 1 call at the money, 30 days to expiry"
+   ],
+   "group": "Single leg",
+   "headline": "Long call: a one-leg backtest (long call)",
+   "key": "long_call",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 1,
+   "name": "Long call",
+   "view": "Bullish"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "long 1 put at the money, 30 days to expiry"
+   ],
+   "group": "Single leg",
+   "headline": "Long put: a one-leg backtest (long put)",
+   "key": "long_put",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 1,
+   "name": "Long put",
+   "view": "Bearish"
+  },
+  {
+   "alloc": 100,
+   "description": [
+    "short 1 put at 0.30 delta, 30 days to expiry"
+   ],
+   "group": "Single leg",
+   "headline": "Cash-secured put: a one-leg backtest (short put)",
+   "key": "short_put",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.3
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 1,
+   "name": "Cash-secured put",
+   "view": "Neutral to bullish"
+  },
+  {
+   "alloc": 50,
+   "description": [
+    "short 1 call at 0.20 delta, 30 days to expiry"
+   ],
+   "group": "Single leg",
+   "headline": "Naked short call: a one-leg backtest (short call)",
+   "key": "short_call",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.2
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 1,
+   "name": "Naked short call",
+   "view": "Neutral to bearish"
+  },
+  {
+   "alloc": 100,
+   "description": [
+    "long 100 shares",
+    "short 1 call at 0.30 delta, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Covered call: a two-leg backtest (long stock, short call)",
+   "key": "covered_call",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "type": "stock"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.3
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Covered call",
+   "view": "Neutral to bullish"
+  },
+  {
+   "alloc": 100,
+   "description": [
+    "long 100 shares",
+    "long 1 put 5% below the price, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Protective put: a two-leg backtest (long stock, long put)",
+   "key": "protective_put",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "type": "stock"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "pct",
+      "value": -5
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Protective put",
+   "view": "Bullish, hedged"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "long 1 call at the money, 30 days to expiry",
+    "short 1 call 5% above the price, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Bull call spread: a two-leg backtest (long call, short call)",
+   "key": "bull_call_spread",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "pct",
+      "value": 5
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Bull call spread",
+   "view": "Moderately bullish"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "long 1 put at the money, 30 days to expiry",
+    "short 1 put 5% below the price, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Bear put spread: a two-leg backtest (long put, short put)",
+   "key": "bear_put_spread",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "put"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "pct",
+      "value": -5
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Bear put spread",
+   "view": "Moderately bearish"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "short 1 put at 0.30 delta, 30 days to expiry",
+    "long 1 put 5% of the price below the short put's strike, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Bull put spread: a two-leg backtest (short put, long put)",
+   "key": "bull_put_spread",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.3
+     },
+     "type": "put"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "leg": 0,
+      "mode": "offset",
+      "value": -5
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Bull put spread",
+   "view": "Neutral to bullish"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "short 1 call at 0.30 delta, 30 days to expiry",
+    "long 1 call 5% of the price above the short call's strike, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Bear call spread: a two-leg backtest (short call, long call)",
+   "key": "bear_call_spread",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.3
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "leg": 0,
+      "mode": "offset",
+      "value": 5
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Bear call spread",
+   "view": "Neutral to bearish"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "long 1 call at the money, 30 days to expiry",
+    "long 1 put at the money, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Long straddle: a two-leg backtest (long call, long put)",
+   "key": "long_straddle",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Long straddle",
+   "view": "Big move, either way"
+  },
+  {
+   "alloc": 50,
+   "description": [
+    "short 1 call at the money, 30 days to expiry",
+    "short 1 put at the money, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Short straddle: a two-leg backtest (short call, short put)",
+   "key": "short_straddle",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Short straddle",
+   "view": "Quiet market"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "long 1 call at 0.25 delta, 30 days to expiry",
+    "long 1 put at 0.25 delta, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Long strangle: a two-leg backtest (long call, long put)",
+   "key": "long_strangle",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "delta",
+      "value": 0.25
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "delta",
+      "value": 0.25
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Long strangle",
+   "view": "Big move, either way"
+  },
+  {
+   "alloc": 50,
+   "description": [
+    "short 1 call at 0.16 delta, 30 days to expiry",
+    "short 1 put at 0.16 delta, 30 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Short strangle: a two-leg backtest (short call, short put)",
+   "key": "short_strangle",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.16
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.16
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Short strangle",
+   "view": "Quiet market"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "short 1 call at the money, 30 days to expiry",
+    "long 1 call at the money, 60 days to expiry"
+   ],
+   "group": "Two legs",
+   "headline": "Call calendar: a two-leg backtest (short call, long call)",
+   "key": "calendar_call",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    },
+    {
+     "dte": 60,
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 2,
+   "name": "Call calendar",
+   "view": "Quiet near term"
+  },
+  {
+   "alloc": 100,
+   "description": [
+    "long 100 shares",
+    "long 1 put 5% below the price, 30 days to expiry",
+    "short 1 call 5% above the price, 30 days to expiry"
+   ],
+   "group": "Three legs",
+   "headline": "Protective collar: a three-leg backtest (long stock, long put, short call)",
+   "key": "collar",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "type": "stock"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "pct",
+      "value": -5
+     },
+     "type": "put"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "pct",
+      "value": 5
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 3,
+   "name": "Protective collar",
+   "view": "Bullish, hedged"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "long 1 call 5% below the price, 30 days to expiry",
+    "short 2 calls at the money, 30 days to expiry",
+    "long 1 call 5% above the price, 30 days to expiry"
+   ],
+   "group": "Three legs",
+   "headline": "Call butterfly: a three-leg backtest (long call, short call)",
+   "key": "call_butterfly",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "pct",
+      "value": -5
+     },
+     "type": "call"
+    },
+    {
+     "qty": 2,
+     "side": "short",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "pct",
+      "value": 5
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 3,
+   "name": "Call butterfly",
+   "view": "Pinned near the price"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "short 1 put at 0.16 delta, 30 days to expiry",
+    "long 1 put 2.5% of the price below the short put's strike, 30 days to expiry",
+    "short 1 call at 0.16 delta, 30 days to expiry",
+    "long 1 call 2.5% of the price above the short call's strike, 30 days to expiry"
+   ],
+   "group": "Four legs",
+   "headline": "Iron condor: a four-leg backtest (short put, long put, short call, long call)",
+   "key": "iron_condor",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.16
+     },
+     "type": "put"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "leg": 0,
+      "mode": "offset",
+      "value": -2.5
+     },
+     "type": "put"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.16
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "leg": 2,
+      "mode": "offset",
+      "value": 2.5
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 4,
+   "name": "Iron condor",
+   "view": "Range-bound"
+  },
+  {
+   "alloc": 10,
+   "description": [
+    "short 1 put at the money, 30 days to expiry",
+    "short 1 call at the money, 30 days to expiry",
+    "long 1 put 5% below the price, 30 days to expiry",
+    "long 1 call 5% above the price, 30 days to expiry"
+   ],
+   "group": "Four legs",
+   "headline": "Iron butterfly: a four-leg backtest (short put, short call, long put, long call)",
+   "key": "iron_butterfly",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "put"
+    },
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "atm"
+     },
+     "type": "call"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "pct",
+      "value": -5
+     },
+     "type": "put"
+    },
+    {
+     "qty": 1,
+     "side": "long",
+     "strike": {
+      "mode": "pct",
+      "value": 5
+     },
+     "type": "call"
+    }
+   ],
+   "legs_count": 4,
+   "name": "Iron butterfly",
+   "view": "Pinned near the price"
+  }
+ ]
+}
