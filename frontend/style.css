@@ -1125,3 +1125,7 @@ main:focus { outline: none; }
 .opt-check-row.active td { background: var(--purple-dim); }
 .opt-check-row:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
 .opt-check-idx td:nth-child(2) { color: var(--muted); font-size: 12.5px; white-space: normal; min-width: 180px; }
+
+/* Options: share and export a result. */
+.opt-share { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 16px; }
+.opt-share-msg { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }

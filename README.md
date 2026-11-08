@@ -270,6 +270,9 @@ to market each day, applies the exit rules, and rolls into the next position.
   overfitting, and deflates the best setting's Sharpe for the 20 tries. It also reruns your
   settings from five start dates a week apart: an SPY iron condor ranges from −13.7% to
   +2.2% a year on the start date alone.
+- **Share and export.** "Copy link to this backtest" puts every setting in the URL, so the
+  link reruns the exact backtest; trades (with each one's P&L split by Greek) and daily
+  values download as CSV, with spreadsheet formulas neutralised.
 - **Entry rules.** Open new positions only when the VIX, the underlying's IV rank, or its
   trend versus the 200-day average passes a rule; open positions are never closed by them.
 - **Shows how much of a result is the model.** Every backtest is rerun with implied
