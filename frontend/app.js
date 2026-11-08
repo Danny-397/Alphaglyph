@@ -28,9 +28,17 @@ const STRATEGY_LABELS = {
 
 // Enable the ML strategy option in a <select> once the backend reports a
 // trained model is deployed (until then it stays disabled with a hint).
+// The model's metadata changes only on redeploy, so the saved copy is exact
+// (backend/tests/test_static_api.py keeps it in step). One request per page.
+let _mlInfo = null
+function mlInfo() {
+  if (!_mlInfo) _mlInfo = savedApi('ml_info.json').then(d => d || api('/api/ml/info'))
+  return _mlInfo
+}
+
 async function enableMlOption(selectEl) {
   if (!selectEl) return
-  const info = await api('/api/ml/info')
+  const info = await mlInfo()
   const opt  = selectEl.querySelector('option[value="ml"]')
   if (!opt) return
   if (info && info.loaded) {
@@ -140,6 +148,62 @@ async function checkBackend(e) {
     if (r.ok) { location.reload(); return }
   } catch (_) { /* still offline */ }
   if (btn) { btn.disabled = false; btn.textContent = 'Still offline' }
+}
+
+// ── Saved answers and waking the backend early ──────────────────────────────
+// A page that calls the API as it opens makes a cold visitor sit through the
+// whole 30-60 s boot. Answers that are the same for everyone are saved as
+// static files in /data/api/ (tools/static_api.py; the daily ones refresh after
+// each close), so pages read those first and open instantly.
+async function savedApi(name) {
+  try {
+    const r = await fetch('/data/api/' + name, { cache: 'no-cache' })
+    if (r.ok) return await r.json()
+  } catch (_) { /* fall back to the live API */ }
+  return null
+}
+
+// The backend's own keep-alive holds it awake on weekdays 09:00-16:30 New York
+// time (backend/app.py), so a live call in that window costs no wake-up.
+function backendLikelyWarm(now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23',
+  }).formatToParts(now).map(x => [x.type, x.value]))
+  if (p.weekday === 'Sat' || p.weekday === 'Sun') return false
+  const m = Number(p.hour) * 60 + Number(p.minute)
+  return m >= 9 * 60 && m < 16 * 60 + 30
+}
+
+// "Saved Nov 7, 4:41 PM. Refresh for live numbers." under a result shown from a saved copy.
+function savedNote(box, iso, what = 'Refresh') {
+  if (!box || !iso) return
+  const when = new Date(iso.replace(/Z$/, ':00Z'))
+  const p = document.createElement('p')
+  p.className = 'text-muted saved-note'
+  p.style.cssText = 'font-size:11.5px;margin-top:8px;'
+  p.textContent = `Saved ${when.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. ${what} for live numbers.`
+  box.appendChild(p)
+}
+
+// Wake on intent: the first time a visitor touches a form control, send one
+// /health ping so the backend boots while they pick a ticker and settings,
+// instead of after they press Run. Once per tab, never for automated browsers
+// (a crawler would burn free-tier hours), and only on pages that use the API.
+function wakeOnIntent() {
+  if (navigator.webdriver) return
+  const KEY = 'ag_wake_sent'
+  const fire = e => {
+    if (!e.target.closest || !e.target.closest('input, select, textarea, button')) return
+    document.removeEventListener('focusin', fire, true)
+    document.removeEventListener('pointerdown', fire, true)
+    try {
+      if (sessionStorage.getItem(KEY)) return
+      sessionStorage.setItem(KEY, '1')
+    } catch (_) { /* private mode: still ping once per page */ }
+    fetch(API_BASE + '/health', { cache: 'no-store' }).catch(() => {})
+  }
+  document.addEventListener('focusin', fire, true)
+  document.addEventListener('pointerdown', fire, true)
 }
 
 // ── Utilities ───────────────────────────────────────────────────────────────
@@ -476,7 +540,7 @@ function initBacktest() {
   // train+validation cutoff — data the model never saw. We read that cutoff
   // from the model meta and push the start date out-of-sample automatically.
   let mlCutoff = null   // { train_end, val_end, purge_days }
-  api('/api/ml/info').then(info => {
+  mlInfo().then(info => {
     if (info && info.loaded && info.splits) { mlCutoff = info.splits; applyMlOOS() }
   })
 
@@ -1563,8 +1627,8 @@ function initSignals() {
   tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTicker() } })
   el('sig-scan').addEventListener('click', scan)
 
-  async function loadRegime() {
-    const r = await api('/api/regime')
+  async function loadRegime(r) {
+    if (!r) r = await api('/api/regime')
     const badge = el('sig-regime-badge')
     if (!r || r.error) { el('sig-regime-desc').textContent = 'Market regime unavailable right now.'; return }
     badge.textContent = (r.label || r.regime || 'UNKNOWN').toUpperCase()
@@ -1576,9 +1640,17 @@ function initSignals() {
   async function scan() {
     const tbody = el('sig-tbody')
     if (!tickers.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Add a ticker to scan.</td></tr>'; return }
+    if (regimeFromSave) { regimeFromSave = false; loadRegime() }   // Rescan refreshes both
     tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">Scanning <span class="dots"><span></span><span></span><span></span></span></td></tr>`
     const data = await api('/api/scan?tickers=' + encodeURIComponent(tickers.join(',')))
     if (!data || !data.scanned) { tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Couldn’t scan right now — try Rescan.</td></tr>'; return }
+    renderScan(data)
+    const now = new Date()
+    el('sig-updated').textContent = 'Updated ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  function renderScan(data) {
+    const tbody = el('sig-tbody')
 
     tbody.innerHTML = data.scanned.map(row => {
       const s = row.signals || {}
@@ -1599,14 +1671,26 @@ function initSignals() {
         <td>${consensus}</td>
       </tr>`
     }).join('')
-
-    const now = new Date()
-    el('sig-updated').textContent = 'Updated ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
-  renderChips()
-  loadRegime()
-  scan()
+  // Opening the page: the default list's scan saved after the last close shows
+  // at once (tools/static_api.py). During market hours the backend is awake
+  // anyway, so a live scan replaces it; outside them, Rescan goes live.
+  let regimeFromSave = false
+  async function firstLoad() {
+    renderChips()
+    const saved = await savedApi('screener.json')
+    const same = saved && saved.tickers && saved.tickers.length === tickers.length &&
+      tickers.every(t => saved.tickers.includes(t))
+    if (!same || backendLikelyWarm()) { loadRegime(); scan(); return }
+    loadRegime(saved.regime); regimeFromSave = true
+    const keep = saved.scan.scanned.filter(row => tickers.includes(row.ticker))
+    renderScan({ ...saved.scan, scanned: tickers.map(t => keep.find(r => r.ticker === t)).filter(Boolean) })
+    const when = new Date(saved.generated_at.replace(/Z$/, ':00Z'))
+    el('sig-updated').textContent = 'Saved ' + when.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' · Rescan for live'
+  }
+
+  firstLoad()
 }
 
 // ── Predictor ────────────────────────────────────────────────────────────────
@@ -1823,11 +1907,14 @@ function initPredictor() {
     calBtn.disabled = true; calBtn.textContent = calLoaded ? 'Refreshing…' : 'Loading…'
     el('cal-loading').hidden = false
     el('cal-result').hidden = true
-    const data = await api('/api/predict/calibration')
+    // First open: the copy saved after the last close (instant). Refresh: live.
+    const saved = calLoaded ? null : await savedApi('calibration.json')
+    const data = saved || await api('/api/predict/calibration')
     el('cal-loading').hidden = true
     calBtn.disabled = false; calBtn.textContent = 'Refresh'
     calLoaded = true
     renderCalibration(data)
+    if (saved && saved.available) savedNote(el('cal-result'), saved.snapshot_at)
   })
 
   // ── Live forward ledger ─────────────────────────────────────────────────────
@@ -1959,10 +2046,13 @@ function initResearch() {
   el('pead-run').addEventListener('click', async () => {
     const btn = el('pead-run'); btn.disabled = true; btn.textContent = 'Running…'
     el('pead-loading').hidden = false; el('pead-result').hidden = true
-    const data = await api('/api/research/pead')
+    // First run: the copy saved after the last close (instant). Refresh: live.
+    const saved = btn.dataset.ran ? null : await savedApi('pead.json')
+    const data = saved || await api('/api/research/pead')
     el('pead-loading').hidden = true
-    btn.disabled = false; btn.textContent = 'Refresh'
+    btn.disabled = false; btn.textContent = 'Refresh'; btn.dataset.ran = '1'
     renderPead(data)
+    if (saved && saved.available) savedNote(el('pead-result'), saved.snapshot_at)
   })
 
   // ── Data-Mining Lab ────────────────────────────────────────────────────────
@@ -2208,3 +2298,4 @@ if (PAGE === 'predict')   initPredictor()
 if (PAGE === 'screener')  initSignals()
 if (PAGE === 'portfolio') initPortfolio()
 if (PAGE === 'research')  { initTabs(document.body); initResearch() }
+if (['backtest', 'predict', 'screener', 'portfolio', 'research', 'options'].includes(PAGE)) wakeOnIntent()

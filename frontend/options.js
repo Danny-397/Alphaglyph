@@ -552,7 +552,7 @@ async function initOptionsBacktest() {
   initTabs(document.body)
   const sel = el('ob-strategy')
   sel.innerHTML = '<option>Loading strategies…</option>'
-  const data = await api('/api/options/presets')
+  const data = (await savedApi('options_presets.json')) || await api('/api/options/presets')
   obState.presets = (data && data.presets) || []
   obState.presets.forEach(p => { obState.byKey[p.key] = p })
   sel.innerHTML = OB_GROUPS.map(g => {

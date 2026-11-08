@@ -1,0 +1,127 @@
+{
+ "generated_at": "2026-11-08T23:34Z",
+ "regime": {
+  "adx": 17.79,
+  "bb_width": 0.064,
+  "description": "No clear trend (ADX < 20, price oscillating)",
+  "label": "Ranging / Sideways",
+  "minus_di": 37.74,
+  "plus_di": 21.25,
+  "regime": "RANGING",
+  "strategy": "rsi",
+  "vol_30d": 17.03
+ },
+ "scan": {
+  "count": 7,
+  "ml_loaded": true,
+  "scanned": [
+   {
+    "buys": 2,
+    "p_up": 0.5479,
+    "price": 342.37,
+    "q50": -0.09,
+    "sells": 0,
+    "signals": {
+     "ma_crossover": "BUY",
+     "macd": "BUY",
+     "ml": "HOLD",
+     "rsi": "HOLD"
+    },
+    "ticker": "AAPL"
+   },
+   {
+    "buys": 2,
+    "p_up": 0.55,
+    "price": 530.61,
+    "q50": 0.01,
+    "sells": 0,
+    "signals": {
+     "ma_crossover": "BUY",
+     "macd": "BUY",
+     "ml": "HOLD",
+     "rsi": "HOLD"
+    },
+    "ticker": "MSFT"
+   },
+   {
+    "buys": 0,
+    "p_up": 0.554,
+    "price": 186.64,
+    "q50": -0.56,
+    "sells": 3,
+    "signals": {
+     "ma_crossover": "SELL",
+     "macd": "SELL",
+     "ml": "HOLD",
+     "rsi": "SELL"
+    },
+    "ticker": "NVDA"
+   },
+   {
+    "buys": 0,
+    "p_up": 0.5675,
+    "price": 284.78,
+    "q50": -0.19,
+    "sells": 3,
+    "signals": {
+     "ma_crossover": "SELL",
+     "macd": "SELL",
+     "ml": "HOLD",
+     "rsi": "SELL"
+    },
+    "ticker": "GOOGL"
+   },
+   {
+    "buys": 2,
+    "p_up": 0.5366,
+    "price": 358.22,
+    "q50": -0.48,
+    "sells": 0,
+    "signals": {
+     "ma_crossover": "BUY",
+     "macd": "BUY",
+     "ml": "HOLD",
+     "rsi": "HOLD"
+    },
+    "ticker": "TSLA"
+   },
+   {
+    "buys": 1,
+    "p_up": 0.557,
+    "price": 334.49,
+    "q50": -0.13,
+    "sells": 2,
+    "signals": {
+     "ma_crossover": "SELL",
+     "macd": "BUY",
+     "ml": "HOLD",
+     "rsi": "SELL"
+    },
+    "ticker": "JPM"
+   },
+   {
+    "buys": 0,
+    "p_up": 0.5607,
+    "price": 735.29,
+    "q50": -0.02,
+    "sells": 2,
+    "signals": {
+     "ma_crossover": "HOLD",
+     "macd": "SELL",
+     "ml": "HOLD",
+     "rsi": "SELL"
+    },
+    "ticker": "SPY"
+   }
+  ]
+ },
+ "tickers": [
+  "AAPL",
+  "MSFT",
+  "NVDA",
+  "GOOGL",
+  "TSLA",
+  "JPM",
+  "SPY"
+ ]
+}
