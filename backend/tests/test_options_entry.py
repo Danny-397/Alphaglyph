@@ -149,3 +149,13 @@ def test_compare_endpoint_applies_entry_rules(client):
     body = c.post('/api/options/compare', json={'ticker': 'SPY', 'start_date': start, 'end_date': end,
                                                 'entry': {'vix_min': 50}}).get_json()
     assert all(r['trades'] == 0 for r in body['results'])
+
+
+def test_backtest_endpoint_takes_monthly_expiries(client):
+    c, start, end = client
+    body = c.post('/api/options/backtest', json={'ticker': 'SPY', 'preset': 'short_put', 'start_date': start,
+                                                 'end_date': end, 'expiries': 'monthly'}).get_json()
+    assert body['strategy']['expiries'] == 'monthly'
+    bad = c.post('/api/options/backtest', json={'ticker': 'SPY', 'preset': 'short_put', 'start_date': start,
+                                                'end_date': end, 'expiries': 'daily'})
+    assert bad.status_code == 400

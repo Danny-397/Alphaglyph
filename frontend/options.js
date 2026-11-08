@@ -69,6 +69,7 @@ function obSettings() {
     exit_dte: num('ob-exit-dte'), profit_take: num('ob-pt'), stop_loss: num('ob-sl'),
     commission: num('ob-commission'), spread_pct: num('ob-spread'), skew: el('ob-skew').checked,
     entry: obEntry(num),
+    expiries: el('ob-expiries').value,
   }
 }
 
@@ -220,7 +221,7 @@ function obSensLine(r) {
     With implied volatility 10% lower or higher throughout, the same backtest returns
     ${lo ? fmtPct(lo.cagr, 1) : '—'} or ${hi ? fmtPct(hi.cagr, 1) : '—'} a year${wide
     ? `: a spread of ${s.cagr_range.toFixed(1)} points, so read the headline as a range, not a number.` : '.'}
-    The check against Cboe's PutWrite index pins the volatility level to within about 2%.</p>`
+    Six of Cboe's real strategy indices pin the volatility level to within a few percent.</p>`
 }
 
 function obSensTable(r) {
@@ -533,7 +534,8 @@ async function obLoadCheck() {
     el('ob-check-idx-tbody').innerHTML = rows.map((r, i) => `<tr class="opt-check-row" data-i="${i}" tabindex="0">
       <td><strong>${r.code}</strong> <span class="text-muted">${r.name}</span></td><td>${r.what}</td>
       <td>${pct(r.model.cagr)}</td><td>${pct(r.real.cagr)}</td><td>${gap(r.cagr_gap)}</td>
-      <td>${gap(r.cagr_gap_before_skew_fit)}</td><td>${r.monthly_corr.toFixed(2)}</td></tr>`).join('')
+      <td>${gap(r.cagr_gap_before_skew_fit)}</td><td>${r.monthly_corr.toFixed(2)}</td>
+      <td class="text-muted">${r.weekly_schedule ? r.weekly_schedule.monthly_corr.toFixed(2) : '—'}</td></tr>`).join('')
   }
   const show = i => {
     const r = rows[i]
@@ -567,9 +569,10 @@ async function obLoadCheck() {
   }
   show(0)
   el('ob-check-fine').textContent = `Gaps are the model's annual return minus the real index's, in points; "before" is the same
-    check with the skew used before this fit. The model still understates the worst months of the option-selling indices:
-    real option prices jump further in a crash than a smooth volatility model allows. Replicas trade SPY at the close every
-    four to five weeks; the indices trade S&P 500 options at Cboe's opening quotation on the third Friday. Updated ${d.generated}.`
+    check with the skew used before this fit. Replicas roll on the third Friday, as the indices do; rolled every four to five
+    weeks instead, they track far less closely (the last column), because in a crash the day an option was sold decides most
+    of the loss. The worst months still differ, mainly because the indices settle at Cboe's opening quotation on the third
+    Friday and the replicas at SPY's close. Updated ${d.generated}.`
   el('ob-check').hidden = false
 }
 

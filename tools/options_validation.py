@@ -114,7 +114,8 @@ def main() -> None:
     for r in out['indices']:
         print(f"{r['code']:5} model {r['model']['cagr']:6}% real {r['real']['cagr']:6}% gap {r['cagr_gap']:+6} "
               f"(before skew fit {r['cagr_gap_before_skew_fit']:+}) corr {r['monthly_corr']} "
-              f"worst month {r['model']['worst_month']} vs {r['real']['worst_month']}")
+              f"worst month {r['model']['worst_month']} vs {r['real']['worst_month']} | weekly roll: "
+              f"corr {r['weekly_schedule']['monthly_corr']} worst {r['weekly_schedule']['worst_month']}")
     print(f'wrote {OUT.relative_to(ROOT)}')
 
 

@@ -155,3 +155,28 @@ def test_index_checks_compare_each_available_index():
     assert rows[0]['cagr_gap'] == 0 and rows[0]['monthly_corr'] == 1.0
     assert rows[0]['cagr_gap_before_skew_fit'] is not None
     assert len(rows[0]['chart']['model']) == len(rows[0]['chart']['real'])
+
+
+def test_third_fridays_and_the_monthly_schedule():
+    from datetime import date
+    assert ob.third_friday(2020, 3) == date(2020, 3, 20)
+    assert ob.third_friday(2026, 11) == date(2026, 11, 20)
+    assert ob.monthly_expiry_for(date(2020, 2, 21), 30) == date(2020, 3, 20)      # roll on expiry day
+    assert ob.monthly_expiry_for(date(2020, 3, 20), 30) == date(2020, 4, 17)
+    assert ob.monthly_expiry_for(date(2026, 12, 18), 30) == date(2027, 1, 15)     # across a year end
+    for d in pd.date_range('2024-01-02', '2024-12-31', freq='7D'):
+        e = ob.monthly_expiry_for(d.date(), 30)
+        assert e > d.date() and e.weekday() == 4 and 15 <= e.day <= 21
+
+
+def test_monthly_expiries_roll_on_third_fridays():
+    m = _market(n=200)
+    start, end = m['close'].index[25].date().isoformat(), m['close'].index[-1].date().isoformat()
+    r = ob.run('SPY', start, end, ob.PRESETS['short_put']['legs'], market=m, expiries='monthly')
+    from datetime import date
+    for t in r['trades'][:-1]:
+        e = date.fromisoformat(t['legs'][0]['expiry'])
+        assert e.weekday() == 4 and 15 <= e.day <= 21
+    assert 'monthly (third-Friday) expiry' in r['strategy']['rules']
+    w = ob.run('SPY', start, end, ob.PRESETS['short_put']['legs'], market=m)
+    assert 'expiries' not in w['strategy']
