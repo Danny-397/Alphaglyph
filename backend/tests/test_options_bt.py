@@ -119,7 +119,7 @@ def test_every_preset_describes_itself_and_counts_its_legs():
         assert d['legs_count'] == len(p['legs']) == len(d['legs'])
         assert 'backtest' in d['headline']
     groups = {p['group'] for p in ob.PRESETS.values()}
-    assert groups == {'Single leg', 'Two legs', 'Three legs', 'Four legs'}
+    assert groups == {'Single leg', 'Two legs', 'Three legs', 'Four legs', 'Cycle'}
 
 
 # ── validation ──────────────────────────────────────────────

@@ -92,3 +92,9 @@ test('the earnings rules round-trip', () => {
   assert.equal('exit_earnings' in plain, false)
   assert.equal('entry' in plain, false)
 })
+
+test('the delta exit and staggering round-trip', () => {
+  const s = m.obParseSettings('?' + m.obShareQuery({ ...body, exit_delta: 0.5, stagger_days: 7 }))
+  assert.equal(s.exit_delta, 0.5)
+  assert.equal(s.stagger_days, 7)
+})

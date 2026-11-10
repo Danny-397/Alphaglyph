@@ -695,6 +695,9 @@ def _options_args(data: dict) -> dict:
         'entry': options_bt.clean_entry(data.get('entry')),
         'expiries': _expiries(data.get('expiries')),
         'exit_earnings': bool(data.get('exit_earnings')),
+        'exit_delta': _num(data, 'exit_delta', None, 0.05, 0.95, 'Exit delta', allow_none=True),
+        'stagger_days': (None if data.get('stagger_days') in (None, '') else
+                         int(_num(data, 'stagger_days', 7, 1, 90, 'Days between new positions'))),
     }
 
 
@@ -726,10 +729,12 @@ def options_backtest():
             p = options_bt.PRESETS[preset]
             legs, name = p['legs'], p['name']
             alloc = _num(data, 'alloc_pct', p['alloc'], 1, 100, 'Capital per position')
+            args['wheel'] = p.get('wheel')
         else:
             legs = options_bt.clean_legs(data.get('legs'))
             name = str(data.get('name') or 'Custom strategy').strip()[:60] or 'Custom strategy'
             alloc = _num(data, 'alloc_pct', 10, 1, 100, 'Capital per position')
+        options_bt.check_wheel(legs, args.get('wheel'), args['stagger_days'])
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
     market = options_bt.load_market(args['ticker'], args['start'], args['end'])
@@ -757,7 +762,10 @@ def options_compare():
         return jsonify(market), 422
     rows, rets, bench = [], [], None
     for key, p in options_bt.PRESETS.items():
-        r = options_bt.run(legs=p['legs'], name=p['name'], alloc_pct=p['alloc'], market=market, **args)
+        if p.get('wheel') and args['stagger_days'] is not None:
+            continue                                   # the wheel runs one position at a time
+        r = options_bt.run(legs=p['legs'], name=p['name'], alloc_pct=p['alloc'], market=market,
+                           wheel=p.get('wheel'), **args)
         if 'error' in r:
             continue
         bench = r['benchmark']
@@ -794,10 +802,12 @@ def options_sweep():
             p = options_bt.PRESETS[preset]
             legs, name = p['legs'], p['name']
             alloc = _num(data, 'alloc_pct', p['alloc'], 1, 100, 'Capital per position')
+            args['wheel'] = p.get('wheel')
         else:
             legs = options_bt.clean_legs(data.get('legs'))
             name = str(data.get('name') or 'Custom strategy').strip()[:60] or 'Custom strategy'
             alloc = _num(data, 'alloc_pct', 10, 1, 100, 'Capital per position')
+        options_bt.check_wheel(legs, args.get('wheel'), args['stagger_days'])
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
     market = options_bt.load_market(args['ticker'], args['start'], args['end'])

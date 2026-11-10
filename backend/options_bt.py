@@ -353,7 +353,28 @@ PRESETS = {
                         'legs': [_L('put', 'short', ATM), _L('call', 'short', ATM),
                                  _L('put', 'long', {'mode': 'pct', 'value': -5}),
                                  _L('call', 'long', {'mode': 'pct', 'value': 5})], 'alloc': 10},
+    # a cycle: puts until assigned, then covered calls until the shares are called away
+    'wheel':           {'name': 'The wheel', 'group': 'Cycle', 'view': 'Neutral to bullish',
+                        'legs': [_L('put', 'short', {'mode': 'delta', 'value': 0.30})], 'alloc': 100,
+                        'wheel': {'call': _L('call', 'short', {'mode': 'delta', 'value': 0.30})}},
 }
+
+
+def describe_wheel(legs: list, wheel: dict, dte: int) -> str:
+    """'Sells a put at 0.30 delta; if assigned, holds the shares and sells a call at 0.30 delta ...'."""
+    return (f"Sells a put {_strike_words(legs[0], legs)}, {dte} days to expiry; if it expires in the money the "
+            f"shares are bought at the strike, and a call {_strike_words(wheel['call'], [wheel['call']])} is sold "
+            f"on them every {dte} days until they are called away, when puts start again.")
+
+
+def check_wheel(legs: list, wheel: dict | None, stagger_days) -> None:
+    """The wheel needs one short put to start from and runs one position at a time."""
+    if wheel is None:
+        return
+    if len(legs) != 1 or legs[0]['type'] != 'put' or legs[0]['side'] != 'short':
+        raise ValueError('The wheel starts from a single short put')
+    if stagger_days is not None:
+        raise ValueError('The wheel runs one position at a time; leave "a new position every" empty')
 
 
 # ── Plain-English descriptions ────────────────────────────────────────────────
@@ -839,13 +860,15 @@ def load_market(ticker: str, start: str, end: str) -> dict:
     df = feat.fetch_ohlcv(ticker, start=lo, end=end)
     if df is None or df.empty:
         return {'error': f'No price history for {ticker}'}
-    close = df['Close'].astype(float)
+    close = df['Close'].astype(float).dropna()      # Yahoo adds today's row with no close yet
+    if close.empty:
+        return {'error': f'No price history for {ticker}'}
     close.index = pd.to_datetime(close.index).tz_localize(None).normalize()
     spy = None
     if ticker != 'SPY':
         sdf = feat.fetch_ohlcv('SPY', start=lo, end=end)
         if sdf is not None and not sdf.empty:
-            spy = sdf['Close'].astype(float)
+            spy = sdf['Close'].astype(float).dropna()
             spy.index = pd.to_datetime(spy.index).tz_localize(None).normalize()
     vix = _fred('VIXCLS', lo, end)
     rate = _fred('DGS3MO', lo, end)
@@ -936,6 +959,7 @@ def position_marks(pos: list, day: date, S: float, iv_atm: float, r: float, skew
     by a different amount (skew and term structure).
     """
     value = delta = gamma = theta = 0.0
+    short_delta = 0.0
     legs = []
     for leg in pos:
         k = _sign(leg) * leg['qty'] * CONTRACT
@@ -950,11 +974,13 @@ def position_marks(pos: list, day: date, S: float, iv_atm: float, r: float, skew
         value += k * bs_price(leg['type'], S * dq, leg['strike'], T, r, sig)
         d, g, th, vg = bs_greeks(leg['type'], S * dq, leg['strike'], T, r, sig)
         delta += k * d * dq                 # Greeks with respect to the spot, not the discounted spot
+        if leg['side'] == 'short':
+            short_delta = max(short_delta, abs(d * dq))
         gamma += k * g * dq * dq
         theta += k * th
         legs.append((sig, k * vg * dq))
     return {'S': S, 'day': day, 'value': value, 'delta': delta, 'gamma': gamma, 'theta': theta,
-            'legs': legs}
+            'legs': legs, 'short_delta': short_delta}
 
 
 ATTR_KEYS = ('delta', 'gamma', 'theta', 'vega', 'other')
@@ -1071,10 +1097,15 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         spread_pct: float | None = None, commission: float = 0.65, stock_slip: float = 0.0003,
         skew: bool = True, market: dict | None = None, entry: dict | None = None,
         iv_scale: float = 1.0, sizing: str = 'risk', expiries: str = 'weekly',
-        exit_earnings: bool = False) -> dict:
+        exit_earnings: bool = False, exit_delta: float | None = None, stagger_days: int | None = None,
+        wheel: dict | None = None) -> dict:
     """Backtest `legs` on `ticker` between start and end. See the module docstring."""
     ticker = ticker.upper()
     rules = entry               # `entry` is reused below for the open position
+    try:
+        check_wheel(legs, wheel, stagger_days)
+    except ValueError as exc:
+        return {'error': str(exc)}
     if spread_pct is None:
         spread_pct = default_spread(ticker)
     m = market or load_market(ticker, start, end)
@@ -1109,7 +1140,12 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         return {'error': 'Need at least 30 trading days in the window'}
 
     cash = float(initial_capital)
-    pos, units, entry = None, 0, None
+    book = []                   # open positions: {'pos': legs, 'units': n, 'entry': {...}}
+    last_open = None            # the day the latest position opened (for stagger_days)
+    wheel_shares = None         # the wheel: units of shares held after a put was assigned
+    wheel_counts = {'assigned': 0, 'called_away': 0}
+    max_open = 0
+    earn_skips = 0
     equity, trades, notes = [], [], []
     total_costs = 0.0
     first_pos = None
@@ -1122,10 +1158,12 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     bench_arr = close.reindex(days).to_numpy(dtype=float)
     last_day = days[-1].date()
 
-    def close_position(day, S, iv, r, cv, q, reason):
-        nonlocal cash, pos, units, entry, total_costs
-        settle = reason == 'expiry'
-        assigned = reason.startswith('assigned')
+    def close_position(P, day, S, iv, r, cv, q, reason, settle=False, assigned=False, carry=False):
+        """Close one position. settle: expiring options settle at intrinsic, no spread; assigned:
+        short calls are exercised (intrinsic, no spread); carry: stock legs change hands without
+        a trade (wheel shares kept, delivered or called away), so no slippage."""
+        nonlocal cash, total_costs
+        pos, units, entry = P['pos'], P['units'], P['entry']
         prices = [leg_value(leg, day, S, iv, r, skew, cv, q) for leg in pos]
         if assigned:                      # short calls are exercised against us: settled at intrinsic
             prices = [max(0.0, S - leg['strike']) if leg['type'] == 'call' and leg['side'] == 'short' else p
@@ -1134,6 +1172,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         # Expiring options settle at intrinsic; any longer-dated legs are sold at the model price.
         cost = 0.0
         for leg, p in zip(pos, prices):
+            if carry and leg['type'] == 'stock':
+                continue
             done = (settle and leg['type'] != 'stock' and leg['expiry'] <= day) or \
                 (assigned and leg['type'] == 'call' and leg['side'] == 'short')
             cost += trade_cost([leg], [p], spread_pct, commission, stock_slip, settle=done)
@@ -1158,7 +1198,24 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             'pnl_pct': round(pnl / entry['basis'] * 100, 2) if entry['basis'] else None,
             'attribution': attr,
         })
-        pos, units, entry = None, 0, None
+        book.remove(P)
+
+    def open_position(cand, n, day, S, iv, r, cv, q, need, carry=False):
+        """Open n units of `cand`; carry: its stock legs are shares already held (no trade)."""
+        nonlocal cash, total_costs, first_pos, last_open
+        open_value = position_value(cand, day, S, iv, r, skew, cv, q)
+        traded = [leg for leg in cand if not (carry and leg['type'] == 'stock')]
+        cost = n * trade_cost(traded, [leg['price'] for leg in traded], spread_pct, commission, stock_slip)
+        cash -= n * open_value + cost
+        total_costs += cost
+        entry = {'day': day, 'S': S, 'value': open_value, 'cost': cost, 'basis': n * need,
+                 'mark': position_marks(cand, day, S, iv, r, skew, cv, q), 'divs': 0.0,
+                 'attr': dict.fromkeys(ATTR_KEYS, 0.0), 'earnings': 0}
+        book.append({'pos': cand, 'units': n, 'entry': entry})
+        last_open = day
+        if first_pos is None:
+            first_pos = {'day': day.isoformat(), 'S': S, 'legs': [dict(leg) for leg in cand],
+                         'need': need, 'unbounded': capital_required(cand, S)[1], 'units': n}
 
     prev_day = None
     # Plain arrays for the daily loop (pandas lookups per day were a large share of the run time).
@@ -1241,9 +1298,11 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
 
         if split_arr[i] != 1.0:
             splits_applied.append(f'{day.isoformat()} ({split_words(split_arr[i])})')
-            if pos is not None:
-                apply_split(pos, entry, float(split_arr[i]))
-        if pos is not None:
+            for P in book:
+                apply_split(P['pos'], P['entry'], float(split_arr[i]))
+        div_next = float(div_arr[i + 1]) if i + 1 < len(days) else 0.0
+        for P in list(book):
+            pos, units, entry = P['pos'], P['units'], P['entry']
             first_exp = min(leg['expiry'] for leg in pos if leg['expiry'])
             if day in react_set:
                 entry['earnings'] += 1
@@ -1259,30 +1318,80 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 entry['attr'][k] += v
             entry['mark'] = mark
             value = mark['value']
-            pnl = units * (value - entry['value'])
-            ref = abs(entry['value']) * units or 1.0
+            # The wheel's covered calls: exits apply to the call alone (the shares are kept).
+            on_shares = wheel is not None and any(leg['type'] == 'stock' for leg in pos)
+            if on_shares:
+                call0 = next(leg for leg in pos if leg['type'] == 'call')
+                c_open = call0['price'] * call0['qty'] * CONTRACT
+                c_now = leg_value(call0, day, S, iv, r, skew, cv, q) * call0['qty'] * CONTRACT
+                pnl, ref = units * (c_open - c_now), c_open * units or 1.0
+            else:
+                pnl = units * (value - entry['value'])
+                ref = abs(entry['value']) * units or 1.0
+            exit_why = None
             if day >= first_exp:
-                close_position(day, S, iv, r, cv, q, 'expiry')
+                exit_why = 'expiry'
             elif exit_dte is not None and (first_exp - day).days <= exit_dte:
-                close_position(day, S, iv, r, cv, q, f'{exit_dte} days before expiry')
+                exit_why = f'{exit_dte} days before expiry'
             elif profit_take is not None and pnl >= profit_take / 100.0 * ref:
-                close_position(day, S, iv, r, cv, q, f'profit target ({profit_take:g}%)')
-            elif stop_loss is not None and pnl <= -stop_loss / 100.0 * ref:
-                close_position(day, S, iv, r, cv, q, f'stop loss ({stop_loss:g}%)')
-            elif exit_earnings and react_next and days[i + 1].date() <= first_exp:
-                close_position(day, S, iv, r, cv, q, 'before earnings')
+                exit_why = f'profit target ({profit_take:g}%)'
+            elif stop_loss is not None and not on_shares and pnl <= -stop_loss / 100.0 * ref:
+                exit_why = f'stop loss ({stop_loss:g}%)'
+            elif exit_delta is not None and mark['short_delta'] >= exit_delta:
+                exit_why = f'short delta reached {exit_delta:g}'
+            elif exit_earnings and not on_shares and react_next and days[i + 1].date() <= first_exp:
+                exit_why = 'before earnings'
             elif day == last_day:
-                close_position(day, S, iv, r, cv, q, 'end of test')
-            elif i + 1 < len(days) and div_arr[i + 1] > 0 and \
-                    early_assignment(pos, day, S, iv, r, skew, cv, q, float(div_arr[i + 1])):
-                close_position(day, S, iv, r, cv, q, 'assigned early (dividend)')
-                assignments += 1
+                exit_why = 'end of test'
+            elif div_next > 0 and early_assignment(pos, day, S, iv, r, skew, cv, q, div_next):
+                exit_why = 'assigned early (dividend)'
+
+            if exit_why is None:
+                continue
+            if exit_why == 'end of test':
+                close_position(P, day, S, iv, r, cv, q, exit_why)
+                wheel_shares = None
+            elif wheel is None:
+                if exit_why == 'assigned early (dividend)':
+                    assignments += 1
+                close_position(P, day, S, iv, r, cv, q, exit_why, settle=exit_why == 'expiry',
+                               assigned=exit_why == 'assigned early (dividend)')
+            elif not on_shares:
+                # The wheel's put: assigned at expiry when in the money, so the shares are bought.
+                put = next(leg for leg in pos if leg['type'] == 'put')
+                if exit_why == 'expiry' and S < put['strike']:
+                    close_position(P, day, S, iv, r, cv, q, 'expiry: assigned, bought the shares', settle=True)
+                    wheel_counts['assigned'] += 1
+                    wheel_shares = (units, put['qty'])
+                else:
+                    close_position(P, day, S, iv, r, cv, q, exit_why, settle=exit_why == 'expiry')
+            else:
+                call0 = next(leg for leg in pos if leg['type'] == 'call')
+                early = exit_why == 'assigned early (dividend)'
+                away = early or (exit_why == 'expiry' and S > call0['strike'])
+                if early:
+                    assignments += 1
+                why = ('shares called away early (dividend)' if early else
+                       'expiry: shares called away' if away else exit_why)
+                close_position(P, day, S, iv, r, cv, q, why, settle=exit_why == 'expiry', assigned=early,
+                               carry=True)
+                if away:
+                    wheel_counts['called_away'] += 1
+                    wheel_shares = None
 
         remaining = (last_day - day).days
+        eq_now = cash + sum(P['units'] * P['entry']['mark']['value'] for P in book)
+        if wheel_shares is not None and not book:
+            # Shares held: sell the next covered call on them straight away, whatever the entry rules.
+            n, qty = wheel_shares
+            call_legs = [{'type': 'stock', 'side': 'long', 'qty': qty}, {**wheel['call'], 'qty': qty}]
+            cand = build_position(call_legs, day, S, iv, r, dte, ticker, skew, cv, monthly=expiries == 'monthly',
+                                  q=q)
+            open_position(cand, n, day, S, iv, r, cv, q, capital_required(cand, S)[0], carry=True)
         cand = None
-        if pos is None and day != last_day and remaining >= max(5, dte // 2) and allow[i] and \
-                not (exit_earnings and react_next):
-            eq_now = cash
+        due = not book if stagger_days is None else (not book or (day - last_open).days >= stagger_days)
+        if due and wheel_shares is None and day != last_day and remaining >= max(5, dte // 2) and allow[i] \
+                and not (exit_earnings and react_next):
             cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv, monthly=expiries == 'monthly', q=q)
             if earn_rule:
                 c_exp = min(leg['expiry'] for leg in cand if leg['expiry'])
@@ -1290,44 +1399,36 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 spans = k < len(react_d) and react_d[k] <= c_exp
                 if spans != (earn_rule == 'only'):
                     cand = None
-        if pos is None and cand is not None:
+                    earn_skips += 1
+        if cand is not None:
             need, unbounded = capital_required(cand, S)
             # 'risk' sizes by each position's worst case; 'notional' holds one unit per 100 shares'
             # worth of the underlying, as Cboe's strategy indices do (used to replicate them).
             per_unit = S * CONTRACT if sizing == 'notional' else need
-            n = int(max(0.0, eq_now) * alloc_pct / 100.0 // per_unit)
+            budget = max(0.0, eq_now) * alloc_pct / 100.0
+            free = eq_now - sum(P['entry']['basis'] for P in book)       # staggered: capital not yet tied up
+            n = int(min(budget, free) // per_unit)
             if n >= 1:
-                open_value = position_value(cand, day, S, iv, r, skew, cv, q)
-                cost = n * trade_cost(cand, [leg['price'] for leg in cand], spread_pct, commission, stock_slip)
-                cash -= n * open_value + cost
-                total_costs += cost
-                pos, units = cand, n
-                entry = {'day': day, 'S': S, 'value': open_value, 'cost': cost, 'basis': n * need,
-                         'mark': position_marks(cand, day, S, iv, r, skew, cv, q), 'divs': 0.0,
-                         'attr': dict.fromkeys(ATTR_KEYS, 0.0), 'earnings': 0}
-                if first_pos is None:
-                    first_pos = {'day': day.isoformat(), 'S': S, 'legs': [dict(leg) for leg in cand],
-                                 'need': need,
-                                 'unbounded': unbounded, 'units': n}
-            elif not notes:
+                open_position(cand, n, day, S, iv, r, cv, q, need)
+            elif budget < per_unit and not notes:
                 notes.append(f'On {day.isoformat()} one unit needed ${need:,.0f} of capital, more than '
                              f'{alloc_pct:g}% of the account; positions are skipped until it fits.')
 
-        held = pos is not None
+        held = bool(book)
         days_in += held
+        max_open = max(max_open, len(book))
         row = {'date': day.isoformat(), 'benchmark': round(bench_shares * float(bench_arr[i]), 2),
                'iv': round(iv * 100, 1)}
-        if held:
-            mk = entry['mark']
-            val = cash + units * mk['value']
-            vega_pt = sum(v for _, v in mk['legs']) / 100.0
-            # Exposures for the chart: dollars per 1% move, per calendar day, per volatility point.
-            row.update({'delta': round(units * mk['delta'] * S * 0.01, 2),
-                        'theta': round(units * mk['theta'] / 365.0, 2),
-                        'vega': round(units * vega_pt, 2)})
-        else:
-            val = cash
-            row.update({'delta': 0.0, 'theta': 0.0, 'vega': 0.0})
+        val = cash
+        dl = th = vg = 0.0
+        for P in book:
+            mk = P['entry']['mark']
+            val += P['units'] * mk['value']
+            dl += P['units'] * mk['delta']
+            th += P['units'] * mk['theta']
+            vg += P['units'] * sum(v for _, v in mk['legs']) / 100.0
+        # Exposures for the chart: dollars per 1% move, per calendar day, per volatility point.
+        row.update({'delta': round(dl * S * 0.01, 2), 'theta': round(th / 365.0, 2), 'vega': round(vg, 2)})
         row['value'] = round(val, 2)
         equity.append(row)
         if val <= 0:
@@ -1343,10 +1444,12 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                      'a modelled slope where a point was missing; applied to every ticker.')
     else:
         term_note = 'A modelled slope (the VIX term structure was unavailable).'
-    if rules:
+    if rules and set(rules) - {'earnings'}:
         n_ok = int(allow[:len(equity)].sum())
         notes.append(f'The entry rules allowed new positions on {n_ok} of {len(equity)} trading days '
                      f'({n_ok / max(1, len(equity)) * 100:.0f}%).')
+    if earn_rule:
+        notes.append(f'The earnings rule held back a new position on {earn_skips} day{"s" if earn_skips != 1 else ""}.')
     out = _summarize(ticker, name, legs, dte, initial_capital, equity, trades, total_costs,
                      days_in, first_pos, notes, iv_note, alloc_pct, exit_dte, profit_take, stop_loss,
                      spread_pct, commission, skew, rf_daily)
@@ -1396,6 +1499,30 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                                         'earnings premium and report-day moves count as ordinary volatility.')
         elif ticker in INDEX_ETFS:
             out['model']['earnings'] = f'{ticker} is an index fund: no earnings reports.'
+        st_ = out.get('strategy')
+        if st_ is not None and exit_delta is not None:
+            st_['rules'] = st_['rules'][:-1] + f", or closed when a short option's delta reaches {exit_delta:g}."
+            st_['exit_delta'] = exit_delta
+        if st_ is not None and stagger_days is not None:
+            st_['rules'] = st_['rules'].replace(
+                'Opens a new position the day the last one closes',
+                f'Opens a new position every {stagger_days} days, alongside any still open', 1).replace(
+                ', from the day the last one closes', f', every {stagger_days} days, alongside any still open', 1)
+            st_['stagger_days'] = stagger_days
+            peak = max_open
+            notes.append(f'Staggered: up to {peak} position{"s" if peak != 1 else ""} open at once.')
+        if st_ is not None and wheel is not None:
+            st_['wheel'] = describe_wheel(legs, wheel, dte)
+            st_['headline'] = (f'{name}: a cycle backtest (short put; once assigned, long {legs[0]["qty"] * CONTRACT} '
+                               'shares and a short call)')
+            st_['rules'] = st_['wheel'] + ' ' + st_['rules'].split(';', 1)[-1].strip().capitalize()
+            st_['rules'] = st_['rules'].replace('Held to expiry.', 'Each option is held to expiry.')
+            out['metrics']['wheel'] = dict(wheel_counts)
+            n_as = wheel_counts['assigned']
+            notes.append(f"Puts assigned {n_as} time{'s' if n_as != 1 else ''}; "
+                         f"shares called away {wheel_counts['called_away']} time"
+                         f"{'s' if wheel_counts['called_away'] != 1 else ''}. Entry and earnings rules apply when "
+                         'selling puts; on assigned shares a call is always sold.')
         if exit_earnings and 'strategy' in out:
             out['strategy']['rules'] = out['strategy']['rules'][:-1] + ', or closed the day before an earnings report.'
             out['strategy']['exit_earnings'] = True
@@ -1498,6 +1625,7 @@ def _summarize(ticker, name, legs, dte, capital, equity, trades, total_costs, da
 def run_preset(key: str, ticker: str, start: str, end: str, **kw) -> dict:
     p = PRESETS[key]
     kw.setdefault('alloc_pct', p['alloc'])
+    kw.setdefault('wheel', p.get('wheel'))
     return run(ticker, start, end, p['legs'], name=p['name'], **kw)
 
 
@@ -1506,7 +1634,11 @@ def presets_summary(dte: int = 30) -> list:
     out = []
     for key, p in PRESETS.items():
         d = describe_strategy(p['name'], p['legs'], dte)
-        out.append({'key': key, 'name': p['name'], 'group': p['group'], 'view': p['view'],
-                    'alloc': p['alloc'], 'legs': p['legs'], 'legs_count': d['legs_count'],
-                    'headline': d['headline'], 'description': d['legs']})
+        row = {'key': key, 'name': p['name'], 'group': p['group'], 'view': p['view'],
+               'alloc': p['alloc'], 'legs': p['legs'], 'legs_count': d['legs_count'],
+               'headline': d['headline'], 'description': d['legs']}
+        if p.get('wheel'):
+            row['wheel'] = p['wheel']
+            row['note'] = describe_wheel(p['legs'], p['wheel'], dte)
+        out.append(row)
     return out

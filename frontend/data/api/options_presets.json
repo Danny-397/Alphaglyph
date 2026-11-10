@@ -626,6 +626,41 @@
    "legs_count": 4,
    "name": "Iron butterfly",
    "view": "Pinned near the price"
+  },
+  {
+   "alloc": 100,
+   "description": [
+    "short 1 put at 0.30 delta, 30 days to expiry"
+   ],
+   "group": "Cycle",
+   "headline": "The wheel: a one-leg backtest (short put)",
+   "key": "wheel",
+   "legs": [
+    {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.3
+     },
+     "type": "put"
+    }
+   ],
+   "legs_count": 1,
+   "name": "The wheel",
+   "note": "Sells a put at 0.30 delta, 30 days to expiry; if it expires in the money the shares are bought at the strike, and a call at 0.30 delta is sold on them every 30 days until they are called away, when puts start again.",
+   "view": "Neutral to bullish",
+   "wheel": {
+    "call": {
+     "qty": 1,
+     "side": "short",
+     "strike": {
+      "mode": "delta",
+      "value": 0.3
+     },
+     "type": "call"
+    }
+   }
   }
  ]
 }

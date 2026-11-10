@@ -109,6 +109,8 @@ def test_avoid_and_only_rules():
     assert avoid['trades'] and all(t['earnings'] == 0 for t in avoid['trades'])
     assert only['trades'] and all(t['earnings'] >= 1 for t in only['trades'])
     assert 'would not hold through an earnings report' in avoid['strategy']['rules']
+    assert any(n.startswith('The earnings rule held back a new position on') for n in avoid['notes'])
+    assert not any('entry rules allowed' in n for n in avoid['notes'])
 
 
 def test_close_the_day_before_earnings():
@@ -147,3 +149,17 @@ def test_the_saved_file_covers_popular_names_with_times():
     assert ev[0]['date'] < pd.Timestamp('2010-01-01')
     assert sum(e['when'] == 'amc' for e in ev) > len(ev) / 2      # Apple reports after the close
     assert ev == sorted(ev, key=lambda e: e['date'])
+
+
+def test_load_market_drops_todays_row_without_a_close(monkeypatch):
+    """Yahoo returns today's row with no close until the day settles; it used to turn every result into NaN."""
+    idx = pd.bdate_range('2024-01-01', periods=50)
+    df = pd.DataFrame({'Close': np.r_[np.linspace(100, 110, 49), np.nan]}, index=idx)
+    monkeypatch.setattr(ob.feat, 'fetch_ohlcv', lambda *a, **k: df)
+    monkeypatch.setattr(ob, '_fred', lambda *a, **k: None)
+    monkeypatch.setattr(ob, 'vix_curve', lambda *a, **k: None)
+    monkeypatch.setattr(ob, 'dividend_data', lambda *a, **k: (None, None, None))
+    monkeypatch.setattr(ob, 'earnings_events', lambda t: [])
+    m = ob.load_market('XYZ', '2024-01-01', '2024-03-08')
+    assert m['close'].notna().all() and len(m['close']) == 49
+    assert m['spy'].notna().all()
