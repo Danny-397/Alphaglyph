@@ -51,6 +51,7 @@ The result is labelled "model-priced" everywhere it is shown.
 from __future__ import annotations
 
 import bisect
+import io
 import json
 import logging
 import math
@@ -622,18 +623,66 @@ def _fred(series_id: str, lo, hi) -> pd.Series | None:
     return s[(s.index >= pd.Timestamp(lo)) & (s.index <= pd.Timestamp(hi))]
 
 
-def vix_curve(lo: str, hi: str) -> pd.DataFrame | None:
-    """Daily ratios of the VIX9D, VIX3M and VIX6M to the VIX (columns = CURVE_TENORS), or None."""
-    def closes(sym):
-        df = feat.fetch_ohlcv(sym, start=lo, end=hi)
-        if df is None or df.empty:
+CBOE_CSV = 'https://cdn.cboe.com/api/global/us_indices/daily_prices/{}_History.csv'
+_CBOE_CACHE: dict = {}              # index -> (fetched_at, Series of closes)
+
+
+def cboe_closes(index: str) -> pd.Series | None:
+    """Daily closes of a Cboe index (VIX, VIX9D, VIX3M, VIX6M) from Cboe's own history file.
+
+    One request for the whole history, cached for six hours. Cboe serves these to any
+    client, including the server, where Yahoo refuses the same symbols.
+    """
+
+    import requests
+    hit = _CBOE_CACHE.get(index)
+    if hit is None or time.time() - hit[0] > _FRED_TTL:
+        try:
+            resp = requests.get(CBOE_CSV.format(index), timeout=15)
+            resp.raise_for_status()
+            series = cboe_frame(resp.text)
+        except Exception as exc:          # pragma: no cover - network
+            logger.warning('Cboe %s history unavailable: %s', index, exc)
             return None
-        c = df['Close'].astype(float)
-        c.index = pd.to_datetime(c.index).tz_localize(None).normalize()
-        return c
+        if series is None:
+            return None
+        hit = (time.time(), series)
+        _CBOE_CACHE[index] = hit
+    return hit[1]
+
+
+def cboe_frame(text: str) -> pd.Series | None:
+    """Parse a Cboe DATE,OPEN,HIGH,LOW,CLOSE history file into closes by day."""
+    df = pd.read_csv(io.StringIO(text))
+    cols = {c.strip().upper(): c for c in df.columns}
+    if 'DATE' not in cols or 'CLOSE' not in cols:
+        return None
+    s = pd.Series(pd.to_numeric(df[cols['CLOSE']], errors='coerce').values,
+                  index=pd.to_datetime(df[cols['DATE']], format='%m/%d/%Y', errors='coerce'))
+    s = s[s.index.notna()].dropna()
+    s = s[s > 0]
+    return s.sort_index() if len(s) else None
+
+
+def vix_curve(lo: str, hi: str) -> pd.DataFrame | None:
+    """Daily ratios of the VIX9D, VIX3M and VIX6M to the VIX (columns = CURVE_TENORS), or None.
+
+    From Cboe's history files; the general price fetch is only a fallback, because on the
+    server it tries Yahoo first, which refuses index symbols there, and took most of a
+    request to give up.
+    """
+    def closes(sym):
+        c = cboe_closes(sym.lstrip('^'))
+        if c is None:
+            df = feat.fetch_ohlcv(sym, start=lo, end=hi)
+            if df is None or df.empty:
+                return None
+            c = df['Close'].astype(float)
+            c.index = pd.to_datetime(c.index).tz_localize(None).normalize()
+        return c[(c.index >= pd.Timestamp(lo)) & (c.index <= pd.Timestamp(hi))]
     try:
         vix = closes('^VIX')
-        if vix is None:
+        if vix is None or vix.empty:
             return None
         cols = {}
         for d, sym in zip(CURVE_TENORS, CURVE_SYMBOLS):
@@ -778,6 +827,8 @@ def earnings_events(ticker: str) -> list | None:
         return hit[1]
     out = None
     try:
+        if os.getenv('RENDER'):                    # Yahoo refuses Render's IPs: don't wait on it there
+            raise RuntimeError('Yahoo is not reachable from the server')
         import yfinance as yf
         raw = yf.Ticker(ticker).get_earnings_dates(limit=100)
         if raw is not None and len(raw):
