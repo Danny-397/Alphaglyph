@@ -694,6 +694,7 @@ def _options_args(data: dict) -> dict:
         'skew': bool(data.get('skew', True)),
         'entry': options_bt.clean_entry(data.get('entry')),
         'expiries': _expiries(data.get('expiries')),
+        'exit_earnings': bool(data.get('exit_earnings')),
     }
 
 

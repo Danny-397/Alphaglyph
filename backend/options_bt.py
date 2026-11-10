@@ -32,6 +32,10 @@ not traded quotes. Every price comes from Black-Scholes on that day's close:
   ex-date when the dividend is worth more than its remaining time value. Puts
   are treated as European. Without dividend data, prices are dividend-adjusted
   and the yield is zero, and the result says so.
+- earnings (single stocks): an option open on a report's reaction day carries
+  the report's expected move as extra variance (the mean square of the previous
+  eight reactions, so nothing is learnt early), which drops out after the report:
+  the volatility crush. Ordinary realized volatility leaves report days out;
 - splits: options trade the actual price (Tiingo's unadjusted close, or Yahoo's
   split-adjusted close multiplied back by later splits). On a split's ex-date every
   open leg is adjusted as the exchange does: strike divided by the ratio, contracts
@@ -46,8 +50,10 @@ The result is labelled "model-priced" everywhere it is shown.
 
 from __future__ import annotations
 
+import bisect
 import logging
 import math
+import time
 from datetime import date, timedelta
 
 import numpy as np
@@ -78,6 +84,7 @@ WARMUP_DAYS = 400                   # calendar days fetched before the window (2
 TREND_DAYS = 200
 IVR_DAYS = 252
 TRENDS = ('any', 'above', 'below')
+EARNINGS_RULES = ('any', 'avoid', 'only')
 MAX_YEARS = 15
 INDEX_ETFS = {'SPY', 'QQQ', 'IWM', 'DIA', 'GLD', 'TLT', 'SLV', 'XLF', 'XLE', 'XLK', 'EEM', 'HYG'}
 
@@ -172,10 +179,37 @@ def day_curve(iv30: float, real: tuple | None) -> tuple:
     return tuple(sorted(pts))
 
 
+class VolCurve(tuple):
+    """A day's term-structure points, plus the earnings reports ahead: ((days away, variance), ...).
+
+    An option that is still open on a report's reaction day carries that report's variance
+    on top of the curve's; once the report is out it drops away (the volatility crush).
+    """
+    events: tuple = ()
+
+
+def with_events(curve: tuple, events: tuple) -> tuple:
+    if not events:
+        return curve
+    c = VolCurve(curve)
+    c.events = events
+    return c
+
+
+def event_iv(iv: float, T: float, curve) -> float:
+    """IV raised by the variance of every earnings report before the option expires."""
+    ev = getattr(curve, 'events', ())
+    if not ev or T <= 0:
+        return iv
+    days = T * 365.0 + 1e-9
+    extra = sum(v for d, v in ev if d <= days)
+    return math.sqrt(iv * iv + extra / T) if extra > 0 else iv
+
+
 def skewed_iv(iv_atm: float, S: float, K: float, T: float, skew: bool = True,
               curve: tuple | None = None) -> float:
-    """IV for strike K and maturity T: the term structure, then the skew by standardized moneyness."""
-    iv_atm = term_iv(iv_atm, T, curve)
+    """IV for strike K and maturity T: the term structure, earnings ahead, then the skew by moneyness."""
+    iv_atm = event_iv(term_iv(iv_atm, T, curve), T, curve)
     if not skew or T <= 0:
         return iv_atm
     m = math.log(K / S) / (iv_atm * math.sqrt(max(T, 1 / 365)))
@@ -399,6 +433,11 @@ def clean_entry(raw) -> dict | None:
         raise ValueError('Trend must be any, above or below')
     if trend != 'any':
         out['trend'] = trend
+    earn = str(raw.get('earnings') or 'any').lower()
+    if earn not in EARNINGS_RULES:
+        raise ValueError('Earnings must be any, avoid or only')
+    if earn != 'any':
+        out['earnings'] = earn
     for a, b, label in (('vix_min', 'vix_max', 'VIX'), ('ivr_min', 'ivr_max', 'IV rank')):
         if a in out and b in out and out[a] > out[b]:
             raise ValueError(f'The lowest {label} is above the highest')
@@ -426,6 +465,10 @@ def describe_entry(entry: dict | None, ticker: str) -> str:
         parts.append(f'its IV rank is {hi:g} or lower')
     if entry.get('trend'):
         parts.append(f"{ticker} is {entry['trend']} its {TREND_DAYS}-day average")
+    if entry.get('earnings') == 'avoid':
+        parts.append('it would not hold through an earnings report')
+    elif entry.get('earnings') == 'only':
+        parts.append('it holds through an earnings report')
     return 'only when ' + ' and '.join(parts)
 
 
@@ -494,15 +537,18 @@ def clean_legs(raw) -> list:
 
 # ── Market inputs ─────────────────────────────────────────────────────────────
 
-def realized_vol(close: pd.Series, window: int = RV_WINDOW) -> pd.Series:
+def realized_vol(close: pd.Series, window: int = RV_WINDOW, exclude=None) -> pd.Series:
+    """Annualized rolling volatility; `exclude` (dates) drops earnings reactions, priced separately."""
     r = np.log(close).diff()
+    if exclude is not None and len(exclude):
+        r[r.index.isin(exclude)] = np.nan
     return r.rolling(window, min_periods=max(10, window // 2)).std() * math.sqrt(TRADING_DAYS)
 
 
 def implied_vol_series(close: pd.Series, ticker: str, vix: pd.Series | None,
-                       spy_close: pd.Series | None) -> tuple[pd.Series, str]:
+                       spy_close: pd.Series | None, exclude=None) -> tuple[pd.Series, str]:
     """ATM implied volatility per day, and a sentence saying how it was estimated."""
-    rv = realized_vol(close)
+    rv = realized_vol(close, exclude=exclude)
     if vix is not None and len(vix):
         v = (vix / 100.0 * VIX_TO_ATM).reindex(close.index).ffill()
         if ticker == 'SPY':
@@ -667,6 +713,102 @@ def dividend_data(ticker: str, lo: str, hi: str) -> tuple:
         return None, None, None
 
 
+_EARN_CACHE: dict = {}              # ticker -> (fetched_at, events)
+_EARN_TTL = 6 * 3600
+EARN_LOOKBACK = 8                   # previous reports averaged for the next one's typical move
+EARN_FALLBACK_DAYS = 3.0            # with no earlier report: a move of 3 ordinary days' volatility
+
+
+def earnings_events(ticker: str) -> list | None:
+    """Past and scheduled earnings reports as [{'date': Timestamp, 'when': 'amc'|'bmo'|None}].
+
+    [] for index ETFs (no earnings); None when no dates could be found. Yahoo gives about
+    25 years with the time of day; where it is blocked (Render), the committed earnings
+    snapshot gives about six years of dates without times.
+    """
+    ticker = ticker.upper()
+    if ticker in INDEX_ETFS:
+        return []
+    hit = _EARN_CACHE.get(ticker)
+    if hit and time.time() - hit[0] < _EARN_TTL:
+        return hit[1]
+    out = None
+    try:
+        import yfinance as yf
+        raw = yf.Ticker(ticker).get_earnings_dates(limit=100)
+        if raw is not None and len(raw):
+            out = []
+            for ts in raw.index:
+                ts = pd.Timestamp(ts)
+                if ts.tzinfo is not None:
+                    ts = ts.tz_convert('America/New_York').tz_localize(None)
+                when = 'amc' if ts.hour >= 16 else ('bmo' if 0 < ts.hour < 10 else None)
+                out.append({'date': ts.normalize(), 'when': when})
+    except Exception as exc:                       # pragma: no cover - network
+        logger.warning('earnings dates unavailable for %s: %s', ticker, exc)
+    if not out:
+        try:
+            import earnings as earn_mod
+            snap = earn_mod._snapshot_frame(ticker)
+            if snap is not None and len(snap):
+                out = [{'date': pd.Timestamp(d).normalize(), 'when': None} for d in snap.index]
+        except Exception as exc:                   # pragma: no cover - defensive
+            logger.warning('earnings snapshot unavailable for %s: %s', ticker, exc)
+            out = None
+    out = sorted(out, key=lambda e: e['date']) if out else None
+    _EARN_CACHE[ticker] = (time.time(), out)
+    return out
+
+
+def reaction_days(close: pd.Series, events: list) -> list:
+    """The trading day on which each report moves the price.
+
+    After the close: the next trading day; before the open: that day; time unknown: the
+    larger move of the two, which is how the report shows up in the prices.
+    """
+    idx = close.index
+    rets = np.log(close).diff()
+    out = set()
+    for e in events or ():
+        j = idx.searchsorted(e['date'])            # first trading day on or after the date
+        if j >= len(idx):
+            continue
+        same_day = idx[j] == e['date']
+        if e['when'] == 'amc':
+            k = j + 1 if same_day else j
+        elif e['when'] == 'bmo':
+            k = j
+        elif same_day and j + 1 < len(idx):
+            k = j if abs(rets.iloc[j]) >= abs(rets.iloc[j + 1]) else j + 1
+        else:
+            k = j
+        if 0 < k < len(idx):
+            out.add(idx[k])
+    return sorted(out)
+
+
+def event_moves(close: pd.Series, days: list, rv: pd.Series) -> dict:
+    """Each report's expected move as a variance: the mean square of the previous reactions.
+
+    Only reports before it count, so a backtest never learns a reaction early. With none
+    yet, it is EARN_FALLBACK_DAYS ordinary days' volatility.
+    """
+    rets = np.log(close).diff()
+    out, past = {}, []
+    for d in days:
+        if past:
+            recent = past[-EARN_LOOKBACK:]
+            var = float(np.mean(np.square(recent)))
+        else:
+            daily = float(rv.get(d, np.nan)) / math.sqrt(TRADING_DAYS)
+            var = (EARN_FALLBACK_DAYS * daily) ** 2 if math.isfinite(daily) else 0.0025
+        out[d] = var
+        r = float(rets.get(d, np.nan))
+        if math.isfinite(r):
+            past.append(r)
+    return out
+
+
 def load_market(ticker: str, start: str, end: str) -> dict:
     """Closes for the ticker (and SPY), the VIX, its term structure and T-bill rates, with a warm-up."""
     # A year and more of warm-up: the 200-day average and a 252-day IV rank need it.
@@ -687,7 +829,7 @@ def load_market(ticker: str, start: str, end: str) -> dict:
     curve = vix_curve(lo, end)
     raw, divs, splits = dividend_data(ticker, lo, end)
     return {'close': close, 'spy': spy, 'vix': vix, 'rate': rate, 'curve': curve,
-            'raw_close': raw, 'dividends': divs, 'splits': splits}
+            'raw_close': raw, 'dividends': divs, 'splits': splits, 'earnings': earnings_events(ticker)}
 
 
 # ── Position mechanics ───────────────────────────────────────────────────────
@@ -905,7 +1047,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         exit_dte: int | None = None, profit_take: float | None = None, stop_loss: float | None = None,
         spread_pct: float | None = None, commission: float = 0.65, stock_slip: float = 0.0003,
         skew: bool = True, market: dict | None = None, entry: dict | None = None,
-        iv_scale: float = 1.0, sizing: str = 'risk', expiries: str = 'weekly') -> dict:
+        iv_scale: float = 1.0, sizing: str = 'risk', expiries: str = 'weekly',
+        exit_earnings: bool = False) -> dict:
     """Backtest `legs` on `ticker` between start and end. See the module docstring."""
     ticker = ticker.upper()
     rules = entry               # `entry` is reused below for the open position
@@ -918,7 +1061,15 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     raw_close, divs = m.get('raw_close'), m.get('dividends')
     use_divs = raw_close is not None and len(raw_close) and divs is not None
     splits = m.get('splits')
-    iv_all, iv_note = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'))
+    # Earnings: each report's reaction day, priced as a separate jump (see event_moves), so the
+    # ordinary volatility is measured without those days.
+    ev_list = m.get('earnings')
+    react = reaction_days(close, ev_list) if ev_list else []
+    iv_all, iv_note = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'), exclude=react or None)
+    ev_var = event_moves(close, react, realized_vol(close, exclude=react)) if react else {}
+    react_d = [d.date() for d in react]
+    react_set = set(react_d)
+    earn_rule = (rules or {}).get('earnings')
     if iv_scale != 1.0:
         iv_all = (iv_all * iv_scale).clip(*IV_CLIP)
     real_curve = m.get('curve')
@@ -980,7 +1131,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                       'open': round(leg['price'], 2), 'close': round(p, 2)} for leg, p in zip(pos, prices)],
             'net_open': round(units * entry['value'], 2), 'net_close': round(units * value, 2),
             'costs': round(cost + entry['cost'], 2), 'dividends': round(entry['divs'], 2), 'pnl': round(pnl, 2),
-            'split': entry.get('split'),
+            'split': entry.get('split'), 'earnings': entry['earnings'],
             'pnl_pct': round(pnl / entry['basis'] * 100, 2) if entry['basis'] else None,
             'attribution': attr,
         })
@@ -1058,6 +1209,11 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         prev_day = day
         real = tuple(cv_arr[i]) if cv_arr is not None else None
         cv = day_curve(iv, real)
+        if react_d:
+            k = bisect.bisect_right(react_d, day)
+            cv = with_events(cv, tuple(((e - day).days, ev_var[pd.Timestamp(e)])
+                                       for e in react_d[k:k + 4] if (e - day).days <= 400))
+        react_next = i + 1 < len(days) and days[i + 1].date() in react_set
         curve_days += real is not None and bool(np.all(np.isfinite(real)))
 
         if split_arr[i] != 1.0:
@@ -1066,6 +1222,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 apply_split(pos, entry, float(split_arr[i]))
         if pos is not None:
             first_exp = min(leg['expiry'] for leg in pos if leg['expiry'])
+            if day in react_set:
+                entry['earnings'] += 1
             if div_arr[i] > 0:            # held at yesterday's close: the stock legs are paid the dividend
                 shares = units * sum(leg['qty'] * CONTRACT for leg in pos if leg['type'] == 'stock')
                 if shares:
@@ -1088,6 +1246,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 close_position(day, S, iv, r, cv, q, f'profit target ({profit_take:g}%)')
             elif stop_loss is not None and pnl <= -stop_loss / 100.0 * ref:
                 close_position(day, S, iv, r, cv, q, f'stop loss ({stop_loss:g}%)')
+            elif exit_earnings and react_next and days[i + 1].date() <= first_exp:
+                close_position(day, S, iv, r, cv, q, 'before earnings')
             elif day == last_day:
                 close_position(day, S, iv, r, cv, q, 'end of test')
             elif i + 1 < len(days) and div_arr[i + 1] > 0 and \
@@ -1096,9 +1256,18 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 assignments += 1
 
         remaining = (last_day - day).days
-        if pos is None and day != last_day and remaining >= max(5, dte // 2) and allow[i]:
+        cand = None
+        if pos is None and day != last_day and remaining >= max(5, dte // 2) and allow[i] and \
+                not (exit_earnings and react_next):
             eq_now = cash
             cand = build_position(legs, day, S, iv, r, dte, ticker, skew, cv, monthly=expiries == 'monthly', q=q)
+            if earn_rule:
+                c_exp = min(leg['expiry'] for leg in cand if leg['expiry'])
+                k = bisect.bisect_right(react_d, day)
+                spans = k < len(react_d) and react_d[k] <= c_exp
+                if spans != (earn_rule == 'only'):
+                    cand = None
+        if pos is None and cand is not None:
             need, unbounded = capital_required(cand, S)
             # 'risk' sizes by each position's worst case; 'notional' holds one unit per 100 shares'
             # worth of the underlying, as Cboe's strategy indices do (used to replicate them).
@@ -1112,7 +1281,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 pos, units = cand, n
                 entry = {'day': day, 'S': S, 'value': open_value, 'cost': cost, 'basis': n * need,
                          'mark': position_marks(cand, day, S, iv, r, skew, cv, q), 'divs': 0.0,
-                         'attr': dict.fromkeys(ATTR_KEYS, 0.0)}
+                         'attr': dict.fromkeys(ATTR_KEYS, 0.0), 'earnings': 0}
                 if first_pos is None:
                     first_pos = {'day': day.isoformat(), 'S': S, 'legs': [dict(leg) for leg in cand],
                                  'need': need,
@@ -1189,6 +1358,24 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         out['strategy']['rules'] = out['strategy']['rules'].replace(
             f'{dte} days to expiry', f'on the monthly (third-Friday) expiry nearest {dte} days out', 1)
         out['strategy']['expiries'] = 'monthly'
+    if 'model' in out:
+        in_window = [d for d in react_d if days[0].date() <= d <= last_day]
+        if react_d and in_window:
+            last_var = ev_var[pd.Timestamp(in_window[-1])]
+            out['model']['earnings'] = (
+                f'{len(in_window)} earnings report{"s" if len(in_window) != 1 else ""} in the window. An option still '
+                f'open on a report day carries the report’s expected move (the root mean square of the previous '
+                f'{EARN_LOOKBACK} reactions; {math.sqrt(last_var) * 100:.1f}% for the latest) as extra variance, which '
+                'drops out once the report is out, as implied volatility collapses after earnings. Ordinary '
+                'volatility is measured without report days.')
+        elif ev_list is None:
+            out['model']['earnings'] = (f'No earnings dates were found for {ticker}, so options are priced without an '
+                                        'earnings premium and report-day moves count as ordinary volatility.')
+        elif ticker in INDEX_ETFS:
+            out['model']['earnings'] = f'{ticker} is an index fund: no earnings reports.'
+        if exit_earnings and 'strategy' in out:
+            out['strategy']['rules'] = out['strategy']['rules'][:-1] + ', or closed the day before an earnings report.'
+            out['strategy']['exit_earnings'] = True
     if iv_scale != 1.0 and 'model' in out:
         out['model']['iv_scale'] = iv_scale
     if 'model' in out:
