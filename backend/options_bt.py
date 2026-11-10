@@ -1140,6 +1140,81 @@ def apply_split(pos: list, entry: dict, ratio: float) -> None:
     entry['split'] = f'{split_words(ratio)} while open: strikes and contracts adjusted'
 
 
+def pricing_context(m: dict, ticker: str) -> dict:
+    """The inputs run() prices options with, as daily series, for pricing outside a backtest.
+
+    Same steps as run(): earnings reaction days left out of realized volatility, the real
+    VIX curve, the T-bill rate, and the trailing dividend yield on actual (unsplit) prices.
+    tools/options_quotes_check.py uses it to price real quoted contracts with the model.
+    """
+    ticker = ticker.upper()
+    close = m['close']
+    raw_close, divs, splits = m.get('raw_close'), m.get('dividends'), m.get('splits')
+    use_divs = raw_close is not None and len(raw_close) and divs is not None
+    ev_list = m.get('earnings')
+    react = reaction_days(close, ev_list) if ev_list else []
+    iv_all, _ = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'), exclude=react or None)
+    ev_var = event_moves(close, react, realized_vol(close, exclude=react)) if react else {}
+    curve = m.get('curve')
+    curve = curve.reindex(close.index).ffill(limit=5) if curve is not None else None
+    rate = m.get('rate')
+    r_all = ((rate / 100.0).reindex(close.index).ffill().bfill() if rate is not None and len(rate)
+             else pd.Series(0.03, index=close.index)).fillna(0.03)
+    px = raw_close.reindex(close.index).ffill() if use_divs else close
+    fac = split_factor(close.index, splits) if use_divs and splits is not None and len(splits) else \
+        pd.Series(1.0, index=close.index)
+    if use_divs:
+        div_adj = divs.groupby(level=0).sum().reindex(close.index, fill_value=0.0) / fac
+        q_all = (div_adj.rolling('365D').sum() / (px / fac)).clip(0.0, 0.2).fillna(0.0)
+    else:
+        q_all = pd.Series(0.0, index=close.index)
+    return {'ticker': ticker, 'px': px, 'iv': iv_all, 'r': r_all, 'q': q_all, 'curve': curve,
+            'react': [d.date() for d in react], 'ev_var': ev_var}
+
+
+def context_at(ctx: dict, day) -> dict | None:
+    """(S, ATM IV, rate, curve with the earnings ahead, dividend yield) on a trading day, or None."""
+    ts = pd.Timestamp(day)
+    if ts not in ctx['px'].index:
+        return None
+    d = ts.date()
+    iv = float(ctx['iv'].get(ts, np.nan))
+    if not math.isfinite(iv):
+        return None
+    real = tuple(ctx['curve'].loc[ts]) if ctx['curve'] is not None else None
+    cv = day_curve(iv, real)
+    react = ctx['react']
+    if react:
+        k = bisect.bisect_right(react, d)
+        cv = with_events(cv, tuple(((e - d).days, ctx['ev_var'][pd.Timestamp(e)])
+                                   for e in react[k:k + 4] if (e - d).days <= 400))
+    return {'S': float(ctx['px'][ts]), 'iv': iv, 'r': float(ctx['r'][ts]), 'q': float(ctx['q'][ts]), 'curve': cv,
+            'next_report': next((e for e in react if e > d), None)}
+
+
+def model_price(kind: str, c: dict, K: float, T: float, skew: bool = True) -> tuple[float, float]:
+    """(price per share, IV) of an option with the model's inputs `c` from context_at."""
+    sig = skewed_iv(c['iv'], c['S'], K, T, skew, c['curve'])
+    return bs_price(kind, c['S'] * math.exp(-c['q'] * T), K, T, c['r'], sig), sig
+
+
+def implied_vol(kind: str, price: float, S: float, K: float, T: float, r: float, q: float = 0.0) -> float | None:
+    """The volatility at which Black-Scholes-Merton gives `price`, by bisection; None if out of range."""
+    if T <= 0 or price <= 0:
+        return None
+    Sq = S * math.exp(-q * T)
+    lo, hi = 0.005, 5.0
+    if not (bs_price(kind, Sq, K, T, r, lo) <= price <= bs_price(kind, Sq, K, T, r, hi)):
+        return None
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        if bs_price(kind, Sq, K, T, r, mid) < price:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
 # ── The backtest ──────────────────────────────────────────────────────────────
 
 def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strategy',

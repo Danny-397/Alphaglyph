@@ -589,6 +589,48 @@ const OB_QUICK = {
 // ── init ───────────────────────────────────────────────────────────────────
 
 // How close the model gets to Cboe's real PutWrite index (tools/options_validation.py).
+// The model priced against real closing quotes archived by Tradeski (tools/options_quotes_check.py).
+async function obLoadQuotes() {
+  let d
+  try {
+    const res = await fetch('/data/options_quotes_check.json', { cache: 'no-cache' })
+    if (!res.ok) return
+    d = await res.json()
+  } catch (e) { return }
+  const o = d.overall
+  if (!o) return
+  const pts = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + ' pts'
+  const nd = d.days.length
+  el('ob-quotes-badge').textContent = `${o.n.toLocaleString('en-US')} real contracts`
+  const etf = d.by_report.find(g => g.label.startsWith('index'))
+  const stk = d.by_report.filter(g => g.label.startsWith('single'))
+  const stkMiss = stk.length ? Math.max(...stk.map(g => g.iv_mae)) : null
+  el('ob-quotes-lede').textContent = `The same model, pricing every out-of-the-money option quoted at the close for
+    ${d.symbols.length} underlyings on ${nd === 1 ? d.days[0] : `${nd} trading days, ${d.days[0]} to ${d.days[nd - 1]}`}, against the
+    midpoint of the real bid and ask. ${etf ? `On the index funds its volatility is typically ${etf.iv_mae.toFixed(1)} points off.` : ''}
+    ${stkMiss != null ? `On single stocks it is typically ${stkMiss.toFixed(1)} points off: a stock's own implied volatility often
+    sits far from what its recent moves suggest, so read single-stock backtests as rougher than SPY's.` : ''}
+    The archive grows every trading day.`
+  el('ob-quotes-stats').innerHTML = [
+    statCard('Model minus market IV', pts(o.iv_bias)),
+    statCard('Typical IV miss', o.iv_mae.toFixed(1) + ' pts'),
+    statCard('Typical price miss', o.price_mae.toFixed(0) + '%'),
+    statCard('Inside the bid/ask', o.inside_spread.toFixed(0) + '%'),
+  ].join('')
+  el('ob-quotes-sym').innerHTML = d.by_symbol.slice().sort((a, b) => b.n - a.n).map(s => `<tr>
+    <td>${obEsc(s.symbol)}${s.note ? ` <span class="text-muted" title="${obEsc(s.note)}">*</span>` : ''}</td>
+    <td>${s.atm ? s.atm.model.toFixed(1) + '%' : '—'}</td><td>${s.atm ? s.atm.market.toFixed(1) + '%' : '—'}</td>
+    <td class="${Math.abs(s.iv_bias) >= 5 ? 'negative' : ''}">${pts(s.iv_bias)}</td><td>${s.iv_mae.toFixed(1)} pts</td>
+    <td>${s.n.toLocaleString('en-US')}</td></tr>`).join('')
+  const grp = [...d.by_moneyness, ...d.by_dte, ...d.by_report]
+  el('ob-quotes-grp').innerHTML = grp.map(g => `<tr><td>${obEsc(g.label)}</td><td>${pts(g.iv_bias)}</td>
+    <td>${g.iv_mae.toFixed(1)} pts</td><td>${fmtPct(g.price_bias, 0)}</td><td>${g.n.toLocaleString('en-US')}</td></tr>`).join('')
+  el('ob-quotes-fine').textContent = `${d.filters} Errors are the model's implied volatility for each strike and expiry minus the
+    one the midpoint implies, with the same rate and dividend yield; out-of-the-money options are cheap, so a small volatility
+    miss is a large share of the price. Quotes: ${d.source}. Updated ${d.generated}.`
+  el('ob-quotes').hidden = false
+}
+
 async function obLoadCheck() {
   let d
   try {
@@ -745,6 +787,7 @@ function obDownload(kind) {
 
 async function initOptionsBacktest() {
   obLoadCheck()
+  obLoadQuotes()
   el('ob-start').value = daysAgo(5 * 365)
   el('ob-end').value = today()
   initTabs(document.body)
