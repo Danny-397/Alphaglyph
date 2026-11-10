@@ -296,7 +296,7 @@ function obRenderResult(r) {
     <td>${fmt$(t.underlying_open)} → ${fmt$(t.underlying_close)}</td>
     <td>${t.net_open >= 0 ? 'paid ' + obMoney0(t.net_open) : 'collected ' + obMoney0(-t.net_open)}</td>
     <td>${obMoney0(t.net_close)}</td><td>${obMoney0(t.costs)}</td>
-    <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}</td></tr>`).join('')
+    <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}${t.split ? `<div class="fine">${t.split}</div>` : ''}</td></tr>`).join('')
     : '<tr><td colspan="10" class="empty-cell">No positions were opened.</td></tr>'
   obRenderWhy(r)
   el('ob-share-msg').textContent = ''
@@ -315,6 +315,7 @@ function obRenderResult(r) {
       ${ck.real.cagr.toFixed(1)}% for the real index; monthly returns correlate at ${ck.monthly_corr.toFixed(2)}. The volatility level was
       fitted on ${obState.check.level.fit_window[0].slice(0, 4)}-${obState.check.level.fit_window[1].slice(0, 4)} only.</p>` : ''}
     ${r.model.dividends ? `<p class="card-desc"><strong>Dividends.</strong> ${r.model.dividends}</p>` : ''}
+    ${r.model.splits ? `<p class="card-desc"><strong>Splits.</strong> ${r.model.splits}</p>` : ''}
     <p class="card-desc"><strong>Costs.</strong> ${r.model.costs}. Stock legs pay 0.03% slippage. Options held to expiry settle at intrinsic value with no spread.</p>
     <p class="card-desc"><strong>Cash.</strong> Cash not tied up earns the Treasury-bill rate. Credit received stays in the account as collateral.</p>
     ${obSensTable(r)}

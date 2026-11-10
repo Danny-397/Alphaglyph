@@ -32,6 +32,10 @@ not traded quotes. Every price comes from Black-Scholes on that day's close:
   ex-date when the dividend is worth more than its remaining time value. Puts
   are treated as European. Without dividend data, prices are dividend-adjusted
   and the yield is zero, and the result says so.
+- splits: options trade the actual price (Tiingo's unadjusted close, or Yahoo's
+  split-adjusted close multiplied back by later splits). On a split's ex-date every
+  open leg is adjusted as the exchange does: strike divided by the ratio, contracts
+  multiplied by it.
 
 Costs are charged on every option and stock trade: a per-contract commission,
 and a bid/ask cost as a share of each option's price (with a one-cent floor).
@@ -573,26 +577,94 @@ def vix_curve(lo: str, hi: str) -> pd.DataFrame | None:
         return None
 
 
+def split_factor(index: pd.DatetimeIndex, splits: pd.Series | None) -> pd.Series:
+    """Per day, the product of every split ratio whose ex-date comes later.
+
+    A split-adjusted price times this factor is the price that actually traded that day
+    (NVDA's split-adjusted $6 in January 2020 times 40 is the $240 it traded at).
+    """
+    f = pd.Series(1.0, index=index)
+    if splits is None or not len(splits):
+        return f
+    for d, ratio in splits.items():
+        if ratio and math.isfinite(ratio) and ratio > 0 and ratio != 1:
+            f[f.index < d] *= float(ratio)
+    return f
+
+
+def _tiingo_actions(ticker: str, lo: str, hi: str) -> tuple | None:
+    """(actual closes, dividends, splits) from Tiingo, which works from datacenter IPs. None if unavailable."""
+    import os
+    token = os.getenv('TIINGO_API_KEY', '').strip()
+    if not token:
+        return None
+    try:
+        import requests
+        resp = requests.get(f'https://api.tiingo.com/tiingo/daily/{ticker}/prices',
+                            params={'startDate': lo, 'endDate': hi, 'token': token, 'format': 'json'},
+                            timeout=15)
+        if resp.status_code != 200:
+            return None
+        return tiingo_frame(resp.json())
+    except Exception as exc:                       # pragma: no cover - network
+        logger.warning('Tiingo actions unavailable for %s: %s', ticker, exc)
+        return None
+
+
+def tiingo_frame(rows: list) -> tuple | None:
+    """Parse Tiingo daily rows: `close` is the unadjusted price, `divCash` and `splitFactor` the actions."""
+    if not rows:
+        return None
+    df = pd.DataFrame(rows)
+    if not {'date', 'close'} <= set(df.columns):
+        return None
+    df.index = pd.to_datetime(df.pop('date'), utc=True).dt.tz_localize(None).dt.normalize()
+    df = df.sort_index()
+    raw = df['close'].astype(float).dropna()
+    dv = df['divCash'].astype(float) if 'divCash' in df else pd.Series(0.0, index=df.index)
+    sp = df['splitFactor'].astype(float) if 'splitFactor' in df else pd.Series(1.0, index=df.index)
+    return raw, dv[dv > 0], sp[(sp > 0) & (sp != 1)]
+
+
 def dividend_data(ticker: str, lo: str, hi: str) -> tuple:
-    """(unadjusted closes, dividends per share by ex-date) from Yahoo, or (None, None)."""
+    """(actual traded closes, dividends per share by ex-date, split ratios by ex-date), or Nones.
+
+    Tiingo first (actual prices and both actions in one call); otherwise Yahoo, whose
+    "unadjusted" closes and dividends are still split-adjusted, so they are multiplied back
+    by the split factor. Trading on split-adjusted prices would put NVDA at $6 in 2020: the
+    wrong strike spacing, a one-cent floor that dwarfs the premium and 40 times the contracts.
+    """
+    t = _tiingo_actions(ticker, lo, hi)
+    if t is not None:
+        return t
     try:
         import yfinance as yf
         df = yf.download(ticker, start=lo, end=hi, progress=False, auto_adjust=False)
         if df is None or df.empty:
-            return None, None
+            return None, None, None
         c = df['Close']
         if isinstance(c, pd.DataFrame):
             c = c.iloc[:, 0]
         c = c.astype(float)
         c.index = pd.to_datetime(c.index).tz_localize(None).normalize()
-        dv = yf.Ticker(ticker).dividends
+        tk = yf.Ticker(ticker)
+        dv = tk.dividends
         dv = dv.astype(float) if dv is not None else pd.Series(dtype=float)
         if len(dv):
             dv.index = pd.to_datetime(dv.index).tz_localize(None).normalize()
-        return c.dropna(), dv[dv > 0]
+        sp = tk.splits
+        sp = sp.astype(float) if sp is not None else pd.Series(dtype=float)
+        if len(sp):
+            sp.index = pd.to_datetime(sp.index).tz_localize(None).normalize()
+        sp = sp[(sp > 0) & (sp != 1)]
+        dv = dv[dv > 0]
+        c = c.dropna() * split_factor(c.dropna().index, sp)
+        if len(dv):
+            dv = dv * split_factor(dv.index, sp)
+        return c, dv, sp
     except Exception as exc:                       # pragma: no cover - network
         logger.warning('dividend data unavailable for %s: %s', ticker, exc)
-        return None, None
+        return None, None, None
 
 
 def load_market(ticker: str, start: str, end: str) -> dict:
@@ -613,9 +685,9 @@ def load_market(ticker: str, start: str, end: str) -> dict:
     vix = _fred('VIXCLS', lo, end)
     rate = _fred('DGS3MO', lo, end)
     curve = vix_curve(lo, end)
-    raw, divs = dividend_data(ticker, lo, end)
+    raw, divs, splits = dividend_data(ticker, lo, end)
     return {'close': close, 'spy': spy, 'vix': vix, 'rate': rate, 'curve': curve,
-            'raw_close': raw, 'dividends': divs}
+            'raw_close': raw, 'dividends': divs, 'splits': splits}
 
 
 # ── Position mechanics ───────────────────────────────────────────────────────
@@ -800,6 +872,32 @@ def trade_cost(pos: list, prices: list, spread_pct: float, commission: float,
     return cost
 
 
+def split_words(ratio: float) -> str:
+    """4.0 -> '4-for-1 split', 0.1 -> '1-for-10 reverse split', 1.5 -> '3-for-2 split'."""
+    from fractions import Fraction
+    fr = Fraction(ratio).limit_denominator(20)
+    kind = 'reverse split' if ratio < 1 else 'split'
+    return f'{fr.numerator}-for-{fr.denominator} {kind}'
+
+
+def apply_split(pos: list, entry: dict, ratio: float) -> None:
+    """Adjust an open position for a split: strikes and prices / ratio, contracts and shares x ratio.
+
+    The position's value is unchanged; the last mark is rescaled the same way, so the
+    next day's P&L attribution compares like with like.
+    """
+    for leg in pos:
+        leg['qty'] = leg['qty'] * ratio
+        leg['price'] = leg['price'] / ratio
+        if leg['type'] != 'stock':
+            leg['strike'] = leg['strike'] / ratio
+    mk = entry['mark']
+    mk['S'] = mk['S'] / ratio
+    mk['delta'] = mk['delta'] * ratio
+    mk['gamma'] = mk['gamma'] * ratio * ratio
+    entry['split'] = f'{split_words(ratio)} while open: strikes and contracts adjusted'
+
+
 # ── The backtest ──────────────────────────────────────────────────────────────
 
 def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strategy',
@@ -819,6 +917,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     close = m['close']                    # dividend-adjusted: the buy-and-hold benchmark (total return)
     raw_close, divs = m.get('raw_close'), m.get('dividends')
     use_divs = raw_close is not None and len(raw_close) and divs is not None
+    splits = m.get('splits')
     iv_all, iv_note = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'))
     if iv_scale != 1.0:
         iv_all = (iv_all * iv_scale).clip(*IV_CLIP)
@@ -875,11 +974,13 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         trades.append({
             'opened': entry['day'].isoformat(), 'closed': day.isoformat(), 'reason': reason,
             'units': units, 'underlying_open': round(entry['S'], 2), 'underlying_close': round(S, 2),
-            'legs': [{'side': leg['side'], 'type': leg['type'], 'qty': leg['qty'] * units,
-                      'strike': leg['strike'], 'expiry': leg['expiry'].isoformat() if leg['expiry'] else None,
+            'legs': [{'side': leg['side'], 'type': leg['type'], 'qty': round(leg['qty'] * units, 4),
+                      'strike': None if leg['strike'] is None else round(leg['strike'], 2),
+                      'expiry': leg['expiry'].isoformat() if leg['expiry'] else None,
                       'open': round(leg['price'], 2), 'close': round(p, 2)} for leg, p in zip(pos, prices)],
             'net_open': round(units * entry['value'], 2), 'net_close': round(units * value, 2),
             'costs': round(cost + entry['cost'], 2), 'dividends': round(entry['divs'], 2), 'pnl': round(pnl, 2),
+            'split': entry.get('split'),
             'pnl_pct': round(pnl / entry['basis'] * 100, 2) if entry['basis'] else None,
             'attribution': attr,
         })
@@ -894,14 +995,28 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         use_divs = False
         px = close
         S_arr = close.reindex(days).to_numpy(dtype=float)
+    # Splits: options trade the actual price, so on an ex-date every open leg is adjusted as the
+    # exchange does (strike divided by the ratio, contracts multiplied). Yields and the trend
+    # rule use split-adjusted prices, which have no jump.
+    split_arr = np.ones(len(days))
+    fac = pd.Series(1.0, index=close.index)
+    if use_divs and splits is not None and len(splits):
+        fac = split_factor(close.index, splits)
+        for d, ratio in splits.groupby(level=0).prod().items():
+            j = days.searchsorted(d)
+            if 0 < j < len(days):
+                split_arr[j] *= float(ratio)
     if use_divs:
         div_on = divs.groupby(level=0).sum()
         div_arr = div_on.reindex(days).fillna(0.0).to_numpy(dtype=float)
-        trailing = div_on.reindex(close.index, fill_value=0.0).rolling('365D').sum()
-        q_arr = np.clip((trailing.reindex(days).to_numpy(dtype=float) / S_arr), 0.0, 0.2)
+        div_adj = div_on.reindex(close.index, fill_value=0.0) / fac
+        trailing = div_adj.rolling('365D').sum()
+        S_adj = S_arr / fac.reindex(days).to_numpy(dtype=float)
+        q_arr = np.clip((trailing.reindex(days).to_numpy(dtype=float) / S_adj), 0.0, 0.2)
     else:
         div_arr = np.zeros(len(days))
         q_arr = np.zeros(len(days))
+    splits_applied = []
     iv_arr = iv_all.reindex(days).to_numpy(dtype=float)
     r_arr = r_all.reindex(days).fillna(0.03).to_numpy(dtype=float)
     iv_fill = float(iv_all.dropna().iloc[0]) if iv_all.notna().any() else 0.25
@@ -923,9 +1038,11 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                 allow &= ivr_arr <= rules.get('ivr_max', np.inf)
         if rules.get('trend'):
             # On the same prices as S (unadjusted when dividends are on), or the comparison is skewed.
-            sma = px.rolling(TREND_DAYS, min_periods=TREND_DAYS).mean().reindex(days).to_numpy(dtype=float)
+            tp = px / fac
+            sma = tp.rolling(TREND_DAYS, min_periods=TREND_DAYS).mean().reindex(days).to_numpy(dtype=float)
+            tp_arr = tp.reindex(days).to_numpy(dtype=float)
             with np.errstate(invalid='ignore'):
-                allow &= (S_arr > sma) if rules['trend'] == 'above' else (S_arr < sma)
+                allow &= (tp_arr > sma) if rules['trend'] == 'above' else (tp_arr < sma)
     for i, ts in enumerate(days):
         day = ts.date()
         S = float(S_arr[i])
@@ -943,6 +1060,10 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         cv = day_curve(iv, real)
         curve_days += real is not None and bool(np.all(np.isfinite(real)))
 
+        if split_arr[i] != 1.0:
+            splits_applied.append(f'{day.isoformat()} ({split_words(split_arr[i])})')
+            if pos is not None:
+                apply_split(pos, entry, float(split_arr[i]))
         if pos is not None:
             first_exp = min(leg['expiry'] for leg in pos if leg['expiry'])
             if div_arr[i] > 0:            # held at yesterday's close: the stock legs are paid the dividend
@@ -993,7 +1114,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                          'mark': position_marks(cand, day, S, iv, r, skew, cv, q), 'divs': 0.0,
                          'attr': dict.fromkeys(ATTR_KEYS, 0.0)}
                 if first_pos is None:
-                    first_pos = {'day': day.isoformat(), 'S': S, 'legs': cand, 'need': need,
+                    first_pos = {'day': day.isoformat(), 'S': S, 'legs': [dict(leg) for leg in cand],
+                                 'need': need,
                                  'unbounded': unbounded, 'units': n}
             elif not notes:
                 notes.append(f'On {day.isoformat()} one unit needed ${need:,.0f} of capital, more than '
@@ -1053,6 +1175,16 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             out['model']['dividends'] = ('Dividend data was unavailable: prices are dividend-adjusted and the '
                                          'dividend yield is zero.')
         out['metrics']['early_assignments'] = assignments
+        if not use_divs:
+            out['model']['splits'] = ('Actual traded prices were unavailable, so prices are split-adjusted: for a '
+                                      'stock that split, strike spacing, contract counts and the one-cent cost '
+                                      'floor are approximate.')
+        elif splits_applied:
+            out['model']['splits'] = ('Traded at actual prices. Splits on ' + ', '.join(splits_applied) +
+                                      ' adjusted any open position as the exchange does: strikes divided by '
+                                      'the ratio, contracts multiplied by it.')
+        else:
+            out['model']['splits'] = 'Traded at actual prices; no splits in the window.'
     if expiries == 'monthly' and 'strategy' in out:
         out['strategy']['rules'] = out['strategy']['rules'].replace(
             f'{dte} days to expiry', f'on the monthly (third-Friday) expiry nearest {dte} days out', 1)
