@@ -245,7 +245,8 @@ visitors' predictions, but on Render's free tier it resets on every redeploy.
 ### Options strategy backtester
 A separate **Options** page backtests option strategies day by day on an underlying's real
 history ([`options_bt.py`](backend/options_bt.py)): it opens the position, marks every leg
-to market each day, applies the exit rules, and rolls into the next position.
+to market each day, applies the exit rules, and rolls into the next position, or staggers
+several at once.
 
 - **One to six legs.** 19 presets plus the wheel: long and short calls and puts, covered calls, protective
   puts, vertical spreads, straddles, strangles, a calendar, collars, butterflies, iron
@@ -263,9 +264,10 @@ to market each day, applies the exit rules, and rolls into the next position.
   exposures, and the remainder is shown as "other", so the parts add up to the P&L exactly.
   Every trade lists its biggest driver, and a chart shows delta, theta and vega over time.
   On SPY, 57% of the cash-secured put's profit was the T-bill interest on its collateral.
-- **Asks whether the edge is real.** The leaderboard deflates every Sharpe for the 19
+- **Asks whether the edge is real.** The leaderboard ranks by Sharpe, shows each strategy's
+  worst month and the share of the account it ties up, and deflates every Sharpe for the 20
   strategies tried (on SPY the best Sharpe, the iron butterfly's, has a PSR of 91% alone but
-  a Deflated Sharpe of 30%: nothing passes). A robustness test reruns one strategy with 20 settings
+  a Deflated Sharpe of 29%: nothing passes). A robustness test reruns one strategy with 20 settings
   (days to expiry × exit rule), runs CSCV on them for the probability of backtest
   overfitting, and deflates the best setting's Sharpe for the 20 tries. It also reruns your
   settings from five start dates a week apart: an SPY iron condor ranges from −13.7% to
@@ -274,12 +276,24 @@ to market each day, applies the exit rules, and rolls into the next position.
   link reruns the exact backtest; trades (with each one's P&L split by Greek) and daily
   values download as CSV, with spreadsheet formulas neutralised.
 - **Entry rules.** Open new positions only when the VIX, the underlying's IV rank, or its
-  trend versus the 200-day average passes a rule; open positions are never closed by them.
+  trend versus the 200-day average passes a rule, or only when a position would (or would
+  not) hold through an earnings report; open positions are never closed by them.
+- **The wheel.** Sell puts until one is assigned, take the shares, sell calls on them until
+  they are called away, and start again. On SPY over 2018-2024 it returned +7.7% a year against
+  +5.2% for the cash-secured put alone, with the same drawdown.
+- **Staggered positions and rolls.** Open a new position every N days alongside the ones still
+  open (a ladder), and close or roll a position when a short option's delta reaches a level.
+- **Single stocks priced for what they are.** Options trade the actual price (not
+  split-adjusted: NVDA was $240 in January 2020, not $6) and open positions are adjusted on a
+  split's ex-date as the exchange does. Earnings reports add their expected move to any option
+  that holds through one, and it drops out after the report (the volatility crush); dates and
+  report times for 105 optionable stocks are saved in the repo for when Yahoo is blocked.
 - **Shows how much of a result is the model.** Every backtest is rerun with implied
   volatility 10% lower and higher and without the skew. The spread is large (an SPY iron
   condor goes from −14.2% to +6.2% a year), so results are shown as a range.
 - **Exit rules and costs:** hold to expiry or close N days before, profit targets and stop
-  losses; $0.65 a contract plus a bid/ask cost per side (1% on index ETFs, 3% on single
+  losses, a short-delta exit, closing the day before earnings (one click sets the common 45-day,
+  close-at-21-days-or-50% routine); $0.65 a contract plus a bid/ask cost per side (1% on index ETFs, 3% on single
   stocks by default). Cash earns the T-bill rate; sizing is by each position's worst case.
   Expiries are the Friday nearest the chosen days (weeklies) or the third-Friday monthlies.
   Dividends are paid to stock legs and priced into options; short calls are assigned early
@@ -292,18 +306,19 @@ to market each day, applies the exit rules, and rolls into the next position.
   every result.
 
 On SPY over five years (2021-11-08 → 2026-11-06, 30 days to expiry, default settings),
-none of the 19 beat buying and holding on return, which is what a strong bull market does
+none of the 20 beat buying and holding on return, which is what a strong bull market does
 to option overlays. The cash-secured put cut the drawdown most; the long call, iron condor and long straddle lost money:
 
-| Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
-|---|---:|---:|---:|---:|
-| Buy and hold SPY | +67.1% | +10.9% | 0.45 | −24.5% |
-| Cash-secured put (1) | +41.7% | +7.3% | 0.46 | −9.5% |
-| Covered call (2) | +29.4% | +5.3% | 0.16 | −19.4% |
-| Protective collar (3) | +23.7% | +4.4% | 0.08 | −21.3% |
-| Long call (1) | −6.7% | −1.4% | 0.06 | −50.5% |
-| Iron condor (4) | −41.5% | −10.2% | −0.74 | −53.9% |
-| Long straddle (2) | −43.3% | −10.8% | −0.47 | −48.7% |
+| Strategy (legs) | Return | CAGR | Sharpe | Max drawdown | Capital at risk |
+|---|---:|---:|---:|---:|---:|
+| Buy and hold SPY | +67.7% | +10.9% | 0.46 | −24.5% | 100% |
+| The wheel (cycle) | +50.8% | +8.6% | 0.48 | −12.5% | 87% |
+| Cash-secured put (1) | +41.8% | +7.3% | 0.46 | −9.5% | 77% |
+| Covered call (2) | +29.7% | +5.4% | 0.16 | −19.4% | 81% |
+| Protective collar (3) | +23.7% | +4.4% | 0.08 | −21.3% | 74% |
+| Long call (1) | −6.7% | −1.4% | 0.06 | −50.5% | 9% |
+| Iron condor (4) | −41.2% | −10.1% | −0.73 | −53.9% | 9% |
+| Long straddle (2) | −43.3% | −10.8% | −0.47 | −48.7% | 9% |
 
 **How close are the model prices to real ones?** Cboe publishes the real returns of option
 strategies as indices. [`tools/options_validation.py`](tools/options_validation.py) runs six

@@ -412,9 +412,11 @@ price-only network, is unchanged.
 ## 9. Options strategy backtests
 
 The options backtester extends the same question, whether an edge is real, to option
-strategies. It holds one position at a time on one underlying: it opens the legs, marks
-them to market at every close, closes on the first of expiry, a days-before-expiry rule,
-a profit target or a stop loss, and opens the next position the same day. Units are sized
+strategies. By default it holds one position at a time on one underlying: it opens the
+legs, marks them to market at every close, closes on the first of expiry, a
+days-before-expiry rule, a profit target, a stop loss, a short-delta level or the eve of an
+earnings report, and opens the next position the same day. It can also open a new position
+every N days alongside those still open, or run the wheel (§9.6). Units are sized
 so that each position's worst case at expiry (or, for uncovered short calls, the loss on a
 30% rally) uses at most a set share of the account. Idle cash earns the 3-month T-bill.
 Expiries are the Friday nearest the chosen days to expiry by default (weekly options), or
@@ -451,6 +453,28 @@ when real holders exercise. The buy-and-hold benchmark stays on total-return pri
 are treated as European. An earlier version priced options on dividend-adjusted prices with
 no yield, which lets calls finish in the money too often, since adjusted prices grow at the
 total return.
+
+**Splits.** Options trade the price that actually traded: Tiingo's unadjusted close, or
+Yahoo's close multiplied back by every later split (Yahoo's "unadjusted" close is still
+split-adjusted). On a split's ex-date every open leg is adjusted as the exchange adjusts
+listed options: the strike divided by the ratio, the contracts multiplied by it. The first
+version traded split-adjusted prices, which put NVDA at $6 in January 2020 instead of $240:
+strikes on the wrong grid (a "30-delta" put came out 8% out of the money), a one-cent cost
+floor that dwarfed the premium, and 183 contracts instead of 4. Fixing it alone moved a
+2020-2024 NVDA cash-secured put from +465% to +420% and its costs from $24k to $18k.
+
+**Earnings.** For single stocks the first version took implied volatility from the last 21
+days of realized volatility, which makes options cheap before a report and rich for a month
+after it, when the report-day jump sits in the window: the opposite of real chains. Now each
+report's reaction day is found (after the close: the next day; before the open: that day),
+ordinary volatility is measured without those days, and an option still open on a reaction
+day carries the report's expected move as extra variance, σ² + E²/T, where E² is the mean
+square of the previous eight reactions, so no reaction is known early. After the report it
+drops out, which is the crush; the P&L split shows it as vega. An at-the-money 30-day AAPL
+option goes from 25.0% to 28.7% the day before a report and back to 25.0% the day after.
+Dates and report times come from Yahoo, or, where Yahoo is blocked (the server, GitHub's
+runners), from a file of 105 optionable stocks back to about 2002, refreshed from a home
+connection.
 
 Calendars depend most on shapes no index checks (the term structure between two
 maturities, at moving strikes), so they are the least reliable results: the SPY calendar
@@ -513,20 +537,21 @@ these figures only; the repository commits the derived results, not the files.
 On SPY over 2021-11-08 → 2026-11-06 (30 days to expiry, weekly expiries, default sizing
 and costs):
 
-| Strategy (legs) | Return | CAGR | Sharpe | Max drawdown |
-|---|---:|---:|---:|---:|
-| Buy and hold SPY | +67.1% | +10.9% | 0.45 | −24.5% |
-| Cash-secured put (1) | +41.7% | +7.3% | 0.46 | −9.5% |
-| Covered call (2) | +29.4% | +5.3% | 0.16 | −19.4% |
-| Protective collar (3) | +23.7% | +4.4% | 0.08 | −21.3% |
-| Long call (1) | −6.7% | −1.4% | 0.06 | −50.5% |
-| Iron condor (4) | −41.5% | −10.2% | −0.74 | −53.9% |
-| Long straddle (2) | −43.3% | −10.8% | −0.47 | −48.7% |
+| Strategy (legs) | Return | CAGR | Sharpe | Max drawdown | Capital at risk |
+|---|---:|---:|---:|---:|---:|
+| Buy and hold SPY | +67.7% | +10.9% | 0.46 | −24.5% | 100% |
+| The wheel (cycle) | +50.8% | +8.6% | 0.48 | −12.5% | 87% |
+| Cash-secured put (1) | +41.8% | +7.3% | 0.46 | −9.5% | 77% |
+| Covered call (2) | +29.7% | +5.4% | 0.16 | −19.4% | 81% |
+| Protective collar (3) | +23.7% | +4.4% | 0.08 | −21.3% | 74% |
+| Long call (1) | −6.7% | −1.4% | 0.06 | −50.5% | 9% |
+| Iron condor (4) | −41.2% | −10.1% | −0.73 | −53.9% | 9% |
+| Long straddle (2) | −43.3% | −10.8% | −0.47 | −48.7% | 9% |
 
 On this window the covered call's stock legs were paid $5.8k in dividends and one short
 call was assigned early. Handling dividends properly moved results more than the yield
 alone would suggest: the covered call from +8.3% to +5.3% a year and the iron
-condor from +1.7% to −10.2%. Most of that is not the dividend; it is the schedule. One early
+condor from +1.7% to −10.1%. Most of that is not the dividend; it is the schedule. One early
 assignment, in June 2023, closed the condor at a loss and moved every later roll by a week,
 and §9.4 shows how much a week's shift alone does.
 
@@ -571,11 +596,11 @@ paid $235.1k, and time decay took $257.3k.
 The options lab is a new way to fool oneself, and the tools of §3 and §4 apply to it
 directly. They run on the options backtester's daily excess returns.
 
-**The leaderboard is 19 tries.** "Compare all strategies" runs every preset and ranks
-them, which is a selection from 19. On the SPY window, the luckiest of 19 strategies with no
-edge would show a Sharpe near 0.84 by chance. The best row, the iron butterfly with a
-Sharpe of 0.61 and a PSR of 91% on its own, has a Deflated Sharpe of 30% once judged as
-the best of 19. No row comes near 95%, and the leaderboard shows the deflated figure next to
+**The leaderboard is 20 tries.** "Compare all strategies" runs every preset and ranks
+them, which is a selection from 20. On the SPY window, the luckiest of 20 strategies with no
+edge would show a Sharpe near 0.85 by chance. The best row, the iron butterfly with a
+Sharpe of 0.61 and a PSR of 91% on its own, has a Deflated Sharpe of 29% once judged as
+the best of 20. No row comes near 95%, and the leaderboard shows the deflated figure next to
 each Sharpe.
 
 **Settings are tries too.** Options traders tune days to expiry and exit rules. The
@@ -657,6 +682,59 @@ which is an error of a few percent in volatility, well inside 10%. The skew colu
 why the skew fit mattered: without a skew, the covered call and the condor look far better
 than with it. Each result shows the range next to its headline, flagged when it spans five
 points or more.
+
+### 9.6 The wheel, staggered positions and earnings
+
+**The wheel.** Sell a 0.30-delta put; if it expires in the money, the shares are bought at the
+strike and a 0.30-delta call is sold on them every cycle until they are called away, and then
+puts start again. Shares carried from one call to the next change hands without a trade, so
+without slippage; dividends and early assignment before ex-dates apply. Entry and earnings
+rules gate the puts; once assigned, a call is always sold. With default settings:
+
+| 30 days to expiry | The wheel | Cash-secured put | Buy and hold |
+|---|---:|---:|---:|
+| SPY 2018-2024: CAGR, Sharpe, max drawdown | +7.7%, 0.50, −22.2% | +5.2%, 0.33, −22.1% | +13.7%, 0.63, −33.7% |
+| AAPL 2019-2024 | +19.0%, 0.94, −20.5% | +18.9%, 1.32, −13.9% | +37.4%, 1.10, −31.4% |
+| NVDA 2020-2024 | +30.1%, 1.05, −48.7% | +38.5%, 1.51, −24.1% | +87.5%, 1.39, −66.3% |
+
+On SPY the wheel was assigned 12 times and called away 12 times, and holding the shares
+between paid. On the two stocks that rose fastest it did the opposite: the shares were
+called away below where the stock went, and the puts alone had the better Sharpe. Neither
+came near holding the stock.
+
+**Staggered positions.** One iron condor at a time can make a whole backtest hinge on a few
+roll dates (§9.4). Opening a new one every week, each with a smaller share, keeps about the
+same capital at risk but spreads the dates. SPY 2018-2024, 45 days to expiry, closed at 21
+days or 50% profit:
+
+| Iron condor | CAGR | Sharpe | Max drawdown | Capital at risk | Positions |
+|---|---:|---:|---:|---:|---:|
+| One at a time, 10% each | −9.9% | −1.17 | −55.1% | 9.4% | 128 |
+| A new one each week, 3% each (up to 4 open) | −3.0% | −0.67 | −25.7% | 7.9% | 361 |
+| A new one each week, 10% each | −16.6% | −0.60 | −75.5% | 28.1% | 361 |
+
+The ladder halved the drawdown at the same capital at risk; at the same share per position
+it simply tripled the exposure. Still, none of them made money.
+
+**Closing on delta.** Closing a short strangle once a short option's delta reached 0.50, 0.40
+or 0.30, and opening a fresh one the same day (a roll), lowered the SPY return from +3.7% a
+year to +1.6-2.0% and the Sharpe from 0.32 to below zero: it sold the losers at their worst
+and paid the spread again.
+
+**Earnings.** An AAPL short strangle over 2019-2024 (30 days, 50% of the account):
+
+| Earnings rule | CAGR | Sharpe | Max drawdown | Positions |
+|---|---:|---:|---:|---:|
+| Hold through reports | +3.3% | 0.17 | −7.8% | 77 |
+| Skip positions that would hold through one | +1.8% | −0.12 | −10.0% | 68 |
+| Close the day before a report | +1.7% | −0.13 | −10.3% | 92 |
+| Only positions that hold through one | +3.2% | 0.22 | −6.5% | 24 |
+| (before earnings were modelled) | +2.8% | 0.08 | −7.3% | 77 |
+
+Avoiding reports cost more than it saved here, but this is the model's assumption showing,
+not a finding: each report is priced at the size of the stock's past reactions, so on
+average it is fair, and the result turns on whether real chains price reports richer than
+that, which free data cannot check.
 
 ---
 
