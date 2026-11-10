@@ -139,3 +139,11 @@ def test_clean_entry_accepts_the_earnings_rule():
     assert ob.clean_entry({'earnings': 'any'}) is None
     with pytest.raises(ValueError):
         ob.clean_entry({'earnings': 'sometimes'})
+
+
+def test_the_saved_file_covers_popular_names_with_times():
+    ev = ob.earnings_events('AAPL')
+    assert ev and len(ev) >= 40
+    assert ev[0]['date'] < pd.Timestamp('2010-01-01')
+    assert sum(e['when'] == 'amc' for e in ev) > len(ev) / 2      # Apple reports after the close
+    assert ev == sorted(ev, key=lambda e: e['date'])
