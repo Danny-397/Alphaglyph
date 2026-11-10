@@ -73,8 +73,7 @@ def test_vix_curve_is_built_from_ratios_and_drops_bad_prints(monkeypatch):
     idx = pd.bdate_range('2024-01-02', periods=5)
     data = {'^VIX': [20, 20, 20, 20, 20], '^VIX9D': [18, 18, 18, 18, 90],
             '^VIX3M': [22, 22, 22, 22, 22], '^VIX6M': [24, 24, 24, 24, 24]}
-    monkeypatch.setattr(ob.feat, 'fetch_ohlcv',
-                        lambda sym, start=None, end=None: pd.DataFrame({'Close': data[sym]}, index=idx))
+    monkeypatch.setattr(ob, 'cboe_closes', lambda name: pd.Series(data['^' + name], index=idx, dtype=float))
     cv = ob.vix_curve('2024-01-01', '2024-01-10')
     assert cv[93].tolist() == pytest.approx([1.1] * 5)
     assert cv[9].iloc[0] == pytest.approx(0.9)
