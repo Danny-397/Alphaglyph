@@ -2,7 +2,8 @@
  "generated": "2026-11-10",
  "source": "Tradeski data/options-archive (closing chains saved after each US close)",
  "days": [
-  "2026-11-06"
+  "2026-11-06",
+  "2026-11-09"
  ],
  "symbols": [
   "AAPL",
@@ -19,308 +20,308 @@
   "TSLA"
  ],
  "overall": {
-  "n": 3467,
-  "iv_bias": 1.77,
-  "iv_mae": 4.21,
-  "price_bias": 16.5,
-  "price_mae": 37.0,
-  "inside_spread": 3.3
+  "n": 7732,
+  "iv_bias": 3.3,
+  "iv_mae": 5.16,
+  "price_bias": 34.2,
+  "price_mae": 50.8,
+  "inside_spread": 3.6
  },
  "by_moneyness": [
   {
    "label": "puts, at the money (40-60 delta)",
-   "n": 155,
-   "iv_bias": 3.65,
-   "iv_mae": 5.83,
-   "price_bias": 16.4,
-   "price_mae": 16.8,
-   "inside_spread": 0.0
+   "n": 355,
+   "iv_bias": 5.82,
+   "iv_mae": 6.44,
+   "price_bias": 23.0,
+   "price_mae": 24.2,
+   "inside_spread": 2.5
   },
   {
    "label": "calls, at the money (40-60 delta)",
-   "n": 288,
-   "iv_bias": 1.69,
-   "iv_mae": 6.15,
-   "price_bias": 9.5,
-   "price_mae": 19.0,
-   "inside_spread": 3.8
+   "n": 583,
+   "iv_bias": 3.4,
+   "iv_mae": 7.15,
+   "price_bias": 17.9,
+   "price_mae": 24.5,
+   "inside_spread": 4.6
   },
   {
    "label": "puts, 15-40 delta",
-   "n": 685,
-   "iv_bias": 2.07,
-   "iv_mae": 4.72,
-   "price_bias": 14.2,
-   "price_mae": 23.1,
-   "inside_spread": 1.6
+   "n": 1497,
+   "iv_bias": 5.33,
+   "iv_mae": 5.85,
+   "price_bias": 35.4,
+   "price_mae": 37.7,
+   "inside_spread": 2.4
   },
   {
    "label": "calls, 15-40 delta",
-   "n": 642,
-   "iv_bias": 1.53,
-   "iv_mae": 4.67,
-   "price_bias": 12.5,
-   "price_mae": 31.5,
-   "inside_spread": 6.1
+   "n": 1312,
+   "iv_bias": 1.76,
+   "iv_mae": 5.82,
+   "price_bias": 16.9,
+   "price_mae": 41.6,
+   "inside_spread": 5.0
   },
   {
    "label": "puts, under 15 delta",
-   "n": 736,
-   "iv_bias": -0.65,
-   "iv_mae": 4.76,
-   "price_bias": -6.5,
-   "price_mae": 41.9,
-   "inside_spread": 4.1
+   "n": 2143,
+   "iv_bias": 4.26,
+   "iv_mae": 5.35,
+   "price_bias": 61.4,
+   "price_mae": 67.3,
+   "inside_spread": 3.9
   },
   {
    "label": "calls, under 15 delta",
-   "n": 961,
-   "iv_bias": 2.39,
-   "iv_mae": 3.24,
-   "price_bias": 69.2,
-   "price_mae": 89.8,
-   "inside_spread": 2.3
+   "n": 1842,
+   "iv_bias": 2.4,
+   "iv_mae": 3.88,
+   "price_bias": 64.6,
+   "price_mae": 92.7,
+   "inside_spread": 3.2
   }
  ],
  "by_dte": [
   {
    "label": "2-10 days",
-   "n": 900,
-   "iv_bias": 1.01,
-   "iv_mae": 4.8,
-   "price_bias": 7.7,
-   "price_mae": 36.7,
-   "inside_spread": 4.0
+   "n": 3181,
+   "iv_bias": 3.83,
+   "iv_mae": 5.79,
+   "price_bias": 42.4,
+   "price_mae": 60.0,
+   "inside_spread": 4.2
   },
   {
    "label": "11-35 days",
-   "n": 2103,
-   "iv_bias": 2.06,
-   "iv_mae": 3.91,
-   "price_bias": 22.4,
-   "price_mae": 38.1,
-   "inside_spread": 3.0
+   "n": 3587,
+   "iv_bias": 2.85,
+   "iv_mae": 4.54,
+   "price_bias": 30.7,
+   "price_mae": 48.3,
+   "inside_spread": 3.1
   },
   {
    "label": "36-75 days",
-   "n": 464,
-   "iv_bias": 0.64,
-   "iv_mae": 5.71,
-   "price_bias": 4.1,
-   "price_mae": 34.2,
-   "inside_spread": 2.8
+   "n": 964,
+   "iv_bias": 3.06,
+   "iv_mae": 6.15,
+   "price_bias": 20.6,
+   "price_mae": 37.6,
+   "inside_spread": 3.6
   }
  ],
  "by_report": [
   {
    "label": "single stocks, expiring before the next report",
-   "n": 1994,
-   "iv_bias": 0.81,
-   "iv_mae": 6.93,
-   "price_bias": 4.9,
-   "price_mae": 37.8,
-   "inside_spread": 3.7
+   "n": 4330,
+   "iv_bias": 1.63,
+   "iv_mae": 7.35,
+   "price_bias": 11.3,
+   "price_mae": 42.4,
+   "inside_spread": 5.3
   },
   {
    "label": "index ETFs (no reports)",
-   "n": 1473,
-   "iv_bias": 2.03,
-   "iv_mae": 2.58,
-   "price_bias": 24.4,
-   "price_mae": 34.5,
-   "inside_spread": 2.6
+   "n": 3402,
+   "iv_bias": 3.97,
+   "iv_mae": 4.28,
+   "price_bias": 60.7,
+   "price_mae": 64.2,
+   "inside_spread": 1.4
   }
  ],
  "by_symbol": [
   {
    "symbol": "AAPL",
-   "n": 220,
-   "iv_bias": -0.16,
-   "iv_mae": 1.4,
-   "price_bias": -1.0,
-   "price_mae": 15.6,
-   "inside_spread": 14.1,
+   "n": 424,
+   "iv_bias": 0.4,
+   "iv_mae": 1.67,
+   "price_bias": 2.8,
+   "price_mae": 17.5,
+   "inside_spread": 16.0,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 27.8,
-    "market": 26.2
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 26.1,
+    "market": 23.0
    },
    "note": null
   },
   {
    "symbol": "AMZN",
-   "n": 194,
-   "iv_bias": 10.86,
-   "iv_mae": 10.86,
-   "price_bias": 49.0,
-   "price_mae": 50.2,
-   "inside_spread": 1.5,
+   "n": 383,
+   "iv_bias": 9.2,
+   "iv_mae": 9.3,
+   "price_bias": 46.0,
+   "price_mae": 48.9,
+   "inside_spread": 4.2,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 46.3,
-    "market": 35.4
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 43.3,
+    "market": 32.7
    },
    "note": null
   },
   {
    "symbol": "GOOGL",
-   "n": 174,
-   "iv_bias": -7.28,
-   "iv_mae": 7.28,
-   "price_bias": -38.8,
-   "price_mae": 38.8,
-   "inside_spread": 1.1,
+   "n": 381,
+   "iv_bias": -8.88,
+   "iv_mae": 8.88,
+   "price_bias": -46.2,
+   "price_mae": 46.2,
+   "inside_spread": 1.3,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 27.1,
-    "market": 33.8
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 24.5,
+    "market": 32.7
    },
    "note": null
   },
   {
    "symbol": "JPM",
-   "n": 104,
-   "iv_bias": 2.82,
-   "iv_mae": 2.82,
-   "price_bias": 17.5,
-   "price_mae": 23.9,
-   "inside_spread": 22.1,
+   "n": 216,
+   "iv_bias": 3.42,
+   "iv_mae": 3.5,
+   "price_bias": 22.7,
+   "price_mae": 26.8,
+   "inside_spread": 16.2,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 29.1,
-    "market": 26.6
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 28.5,
+    "market": 24.4
    },
    "note": null
   },
   {
    "symbol": "META",
-   "n": 413,
-   "iv_bias": -6.08,
-   "iv_mae": 6.08,
-   "price_bias": -26.3,
-   "price_mae": 27.9,
-   "inside_spread": 0.0,
+   "n": 935,
+   "iv_bias": -4.63,
+   "iv_mae": 4.88,
+   "price_bias": -17.7,
+   "price_mae": 29.4,
+   "inside_spread": 6.7,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 36.0,
-    "market": 42.2
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 38.9,
+    "market": 39.3
    },
    "note": null
   },
   {
    "symbol": "MSFT",
-   "n": 321,
-   "iv_bias": 9.22,
-   "iv_mae": 9.22,
-   "price_bias": 68.6,
-   "price_mae": 68.6,
-   "inside_spread": 0.0,
+   "n": 648,
+   "iv_bias": 9.66,
+   "iv_mae": 9.66,
+   "price_bias": 76.8,
+   "price_mae": 76.8,
+   "inside_spread": 1.2,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 40.2,
-    "market": 30.0
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 37.3,
+    "market": 26.0
    },
    "note": null
   },
   {
    "symbol": "NVDA",
-   "n": 196,
-   "iv_bias": -6.08,
-   "iv_mae": 6.61,
-   "price_bias": -20.6,
-   "price_mae": 22.3,
-   "inside_spread": 1.0,
+   "n": 439,
+   "iv_bias": -9.94,
+   "iv_mae": 9.94,
+   "price_bias": -34.4,
+   "price_mae": 36.5,
+   "inside_spread": 2.1,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 51.8,
-    "market": 58.1
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 47.5,
+    "market": 55.9
    },
    "note": null
   },
   {
    "symbol": "QQQ",
-   "n": 657,
-   "iv_bias": 3.9,
-   "iv_mae": 3.9,
-   "price_bias": 47.1,
-   "price_mae": 47.1,
-   "inside_spread": 2.6,
+   "n": 1799,
+   "iv_bias": 5.38,
+   "iv_mae": 5.38,
+   "price_bias": 73.8,
+   "price_mae": 73.8,
+   "inside_spread": 1.1,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 35.1,
-    "market": 29.5
+    "day": "2026-11-09",
+    "expiry": "2026-11-27",
+    "model": 35.7,
+    "market": 24.9
    },
    "note": null
   },
   {
    "symbol": "RDW",
-   "n": 17,
-   "iv_bias": 42.9,
-   "iv_mae": 42.9,
-   "price_bias": 69.8,
-   "price_mae": 69.8,
+   "n": 44,
+   "iv_bias": 42.85,
+   "iv_mae": 42.85,
+   "price_bias": 69.9,
+   "price_mae": 69.9,
    "inside_spread": 0.0,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 123.7,
-    "market": 83.5
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 126.7,
+    "market": 84.9
    },
    "note": null
   },
   {
    "symbol": "SOFI",
-   "n": 75,
-   "iv_bias": 12.11,
-   "iv_mae": 12.11,
+   "n": 161,
+   "iv_bias": 11.42,
+   "iv_mae": 11.42,
    "price_bias": 28.1,
-   "price_mae": 28.1,
-   "inside_spread": 6.7,
+   "price_mae": 29.3,
+   "inside_spread": 5.6,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 64.8,
-    "market": 52.2
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 61.2,
+    "market": 48.7
    },
    "note": null
   },
   {
    "symbol": "SPY",
-   "n": 816,
-   "iv_bias": 1.27,
-   "iv_mae": 1.88,
-   "price_bias": 9.5,
-   "price_mae": 28.6,
-   "inside_spread": 2.7,
+   "n": 1603,
+   "iv_bias": 2.1,
+   "iv_mae": 2.82,
+   "price_bias": 42.2,
+   "price_mae": 55.7,
+   "inside_spread": 1.7,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 22.0,
-    "market": 20.5
+    "day": "2026-11-09",
+    "expiry": "2026-11-27",
+    "model": 22.1,
+    "market": 16.0
    },
    "note": null
   },
   {
    "symbol": "TSLA",
-   "n": 280,
-   "iv_bias": 9.52,
-   "iv_mae": 9.52,
-   "price_bias": 28.7,
-   "price_mae": 29.7,
-   "inside_spread": 2.9,
+   "n": 699,
+   "iv_bias": 10.65,
+   "iv_mae": 11.11,
+   "price_bias": 43.0,
+   "price_mae": 45.7,
+   "inside_spread": 2.6,
    "atm": {
-    "day": "2026-11-06",
-    "expiry": "2026-12-04",
-    "model": 63.4,
-    "market": 51.4
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 61.3,
+    "market": 45.1
    },
    "note": null
   }
@@ -332,6 +333,12 @@
     "expiry": "2026-12-04",
     "model": 27.8,
     "market": 26.2
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 26.1,
+    "market": 23.0
    }
   ],
   "AMZN": [
@@ -340,6 +347,12 @@
     "expiry": "2026-12-04",
     "model": 46.3,
     "market": 35.4
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 43.3,
+    "market": 32.7
    }
   ],
   "GOOGL": [
@@ -348,6 +361,12 @@
     "expiry": "2026-12-04",
     "model": 27.1,
     "market": 33.8
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 24.5,
+    "market": 32.7
    }
   ],
   "JPM": [
@@ -356,6 +375,12 @@
     "expiry": "2026-12-04",
     "model": 29.1,
     "market": 26.6
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 28.5,
+    "market": 24.4
    }
   ],
   "META": [
@@ -364,6 +389,12 @@
     "expiry": "2026-12-04",
     "model": 36.0,
     "market": 42.2
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 38.9,
+    "market": 39.3
    }
   ],
   "MSFT": [
@@ -372,6 +403,12 @@
     "expiry": "2026-12-04",
     "model": 40.2,
     "market": 30.0
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 37.3,
+    "market": 26.0
    }
   ],
   "NVDA": [
@@ -380,6 +417,12 @@
     "expiry": "2026-12-04",
     "model": 51.8,
     "market": 58.1
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 47.5,
+    "market": 55.9
    }
   ],
   "QQQ": [
@@ -388,6 +431,12 @@
     "expiry": "2026-12-04",
     "model": 35.1,
     "market": 29.5
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-11-27",
+    "model": 35.7,
+    "market": 24.9
    }
   ],
   "RDW": [
@@ -396,6 +445,12 @@
     "expiry": "2026-12-04",
     "model": 123.7,
     "market": 83.5
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 126.7,
+    "market": 84.9
    }
   ],
   "SOFI": [
@@ -404,6 +459,12 @@
     "expiry": "2026-12-04",
     "model": 64.8,
     "market": 52.2
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 61.2,
+    "market": 48.7
    }
   ],
   "SPY": [
@@ -412,6 +473,12 @@
     "expiry": "2026-12-04",
     "model": 22.0,
     "market": 20.5
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-11-27",
+    "model": 22.1,
+    "market": 16.0
    }
   ],
   "TSLA": [
@@ -420,6 +487,12 @@
     "expiry": "2026-12-04",
     "model": 63.4,
     "market": 51.4
+   },
+   {
+    "day": "2026-11-09",
+    "expiry": "2026-12-11",
+    "model": 61.3,
+    "market": 45.1
    }
   ]
  },
