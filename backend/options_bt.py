@@ -51,8 +51,10 @@ The result is labelled "model-priced" everywhere it is shown.
 from __future__ import annotations
 
 import bisect
+import json
 import logging
 import math
+import os
 import time
 from datetime import date, timedelta
 
@@ -719,16 +721,37 @@ EARN_LOOKBACK = 8                   # previous reports averaged for the next one
 EARN_FALLBACK_DAYS = 3.0            # with no earlier report: a move of 3 ordinary days' volatility
 
 
-def earnings_events(ticker: str) -> list | None:
-    """Past and scheduled earnings reports as [{'date': Timestamp, 'when': 'amc'|'bmo'|None}].
+OPTIONS_EARNINGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'options_earnings.json')
+_OPT_EARN: dict | None = None
 
-    [] for index ETFs (no earnings); None when no dates could be found. Yahoo gives about
-    25 years with the time of day; where it is blocked (Render), the committed earnings
-    snapshot gives about six years of dates without times.
+
+def _saved_earnings() -> dict:
+    """backend/options_earnings.json (tools/refresh_options_earnings.py), read once."""
+    global _OPT_EARN
+    if _OPT_EARN is None:
+        try:
+            with open(OPTIONS_EARNINGS_PATH, encoding='utf-8') as fh:
+                _OPT_EARN = json.load(fh)
+        except (OSError, ValueError) as exc:
+            logger.warning('options earnings file unavailable: %s', exc)
+            _OPT_EARN = {}
+    return _OPT_EARN
+
+
+def earnings_events(ticker: str) -> list | None:
+    """Earnings reports as [{'date': Timestamp, 'when': 'amc'|'bmo'|None}], oldest first.
+
+    [] for index ETFs (no earnings); None when no dates could be found. The saved file
+    comes first, so a backtest gives the same answer here and on the server, where Yahoo
+    is blocked; then Yahoo (about 25 years, with the time of day); then the Predictor's
+    earnings snapshot (about six years of dates, no times).
     """
     ticker = ticker.upper()
     if ticker in INDEX_ETFS:
         return []
+    saved = (_saved_earnings().get('tickers') or {}).get(ticker)
+    if saved:
+        return [{'date': pd.Timestamp(d), 'when': w} for d, w in saved]
     hit = _EARN_CACHE.get(ticker)
     if hit and time.time() - hit[0] < _EARN_TTL:
         return hit[1]
