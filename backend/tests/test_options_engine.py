@@ -138,3 +138,20 @@ def test_staggering_wording_with_an_entry_rule():
                       entry={'vix_min': 10})
     assert 'every 7 days, alongside any still open' in r['strategy']['rules']
     assert 'the last one closes' not in r['strategy']['rules']
+
+
+def test_path_stats():
+    eq = [{'date': d, 'value': v} for d, v in [('2024-01-02', 100), ('2024-01-31', 110), ('2024-02-15', 99),
+                                                ('2024-02-29', 104), ('2024-03-28', 112), ('2024-04-30', 120)]]
+    s = ob.path_stats(eq)
+    assert s['best_month'] == pytest.approx(10.0)
+    assert s['worst_month'] == pytest.approx((104 / 110 - 1) * 100, abs=0.01)
+    assert s['longest_drawdown_days'] == (pd.Timestamp('2024-03-28') - pd.Timestamp('2024-02-15')).days
+
+
+def test_capital_used_is_reported():
+    m = _market(np.linspace(100, 110, 200))
+    put = ob.run_preset('short_put', 'XYZ', *_window(m), market=m)
+    spread = ob.run_preset('bull_put_spread', 'XYZ', *_window(m), market=m)
+    assert 70 < put['metrics']['capital_used'] <= 100
+    assert spread['metrics']['capital_used'] < 15

@@ -775,6 +775,7 @@ def options_compare():
                      'headline': r['strategy']['headline'], 'alloc_pct': p['alloc'],
                      **{k: m[k] for k in ('total_return', 'cagr', 'sharpe', 'max_drawdown', 'win_rate',
                                           'trades', 'psr', 'total_costs')},
+                     **{k: m.get(k) for k in ('capital_used', 'worst_month')},
                      'equity': [e['value'] for e in r['equity']][::5]})
     deflation = options_robust.deflate(rows, rets)
     rows.sort(key=lambda r: -(r['total_return'] or -1e9))

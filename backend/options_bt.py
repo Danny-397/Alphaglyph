@@ -1146,6 +1146,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     wheel_counts = {'assigned': 0, 'called_away': 0}
     max_open = 0
     earn_skips = 0
+    tied_sum = 0.0              # share of the account tied up in positions, summed over days
     equity, trades, notes = [], [], []
     total_costs = 0.0
     first_pos = None
@@ -1430,6 +1431,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         # Exposures for the chart: dollars per 1% move, per calendar day, per volatility point.
         row.update({'delta': round(dl * S * 0.01, 2), 'theta': round(th / 365.0, 2), 'vega': round(vg, 2)})
         row['value'] = round(val, 2)
+        if val > 0:
+            tied_sum += min(1.0, sum(P['entry']['basis'] for P in book) / val)
         equity.append(row)
         if val <= 0:
             notes.append(f'The account was wiped out on {day.isoformat()}.')
@@ -1450,6 +1453,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
                      f'({n_ok / max(1, len(equity)) * 100:.0f}%).')
     if earn_rule:
         notes.append(f'The earnings rule held back a new position on {earn_skips} day{"s" if earn_skips != 1 else ""}.')
+    extra = path_stats(equity)
+    extra['capital_used'] = round(tied_sum / max(1, len(equity)) * 100, 1)
     out = _summarize(ticker, name, legs, dte, initial_capital, equity, trades, total_costs,
                      days_in, first_pos, notes, iv_note, alloc_pct, exit_dte, profit_take, stop_loss,
                      spread_pct, commission, skew, rf_daily)
@@ -1484,6 +1489,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         out['strategy']['rules'] = out['strategy']['rules'].replace(
             f'{dte} days to expiry', f'on the monthly (third-Friday) expiry nearest {dte} days out', 1)
         out['strategy']['expiries'] = 'monthly'
+    if 'metrics' in out:
+        out['metrics'].update(extra)
     if 'model' in out:
         in_window = [d for d in react_d if days[0].date() <= d <= last_day]
         if react_d and in_window:
@@ -1535,6 +1542,29 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         total['interest'] = round(interest, 2)
         out['attribution'] = total
     return out
+
+
+def path_stats(equity: list) -> dict:
+    """Worst and best calendar month, and the longest stretch below a previous high, in calendar days."""
+    if len(equity) < 2:
+        return {'worst_month': None, 'best_month': None, 'longest_drawdown_days': None}
+    s = pd.Series([e['value'] for e in equity], index=pd.to_datetime([e['date'] for e in equity]))
+    ends = s.groupby(s.index.to_period('M')).last()
+    starts = pd.concat([s.iloc[:1], ends.iloc[:-1]]).to_numpy()
+    month = ends.to_numpy() / starts - 1
+    peak = s.cummax()
+    under = s < peak * (1 - 1e-9)
+    longest, began = 0, None
+    for d, u in under.items():
+        if u and began is None:
+            began = d
+        elif not u and began is not None:
+            longest = max(longest, (d - began).days)
+            began = None
+    if began is not None:
+        longest = max(longest, (s.index[-1] - began).days)
+    return {'worst_month': round(float(month.min()) * 100, 2), 'best_month': round(float(month.max()) * 100, 2),
+            'longest_drawdown_days': int(longest)}
 
 
 def _metrics(values: np.ndarray, days: int, rf_daily: float = 0.0) -> dict:

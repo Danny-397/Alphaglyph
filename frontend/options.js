@@ -10,6 +10,9 @@ Object.assign(GLOSSARY, {
   'Positions':        'Number of option positions opened and closed over the test.',
   'Profitable':       'Share of positions that closed for a profit, after costs.',
   'Volatility':       'Annualized standard deviation of daily returns.',
+  'Capital at Risk':  'Average share of the account tied up in positions: what each could lose, or the cash it sets aside.',
+  'Worst Month':      'The worst calendar month for the account.',
+  'Longest Drawdown': 'The longest stretch, in calendar days, spent below a previous high.',
 })
 
 const OB_GROUPS = ['Single leg', 'Two legs', 'Three legs', 'Four legs', 'Cycle']
@@ -296,6 +299,9 @@ function obRenderResult(r) {
     statCard('Profitable', m.win_rate == null ? '—' : m.win_rate + '%'),
     statCard('Total Costs', obMoney0(m.total_costs)),
     statCard('Time in Market', m.time_in_market + '%'),
+    statCard('Capital at Risk', m.capital_used == null ? '—' : m.capital_used + '%'),
+    statCard('Worst Month', m.worst_month == null ? '—' : fmtPct(m.worst_month, 1), clr(m.worst_month)),
+    statCard('Longest Drawdown', m.longest_drawdown_days == null ? '—' : m.longest_drawdown_days + ' days'),
   ].join('')
   el('ob-bench-stats').innerHTML = [
     statCard('Benchmark Return', fmtPct(b.total_return, 1), clr(b.total_return)),
@@ -309,11 +315,14 @@ function obRenderResult(r) {
     <td>${t.opened}</td><td>${t.closed}</td>
     <td class="opt-pos-cell">${t.legs.map(l => `<span class="opt-side opt-side-${l.side}">${l.side}</span>${l.type === 'stock'
       ? `${l.qty * 100} sh` : `${l.qty} ${fmt$(l.strike).replace('.00', '')} ${l.type}`}`).join('<br>')}</td>
+    <td class="${clr(t.pnl)}"><strong>${obMoney0(t.pnl)}</strong></td>
+    <td>${t.reason}${t.earnings ? `<div class="fine">held through ${t.earnings === 1 ? 'an earnings report' : t.earnings + ' earnings reports'}</div>` : ''}${t.split ? `<div class="fine">${t.split}</div>` : ''}</td>
+    <td>${obDriver(t.attribution, t.pnl)}</td>
     <td>${fmt$(t.underlying_open)} → ${fmt$(t.underlying_close)}</td>
     <td>${t.net_open >= 0 ? 'paid ' + obMoney0(t.net_open) : 'collected ' + obMoney0(-t.net_open)}</td>
-    <td>${obMoney0(t.net_close)}</td><td>${obMoney0(t.costs)}</td>
-    <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}${t.earnings ? `<div class="fine">held through ${t.earnings === 1 ? 'an earnings report' : t.earnings + ' earnings reports'}</div>` : ''}${t.split ? `<div class="fine">${t.split}</div>` : ''}</td></tr>`).join('')
+    <td>${obMoney0(t.net_close)}</td><td>${obMoney0(t.costs)}</td></tr>`).join('')
     : '<tr><td colspan="10" class="empty-cell">No positions were opened.</td></tr>'
+  obDrawHist(r)
   obRenderWhy(r)
   el('ob-share-msg').textContent = ''
   el('ob-sweep-out').hidden = true
@@ -354,11 +363,43 @@ const OB_GREEK_NOTE = {
 
 function obSigned(v) { return (v >= 0 ? '+' : '−') + obMoney0(Math.abs(v)) }
 
-function obDriver(a) {
+// The largest part of a position's P&L split that pushed the same way as its result: a winner's
+// main driver is its biggest gain, a loser's its biggest loss.
+function obDriver(a, pnl) {
   if (!a) return '—'
-  const short = { delta: 'Direction', gamma: 'Big moves', theta: 'Time decay', vega: 'Volatility', other: 'Other', costs: 'Costs' }
-  const k = Object.keys(short).reduce((best, x) => Math.abs(a[x] || 0) > Math.abs(a[best] || 0) ? x : best, 'delta')
+  const short = { delta: 'Direction', gamma: 'Big moves', theta: 'Time decay', vega: 'Volatility', other: 'Other',
+    costs: 'Costs', dividends: 'Dividends' }
+  const sign = pnl == null || pnl >= 0 ? 1 : -1
+  const keys = Object.keys(short).filter(x => (a[x] || 0) * sign > 0)
+  if (!keys.length) return '—'
+  const k = keys.reduce((best, x) => Math.abs(a[x]) > Math.abs(a[best]) ? x : best)
   return `${short[k]} <span class="${clr(a[k])}">${obSigned(a[k])}</span>`
+}
+
+// Histogram of each position's P&L after costs.
+function obDrawHist(r) {
+  obState.charts.hist = destroyChart(obState.charts.hist)
+  const p = r.trades.map(t => t.pnl).filter(v => v != null)
+  el('ob-hist-note').textContent = ''
+  if (p.length < 2) return
+  const lo = Math.min(...p), hi = Math.max(...p)
+  const nb = Math.min(24, Math.max(6, Math.round(Math.sqrt(p.length) * 2)))
+  const w = (hi - lo) / nb || 1
+  const bins = Array.from({ length: nb }, (_, i) => ({ from: lo + i * w, to: lo + (i + 1) * w, n: 0 }))
+  p.forEach(v => { bins[Math.min(nb - 1, Math.floor((v - lo) / w))].n += 1 })
+  const sorted = [...p].sort((x, y) => x - y)
+  const med = sorted[Math.floor(sorted.length / 2)]
+  el('ob-hist-note').textContent = `(median ${obMoney0(med)}, worst ${obMoney0(sorted[0])}, best ${obMoney0(sorted[sorted.length - 1])})`
+  obState.charts.hist = new Chart(el('ob-hist'), {
+    type: 'bar',
+    data: { labels: bins.map(b => obMoney0((b.from + b.to) / 2)), datasets: [{ data: bins.map(b => b.n),
+      backgroundColor: bins.map(b => (b.from + b.to) / 2 >= 0 ? 'rgba(63,185,80,0.7)' : 'rgba(255,107,97,0.7)'),
+      barPercentage: 1, categoryPercentage: 0.95 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { title: c => `${obMoney0(bins[c[0].dataIndex].from)} to ${obMoney0(bins[c[0].dataIndex].to)}`,
+        label: c => `${c.parsed.y} position${c.parsed.y === 1 ? '' : 's'}` } } },
+      scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { ticks: { precision: 0 } } } },
+  })
 }
 
 function obRenderWhy(r) {
@@ -498,13 +539,8 @@ async function obCompare() {
   const b = data.benchmark
   el('ob-cmp-model').textContent = 'Option prices are reconstructed with Black-Scholes from each day’s close and a volatility estimate, not real quotes.'
   el('ob-cmp-meta').textContent = `${data.ticker} · ${data.start_date} to ${data.end_date} · ${data.dte} days to expiry · buy and hold ${fmtPct(b.total_return, 1)}`
-  el('ob-cmp-tbody').innerHTML = data.results.map((r, i) => `<tr class="opt-cmp-row" data-key="${r.key}" tabindex="0">
-    <td>${i + 1}</td><td><strong>${r.name}</strong></td>
-    <td><span class="badge">${r.legs_count}</span></td>
-    <td class="${clr(r.total_return)}">${fmtPct(r.total_return, 1)}</td><td class="${clr(r.cagr)}">${fmtPct(r.cagr, 1)}</td>
-    <td>${fmtN(r.sharpe)}</td><td class="negative">${fmtPct(r.max_drawdown, 1)}</td>
-    <td>${r.win_rate == null ? '—' : r.win_rate + '%'}</td><td>${r.trades}</td>
-    <td class="${r.dsr != null && r.dsr >= 95 ? 'positive' : ''}">${r.dsr == null ? '—' : r.dsr.toFixed(0) + '%'}</td></tr>`).join('')
+  obState.cmp = data
+  obRenderCmpRows()
   const df = data.deflation
   el('ob-cmp-deflation').textContent = df && df.sharpe_bar != null
     ? `Deflated Sharpe: ${df.n} strategies were tried here, and the luckiest of ${df.n} with no edge at all would show a Sharpe near
@@ -512,7 +548,7 @@ async function obCompare() {
        the usual line. It tests the selection, not the model prices.`
     : ''
   obState.charts.cmp = destroyChart(obState.charts.cmp)
-  const top = data.results.slice(0, 5)
+  const top = obCmpSorted().slice(0, 5)
   const palette = ['#3fb950', '#c4a5f5', '#e3b341', '#58a6ff', '#e3913b']
   const n = Math.max(...top.map(r => r.equity.length))
   obState.charts.cmp = new Chart(el('ob-cmp-chart'), {
@@ -523,6 +559,31 @@ async function obCompare() {
       scales: { x: { display: false }, y: { ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } } },
       plugins: { tooltip: { callbacks: { title: () => '', label: c => `${c.dataset.label}: ${fmt$(c.parsed.y)}` } } } },
   })
+}
+
+function obCmpSorted() {
+  const d = obState.cmp
+  if (!d) return []
+  const key = obState.cmpSort || 'sharpe'
+  return [...d.results].sort((x, y) => (y[key] ?? -1e9) - (x[key] ?? -1e9))
+}
+
+function obRenderCmpRows() {
+  el('ob-cmp-tbody').innerHTML = obCmpSorted().map((r, i) => `<tr class="opt-cmp-row" data-key="${r.key}" tabindex="0">
+    <td>${i + 1}</td><td><strong>${r.name}</strong></td>
+    <td><span class="badge">${r.key === 'wheel' ? 'cycle' : r.legs_count}</span></td>
+    <td class="${clr(r.total_return)}">${fmtPct(r.total_return, 1)}</td><td class="${clr(r.cagr)}">${fmtPct(r.cagr, 1)}</td>
+    <td>${fmtN(r.sharpe)}</td><td class="negative">${fmtPct(r.max_drawdown, 1)}</td>
+    <td class="${clr(r.worst_month)}">${r.worst_month == null ? '—' : fmtPct(r.worst_month, 1)}</td>
+    <td>${r.capital_used == null ? '—' : r.capital_used + '%'}</td>
+    <td>${r.win_rate == null ? '—' : r.win_rate + '%'}</td><td>${r.trades}</td>
+    <td class="${r.dsr != null && r.dsr >= 95 ? 'positive' : ''}">${r.dsr == null ? '—' : r.dsr.toFixed(0) + '%'}</td></tr>`).join('')
+}
+
+// One-click setups: what most traders run.
+const OB_QUICK = {
+  hold: { dte: 30, exit_dte: '', pt: '', sl: '' },
+  managed: { dte: 45, exit_dte: 21, pt: 50, sl: '' },
 }
 
 // ── init ───────────────────────────────────────────────────────────────────
@@ -729,6 +790,21 @@ async function initOptionsBacktest() {
     if (b && obState.result) obDrawGreek(obState.result, b.dataset.greek)
   })
   el('ob-sweep-run').addEventListener('click', obSweep)
+  document.querySelector('.opt-quick').addEventListener('click', e => {
+    const b = e.target.closest('[data-quick]')
+    if (!b) return
+    const q = OB_QUICK[b.dataset.quick]
+    el('ob-dte').value = q.dte; el('ob-exit-dte').value = q.exit_dte; el('ob-pt').value = q.pt; el('ob-sl').value = q.sl
+    if (b.dataset.quick === 'managed') el('ob-exits').open = true
+    obRenderWhat()
+  })
+  el('ob-cmp-sort').addEventListener('click', e => {
+    const b = e.target.closest('[data-sort]')
+    if (!b || !obState.cmp) return
+    obState.cmpSort = b.dataset.sort
+    el('ob-cmp-sort').querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('active', x === b))
+    obRenderCmpRows()
+  })
   el('ob-share-link').addEventListener('click', obCopyLink)
   el('ob-csv-trades').addEventListener('click', () => obDownload('trades'))
   el('ob-csv-equity').addEventListener('click', () => obDownload('equity'))
