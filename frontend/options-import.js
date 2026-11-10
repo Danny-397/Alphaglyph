@@ -95,6 +95,8 @@ function obShareQuery(body) {
   const e = body.entry || {}
   for (const k of OB_ENTRY_FIELDS) if (e[k] != null) q.set(k, String(e[k]))
   if (e.trend && e.trend !== 'any') q.set('trend', e.trend)
+  if (e.earnings && e.earnings !== 'any') q.set('earnings', e.earnings)
+  if (body.exit_earnings) q.set('exit_earnings', '1')
   q.set('run', '1')
   return q.toString()
 }
@@ -125,6 +127,8 @@ function obParseSettings(search) {
   const entry = {}
   for (const k of OB_ENTRY_FIELDS) { const v = q.get(k); if (ok(v) && Number.isFinite(Number(v))) entry[k] = Number(v) }
   if (['above', 'below'].includes(q.get('trend'))) entry.trend = q.get('trend')
+  if (['avoid', 'only'].includes(q.get('earnings'))) entry.earnings = q.get('earnings')
+  if (q.get('exit_earnings') === '1') out.exit_earnings = true
   if (Object.keys(entry).length) out.entry = entry
   const preset = q.get('preset')
   if (preset && /^[a-z_]{2,40}$/.test(preset)) out.preset = preset

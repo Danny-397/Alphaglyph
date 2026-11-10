@@ -70,12 +70,13 @@ function obSettings() {
     commission: num('ob-commission'), spread_pct: num('ob-spread'), skew: el('ob-skew').checked,
     entry: obEntry(num),
     expiries: el('ob-expiries').value,
+    exit_earnings: el('ob-exit-earn').checked,
   }
 }
 
 function obEntry(num) {
   const e = { vix_min: num('ob-vix-min'), vix_max: num('ob-vix-max'), ivr_min: num('ob-ivr-min'), ivr_max: num('ob-ivr-max'),
-    trend: el('ob-trend').value }
+    trend: el('ob-trend').value, earnings: el('ob-earn').value }
   Object.keys(e).forEach(k => { if (e[k] == null || e[k] === 'any') delete e[k] })
   return Object.keys(e).length ? e : null
 }
@@ -296,7 +297,7 @@ function obRenderResult(r) {
     <td>${fmt$(t.underlying_open)} → ${fmt$(t.underlying_close)}</td>
     <td>${t.net_open >= 0 ? 'paid ' + obMoney0(t.net_open) : 'collected ' + obMoney0(-t.net_open)}</td>
     <td>${obMoney0(t.net_close)}</td><td>${obMoney0(t.costs)}</td>
-    <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}${t.split ? `<div class="fine">${t.split}</div>` : ''}</td></tr>`).join('')
+    <td class="${clr(t.pnl)}">${obMoney0(t.pnl)}</td><td>${obDriver(t.attribution)}</td><td>${t.reason}${t.earnings ? `<div class="fine">held through ${t.earnings === 1 ? 'an earnings report' : t.earnings + ' earnings reports'}</div>` : ''}${t.split ? `<div class="fine">${t.split}</div>` : ''}</td></tr>`).join('')
     : '<tr><td colspan="10" class="empty-cell">No positions were opened.</td></tr>'
   obRenderWhy(r)
   el('ob-share-msg').textContent = ''
@@ -316,6 +317,7 @@ function obRenderResult(r) {
       fitted on ${obState.check.level.fit_window[0].slice(0, 4)}-${obState.check.level.fit_window[1].slice(0, 4)} only.</p>` : ''}
     ${r.model.dividends ? `<p class="card-desc"><strong>Dividends.</strong> ${r.model.dividends}</p>` : ''}
     ${r.model.splits ? `<p class="card-desc"><strong>Splits.</strong> ${r.model.splits}</p>` : ''}
+    ${r.model.earnings ? `<p class="card-desc"><strong>Earnings.</strong> ${r.model.earnings}</p>` : ''}
     <p class="card-desc"><strong>Costs.</strong> ${r.model.costs}. Stock legs pay 0.03% slippage. Options held to expiry settle at intrinsic value with no spread.</p>
     <p class="card-desc"><strong>Cash.</strong> Cash not tied up earns the Treasury-bill rate. Credit received stays in the account as collateral.</p>
     ${obSensTable(r)}
@@ -617,8 +619,10 @@ function obApplyImport() {
   const e = set.entry || {}
   put('ob-vix-min', e.vix_min); put('ob-vix-max', e.vix_max); put('ob-ivr-min', e.ivr_min); put('ob-ivr-max', e.ivr_max)
   if (e.trend) el('ob-trend').value = e.trend
+  if (e.earnings) el('ob-earn').value = e.earnings
+  if (set.exit_earnings) el('ob-exit-earn').checked = true
   if (set.entry) el('ob-entry').open = true
-  if (set.exit_dte != null || set.profit_take != null || set.stop_loss != null) el('ob-exits').open = true
+  if (set.exit_dte != null || set.profit_take != null || set.stop_loss != null || set.exit_earnings) el('ob-exits').open = true
   if (imp) obRenderLegs()
   obRenderWhat()
   if (imp) {

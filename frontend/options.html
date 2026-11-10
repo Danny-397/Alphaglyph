@@ -128,6 +128,11 @@
                 <input type="number" id="ob-sl" min="1" max="1000" step="5" placeholder="None">
               </div>
             </div>
+            <label class="check">
+              <input type="checkbox" id="ob-exit-earn">
+              <span class="check-title">Close the day before earnings</span>
+              <span class="check-desc">Single stocks only. The next position opens after the report.</span>
+            </label>
             <p class="check-desc">Both are a percent of what the position cost or collected. A new position opens the day the last one closes.</p>
           </div>
         </details>
@@ -161,6 +166,14 @@
                 <option value="any">Any</option>
                 <option value="above">Only above its 200-day average</option>
                 <option value="below">Only below its 200-day average</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ob-earn">Earnings reports</label>
+              <select id="ob-earn">
+                <option value="any">Hold through them</option>
+                <option value="avoid">Skip positions that would hold through one</option>
+                <option value="only">Only positions that hold through one</option>
               </select>
             </div>
             <p class="check-desc">New positions open only on days that pass every rule; open positions are never closed by them.

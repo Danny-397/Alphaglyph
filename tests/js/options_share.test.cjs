@@ -83,3 +83,12 @@ test('at-the-money legs with their own expiry keep it', () => {
     { type: 'call', side: 'long', qty: 1, strike: { mode: 'atm' }, dte: 60 }]
   assert.deepEqual(m.obParseImport('?' + m.obShareQuery({ ticker: 'SPY', legs, name: 'Calendar' })).legs, legs)
 })
+
+test('the earnings rules round-trip', () => {
+  const s = m.obParseSettings('?' + m.obShareQuery({ ...body, entry: { earnings: 'avoid' }, exit_earnings: true }))
+  assert.deepEqual(s.entry, { earnings: 'avoid' })
+  assert.equal(s.exit_earnings, true)
+  const plain = m.obParseSettings('?' + m.obShareQuery({ ...body, entry: { earnings: 'any' }, exit_earnings: false }))
+  assert.equal('exit_earnings' in plain, false)
+  assert.equal('entry' in plain, false)
+})
