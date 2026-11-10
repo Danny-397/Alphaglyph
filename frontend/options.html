@@ -265,6 +265,20 @@
               <tbody id="ob-check-tbody"></tbody></table></div>
             <p class="fine" id="ob-check-fine"></p>
           </div>
+          <div class="card opt-check" id="ob-quotes" hidden>
+            <div class="section-header">And against real option quotes? <span class="badge badge-green" id="ob-quotes-badge"></span></div>
+            <p class="card-desc" id="ob-quotes-lede"></p>
+            <div class="stats-grid" id="ob-quotes-stats" style="margin-bottom:14px;"></div>
+            <div class="opt-sub">By underlying, at the money about a month out</div>
+            <div class="table-wrap"><table class="data-table opt-check-table">
+              <thead><tr><th>Underlying</th><th>Model IV</th><th>Market IV</th><th title="Median of model IV minus market IV over every quoted contract">Model minus market</th><th title="Median size of the miss, either way">Typical miss</th><th>Contracts</th></tr></thead>
+              <tbody id="ob-quotes-sym"></tbody></table></div>
+            <div class="opt-sub" style="margin-top:14px;">By strike, time to expiry and earnings</div>
+            <div class="table-wrap"><table class="data-table opt-check-table">
+              <thead><tr><th></th><th>Model minus market</th><th>Typical miss</th><th title="Median of model price over the midpoint, minus one">Price vs midpoint</th><th>Contracts</th></tr></thead>
+              <tbody id="ob-quotes-grp"></tbody></table></div>
+            <p class="fine" id="ob-quotes-fine"></p>
+          </div>
         </div>
 
         <div id="ob-loading" hidden>

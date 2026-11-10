@@ -23,7 +23,7 @@ overfitting** (SPY, run 2026-08-01) — the in-sample winner lands in the bottom
 out-of-sample more often than not. That is the headline result, and it is a negative
 one.
 
-- 19 REST endpoints, 351 automated tests in CI
+- 19 REST endpoints, 358 automated tests in CI
 - Indicators implemented from first principles (SMA, EMA, RSI, MACD, ADX, Bollinger)
 - Live at [alphaglyph.org](https://alphaglyph.org)
 
@@ -532,6 +532,32 @@ The fitted settings absorb the average effect of the replicas' simplifications, 
 are effective values, not measurements of implied volatility. Cboe's files are used for
 these figures only; the repository commits the derived results, not the files.
 
+**Against real option quotes.** The indices check SPY strategies; they say nothing about
+single stocks, or about any one strike. Tradeski's daily job now keeps the closing option
+chains of twelve underlyings (`data/options-archive/` in the Tradeski repository), and
+`tools/options_quotes_check.py` prices every quoted out-of-the-money contract with the
+backtester's model on the same day: the same inputs `run()` uses, from `pricing_context`,
+which a test pins to the backtest's own entry prices. Each contract's error is the model's
+implied volatility minus the one the bid/ask midpoint implies, with the same rate and
+dividend yield. On the first day, 2026-11-06, over 3,467 contracts:
+
+| | Model minus market IV | Typical miss | Contracts |
+|---|---:|---:|---:|
+| SPY | +1.3 pts | 1.9 pts | 816 |
+| QQQ | +3.9 pts | 3.9 pts | 657 |
+| AAPL | −0.2 pts | 1.4 pts | 220 |
+| MSFT, TSLA, AMZN | +9.2, +9.5, +10.9 pts | 9-11 pts | 795 |
+| META, NVDA, GOOGL | −6.1, −6.1, −7.3 pts | 6-7 pts | 783 |
+| All single stocks | +0.8 pts | 6.9 pts | 1,994 |
+
+On SPY the model is about a point and a half of volatility rich, in line with the Cboe
+check. On single stocks it misses by six to eleven points either way: a stock's own
+implied volatility often sits far from its recent realized volatility times the market's
+ratio, which is all the model knows. So single-stock backtests are much rougher than SPY's,
+and the misses don't cancel within a stock. One day is a snapshot (the VIX was 25.6); the
+job reruns after every close as the archive grows, and the Options page shows the current
+figures.
+
 ### 9.2 Results on SPY
 
 On SPY over 2021-11-08 → 2026-11-06 (30 days to expiry, weekly expiries, default sizing
@@ -744,7 +770,7 @@ that, which free data cannot check.
 git clone https://github.com/Danny-397/Alphaglyph
 cd Alphaglyph/backend
 pip install -r requirements.txt
-pytest                     # 351 tests
+pytest                     # 358 tests
 python app.py              # http://localhost:5000
 cd .. && node --test tests/js/*.test.cjs        # the page's link and CSV helpers
 python tools/options_validation.py              # refit and recheck against Cboe's indices
