@@ -102,6 +102,10 @@
             <option value="weekly">Any Friday (weeklies), nearest to the days chosen</option>
             <option value="monthly">Monthly only (third Friday), as Cboe's indices roll</option>
           </select>
+          <div class="opt-quick" role="group" aria-label="Common setups">
+            <button type="button" class="btn btn-sm" data-quick="hold">30 days, hold to expiry</button>
+            <button type="button" class="btn btn-sm" data-quick="managed">45 days, close at 21 days or 50% profit</button>
+          </div>
         </div>
 
         <div class="form-group">
@@ -278,11 +282,20 @@
           <div class="wf-banner opt-model-banner"><strong>Model-priced.</strong> <span id="ob-cmp-model"></span></div>
           <div class="card">
             <div class="section-header">Options strategy leaderboard <span id="ob-cmp-meta" class="text-muted" style="margin-left:auto;font-size:12px;font-weight:400;"></span></div>
-            <p class="card-desc">Every preset run on the same underlying, period, expiry and costs, each at its default capital per position. Click a row to open it.</p>
+            <p class="card-desc">Every preset run on the same underlying, period, expiry and costs, each at its default capital per position.
+              Those differ (a cash-secured put ties up most of the account, a spread a tenth), so raw returns aren't like for like:
+              rank by Sharpe, and read the capital at risk next to each. Click a row to open it.</p>
+            <div class="opt-sub">Rank by
+              <span class="seg" role="group" aria-label="Rank by" id="ob-cmp-sort">
+                <button type="button" class="seg-btn active" data-sort="sharpe">Sharpe</button>
+                <button type="button" class="seg-btn" data-sort="total_return">Return</button>
+                <button type="button" class="seg-btn" data-sort="max_drawdown">Smallest drawdown</button>
+              </span>
+            </div>
             <div class="chart-wrap" style="height:280px;margin-bottom:16px;"><canvas id="ob-cmp-chart"></canvas></div>
             <div class="table-wrap">
               <table class="data-table">
-                <thead><tr><th>#</th><th>Strategy</th><th>Legs</th><th>Return</th><th>CAGR</th><th>Sharpe</th><th>Max drawdown</th><th>Win rate</th><th>Trades</th><th title="Probability the Sharpe beats what the luckiest of the strategies tried would show by chance">Deflated Sharpe</th></tr></thead>
+                <thead><tr><th>#</th><th>Strategy</th><th>Legs</th><th>Return</th><th>CAGR</th><th>Sharpe</th><th>Max drawdown</th><th>Worst month</th><th title="Average share of the account tied up in positions">Capital at risk</th><th>Win rate</th><th>Trades</th><th title="Probability the Sharpe beats what the luckiest of the strategies tried would show by chance">Deflated Sharpe</th></tr></thead>
                 <tbody id="ob-cmp-tbody"></tbody>
               </table>
             </div>
@@ -369,9 +382,11 @@
               </div>
             </div>
             <div class="tab-panel" id="ob-trades">
+              <div class="opt-sub">Profit or loss per position <span class="text-muted" id="ob-hist-note" style="font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+              <div class="chart-wrap" style="height:200px;margin-bottom:16px;"><canvas id="ob-hist"></canvas></div>
               <div class="scroll-box">
                 <table class="data-table">
-                  <thead><tr><th>Opened</th><th>Closed</th><th>Position</th><th>Underlying</th><th>Paid / collected</th><th>Closed at</th><th>Costs</th><th>P&amp;L</th><th>Biggest driver</th><th>Why it closed</th></tr></thead>
+                  <thead><tr><th>Opened</th><th>Closed</th><th>Position</th><th>P&amp;L</th><th>Why it closed</th><th title="The largest part of the P&amp;L split that pushed the same way as the result">Main driver</th><th>Underlying</th><th>Paid / collected</th><th>Closed at</th><th>Costs</th></tr></thead>
                   <tbody id="ob-trades-tbody"></tbody>
                 </table>
               </div>
