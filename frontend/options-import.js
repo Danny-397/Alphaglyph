@@ -76,6 +76,7 @@ const OB_SHARE_FIELDS = [
   ['start_date', 'start', 'date'], ['end_date', 'end', 'date'], ['initial_capital', 'capital', 'num'],
   ['alloc_pct', 'alloc', 'num'], ['exit_dte', 'exit_dte', 'num'], ['profit_take', 'pt', 'num'],
   ['stop_loss', 'sl', 'num'], ['commission', 'commission', 'num'], ['spread_pct', 'spread', 'num'],
+  ['exit_delta', 'exit_delta', 'num'], ['stagger_days', 'every', 'num'],
 ]
 const OB_ENTRY_FIELDS = ['vix_min', 'vix_max', 'ivr_min', 'ivr_max']
 

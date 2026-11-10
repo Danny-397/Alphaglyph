@@ -12,7 +12,7 @@ Object.assign(GLOSSARY, {
   'Volatility':       'Annualized standard deviation of daily returns.',
 })
 
-const OB_GROUPS = ['Single leg', 'Two legs', 'Three legs', 'Four legs']
+const OB_GROUPS = ['Single leg', 'Two legs', 'Three legs', 'Four legs', 'Cycle']
 const OB_STRIKE_MODES = [['atm', 'At the money'], ['pct', '% from price'], ['delta', 'Delta'], ['offset', '% from leg']]
 const obState = { presets: [], byKey: {}, legs: [], result: null, charts: {} }
 
@@ -71,6 +71,7 @@ function obSettings() {
     entry: obEntry(num),
     expiries: el('ob-expiries').value,
     exit_earnings: el('ob-exit-earn').checked,
+    exit_delta: num('ob-exit-delta'), stagger_days: num('ob-stagger'),
   }
 }
 
@@ -88,7 +89,7 @@ function obRenderWhat() {
   const custom = key === 'custom'
   el('ob-custom').hidden = !custom
   const dte = Number(el('ob-dte').value) || 30
-  let name, legs, view
+  let name, legs, view, wheel = null
   if (custom) {
     name = el('ob-name').value.trim() || 'Custom strategy'
     legs = obState.legs
@@ -96,7 +97,21 @@ function obRenderWhat() {
   } else {
     const p = obState.byKey[key]
     if (!p) return
-    name = p.name; legs = p.legs; view = p.view
+    name = p.name; legs = p.legs; view = p.view; wheel = p.wheel || null
+  }
+  el('ob-stagger').disabled = !!wheel
+  if (wheel) el('ob-stagger').value = ''
+  if (wheel) {
+    const put = obDescribe(name, legs, dte).legs[0].replace(/^short 1 put /, '')
+    const call = obDescribe(name, [wheel.call], dte).legs[0].replace(/^short 1 call /, '')
+    el('ob-what').innerHTML = `
+    <div class="opt-what-head"><span class="badge badge-green">Cycle</span><span class="opt-what-view">${view}</span></div>
+    <p class="opt-what-title">The wheel: puts until assigned, then covered calls until called away</p>
+    <ul class="opt-what-legs">
+      <li><span class="opt-side opt-side-short">short</span>1 put ${put}</li>
+      <li><span class="opt-side opt-side-long">then</span>100 shares if the put is assigned</li>
+      <li><span class="opt-side opt-side-short">short</span>1 call ${call} on them, until called away</li></ul>`
+    return
   }
   if (!legs.length) { el('ob-what').innerHTML = '<p class="check-desc">Add a leg to start.</p>'; return }
   const d = obDescribe(name, legs, dte)
@@ -614,6 +629,7 @@ function obApplyImport() {
   put('ob-capital', set.initial_capital); put('ob-alloc', set.alloc_pct)
   put('ob-exit-dte', set.exit_dte); put('ob-pt', set.profit_take); put('ob-sl', set.stop_loss)
   put('ob-commission', set.commission); put('ob-spread', set.spread_pct)
+  put('ob-exit-delta', set.exit_delta); put('ob-stagger', set.stagger_days)
   if (set.skew === false) el('ob-skew').checked = false
   if (set.expiries) el('ob-expiries').value = set.expiries
   const e = set.entry || {}
@@ -622,7 +638,8 @@ function obApplyImport() {
   if (e.earnings) el('ob-earn').value = e.earnings
   if (set.exit_earnings) el('ob-exit-earn').checked = true
   if (set.entry) el('ob-entry').open = true
-  if (set.exit_dte != null || set.profit_take != null || set.stop_loss != null || set.exit_earnings) el('ob-exits').open = true
+  if (set.exit_dte != null || set.profit_take != null || set.stop_loss != null || set.exit_earnings ||
+      set.exit_delta != null) el('ob-exits').open = true
   if (imp) obRenderLegs()
   obRenderWhat()
   if (imp) {

@@ -2,7 +2,7 @@
 Is an options strategy's edge real? The same tests AlphaGlyph applies to stock
 strategies, applied to options.
 
-- Deflated Sharpe on the leaderboard. Comparing all 19 presets and picking the
+- Deflated Sharpe on the leaderboard. Comparing all 20 presets and picking the
   best is 19 tries: the luckiest of 19 strategies with no edge would still show
   a positive Sharpe, so each row's Sharpe is tested against that bar instead of
   against zero (Bailey and Lopez de Prado, 2014).

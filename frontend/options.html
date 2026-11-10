@@ -111,6 +111,13 @@
             cash-secured put sets aside the strike). Uncovered short calls reserve enough for a 30% rally.</p>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="ob-stagger">Open a new position every … days</label>
+          <input type="number" id="ob-stagger" min="1" max="90" step="1" placeholder="One at a time">
+          <p class="check-desc" style="margin-top:6px;">Empty: the next position opens when the last one closes. A number
+            staggers them (say 7 for a new one each week), each sized as above while capital is free.</p>
+        </div>
+
         <details class="collapsible" id="ob-exits">
           <summary>Exit rules</summary>
           <div class="collapsible-body">
@@ -127,6 +134,12 @@
                 <label class="form-label" for="ob-sl">Stop loss, %</label>
                 <input type="number" id="ob-sl" min="1" max="1000" step="5" placeholder="None">
               </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ob-exit-delta">Close when a short option's delta reaches</label>
+              <input type="number" id="ob-exit-delta" min="0.05" max="0.95" step="0.05" placeholder="Never">
+              <p class="check-desc" style="margin-top:6px;">0.50 closes a short strike once the price reaches it. When
+                positions open one at a time, the next opens the same day: a roll.</p>
             </div>
             <label class="check">
               <input type="checkbox" id="ob-exit-earn">
@@ -221,7 +234,7 @@
               <div class="empty-preview-card">
                 <span class="epc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h16"/><path d="M4 18l5-9 4 6 3-4 4 7"/></svg></span>
                 <strong>Any structure</strong>
-                <span>19 presets from one to four legs, or build your own with up to six legs, stock included.</span>
+                <span>19 presets from one to four legs plus the wheel, or build your own with up to six legs, stock included.</span>
               </div>
               <div class="empty-preview-card">
                 <span class="epc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span>
