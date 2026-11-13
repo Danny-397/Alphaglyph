@@ -111,3 +111,30 @@ def test_late_runs_still_log_the_day():
     assert fl.can_log(at(18, 49))           # the 2026-11-06 run, three hours late
     assert fl.can_log(at(23, 59))
     assert not fl.can_log(at(9, 30))        # next morning: that day's close is gone
+
+
+def test_a_nan_price_is_never_logged():
+    """NaN passes `not price` and `price <= 0`; the 2026-11-09 batch went in that way."""
+    rows = []
+    assert fl.log_calls(rows, lambda t: pred(t, price=float('nan')), NOW, 'v1', basket=['SPY']) == []
+    assert fl.log_calls(rows, lambda t: pred(t, p_up=float('nan')), NOW, 'v1', basket=['SPY']) == []
+    assert rows == []
+
+
+def test_a_row_without_an_entry_price_is_voided_not_scored(tmp_path):
+    """Graded, a NaN entry would score every bullish call as wrong. It is set aside instead."""
+    rows = []
+    fl.log_calls(rows, lambda t: pred(t), NOW, 'v1', basket=['SPY', 'QQQ'])
+    rows[1]['price_at_pred'] = 'nan'                     # as the CSV holds it
+    path = str(tmp_path / 'ledger.csv')
+    fl.write_rows(rows, path)
+    rows = fl.read_rows(path)
+
+    done = fl.grade_rows(rows, lambda t, d: 104.0, date(2026, 11, 9), NOW)
+    assert done == ['SPY 2026-11-02', 'QQQ 2026-11-02 (void: no entry price)']
+    assert rows[1]['status'] == 'void' and rows[1]['correct'] in ('', None)
+
+    out = fl.summary_json(rows, NOW)
+    assert out['n_void'] == 1 and out['summary']['n_graded'] == 1 and out['summary']['hit_rate'] == 100.0
+    json_text = __import__('json').dumps(out, allow_nan=False)   # strict JSON: the site parses it
+    assert 'NaN' not in json_text
