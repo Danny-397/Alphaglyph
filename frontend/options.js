@@ -398,7 +398,7 @@ function obDrawHist(r) {
   obState.charts.hist = new Chart(el('ob-hist'), {
     type: 'bar',
     data: { labels: bins.map(b => obMoney0((b.from + b.to) / 2)), datasets: [{ data: bins.map(b => b.n),
-      backgroundColor: bins.map(b => (b.from + b.to) / 2 >= 0 ? 'rgba(63,185,80,0.7)' : 'rgba(255,107,97,0.7)'),
+      backgroundColor: bins.map(b => (b.from + b.to) / 2 >= 0 ? 'rgba(48,209,88,0.7)' : 'rgba(255,69,58,0.7)'),
       barPercentage: 1, categoryPercentage: 0.95 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
       tooltip: { callbacks: { title: c => `${obMoney0(bins[c[0].dataIndex].from)} to ${obMoney0(bins[c[0].dataIndex].to)}`,
@@ -425,7 +425,7 @@ function obRenderWhy(r) {
   obState.charts.attr = new Chart(el('ob-attr-chart'), {
     type: 'bar',
     data: { labels: rows.map(([, l]) => l), datasets: [{ data: rows.map(([k]) => a[k]),
-      backgroundColor: rows.map(([k]) => a[k] >= 0 ? 'rgba(63,185,80,0.75)' : 'rgba(248,81,73,0.75)'), borderRadius: 4 }] },
+      backgroundColor: rows.map(([k]) => a[k] >= 0 ? 'rgba(48,209,88,0.75)' : 'rgba(255,69,58,0.75)'), borderRadius: 4 }] },
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       scales: { x: { ticks: { callback: v => (v < 0 ? '−$' : '$') + Math.abs(v / 1000).toFixed(0) + 'k' } } },
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => obSigned(c.parsed.x) } } } },
@@ -483,8 +483,8 @@ function obRenderSweep(d) {
   const sh = d.cells.map(c => c.sharpe)
   const lo = Math.min(...sh), hi = Math.max(...sh)
   const tint = v => {
-    if (v >= 0) return `rgba(63,185,80,${(0.12 + 0.6 * (hi > 0 ? v / hi : 0)).toFixed(2)})`
-    return `rgba(248,81,73,${(0.12 + 0.6 * (lo < 0 ? v / lo : 0)).toFixed(2)})`
+    if (v >= 0) return `rgba(48,209,88,${(0.12 + 0.6 * (hi > 0 ? v / hi : 0)).toFixed(2)})`
+    return `rgba(255,69,58,${(0.12 + 0.6 * (lo < 0 ? v / lo : 0)).toFixed(2)})`
   }
   const head = `<thead><tr><th>Days to expiry</th>${d.exits.map(x => `<th>${x.label}</th>`).join('')}</tr></thead>`
   const body = d.dte.map(dte => `<tr><th scope="row">${dte === d.current_dte ? '▸ ' : ''}${dte} days</th>${d.exits.map(x => {
@@ -503,9 +503,9 @@ function obDrawEquity(r) {
   obState.charts.eq = new Chart(el('ob-chart'), {
     type: 'line',
     data: { labels, datasets: [
-      { label: r.strategy.name, data: r.equity.map(e => e.value), borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.08)',
+      { label: r.strategy.name, data: r.equity.map(e => e.value), borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.10)',
         borderWidth: 2, pointRadius: 0, fill: true, tension: 0.15 },
-      { label: r.benchmark.label, data: r.equity.map(e => e.benchmark), borderColor: '#9ba49f', borderDash: [5, 4],
+      { label: r.benchmark.label, data: r.equity.map(e => e.benchmark), borderColor: '#86868b', borderDash: [5, 4],
         borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.15 },
     ] },
     options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
@@ -521,8 +521,8 @@ function obDrawPayoff(ex) {
     type: 'line',
     data: { labels: pts.map(p => p.x), datasets: [{
       data: pts.map(p => p.pnl), borderWidth: 2, pointRadius: 0, tension: 0,
-      segment: { borderColor: c => (c.p0.parsed.y + c.p1.parsed.y) / 2 >= 0 ? '#3fb950' : '#ff6b61' },
-      fill: { target: 'origin', above: 'rgba(63,185,80,0.12)', below: 'rgba(255,107,97,0.12)' },
+      segment: { borderColor: c => (c.p0.parsed.y + c.p1.parsed.y) / 2 >= 0 ? '#30d158' : '#ff453a' },
+      fill: { target: 'origin', above: 'rgba(48,209,88,0.12)', below: 'rgba(255,69,58,0.12)' },
     }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
       tooltip: { callbacks: { title: c => `${obState.result.ticker} at ${fmt$(Number(c[0].label))}`, label: c => obMoney0(c.parsed.y) } } },
@@ -554,7 +554,7 @@ async function obCompare() {
     : ''
   obState.charts.cmp = destroyChart(obState.charts.cmp)
   const top = obCmpSorted().slice(0, 5)
-  const palette = ['#3fb950', '#c4a5f5', '#e3b341', '#58a6ff', '#e3913b']
+  const palette = ['#30d158', '#bf5af2', '#ffd60a', '#0a84ff', '#ff9f0a']
   const n = Math.max(...top.map(r => r.equity.length))
   obState.charts.cmp = new Chart(el('ob-cmp-chart'), {
     type: 'line',
@@ -684,7 +684,7 @@ async function obLoadCheck() {
       type: 'line',
       data: { labels: d.chart.months.slice(0, r.chart.model.length), datasets: [
         { label: `Model replica (SPY)`, data: r.chart.model, borderColor: '#a371f7', borderWidth: 2, pointRadius: 0, tension: 0.15 },
-        { label: `Real Cboe ${r.code} index`, data: r.chart.real, borderColor: '#9ba49f', borderDash: [5, 4], borderWidth: 1.5,
+        { label: `Real Cboe ${r.code} index`, data: r.chart.real, borderColor: '#86868b', borderDash: [5, 4], borderWidth: 1.5,
           pointRadius: 0, tension: 0.15 },
       ] },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },

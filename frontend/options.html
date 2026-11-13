@@ -7,7 +7,7 @@
   <meta name="description" content="Backtest options strategies, from single calls and puts to collars, spreads and iron condors, day by day on real market history with model-priced options and every cost charged.">
   <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <style>@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-greek.woff2) format('woff2');unicode-range:U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF}</style>
-  <meta name="theme-color" content="#0b0c0c">
+  <meta name="theme-color" content="#000000">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
@@ -25,31 +25,23 @@
       <span class="nav-brand-name">AlphaGlyph</span>
     </a>
     <div class="nav-links">
-      <a href="index.html" class="nav-link">Overview</a>
-      <a href="backtest.html" class="nav-link">Stock backtest</a>
+      <a href="backtest.html" class="nav-link">Backtest</a>
+      <a href="options.html" class="nav-link active" aria-current="page">Options</a>
       <a href="predict.html" class="nav-link">Predictor</a>
-      <a href="screener.html" class="nav-link">Screener</a>
-      <a href="portfolio.html" class="nav-link">Portfolio</a>
       <a href="research.html" class="nav-link">Research</a>
-      <span class="nav-sep" aria-hidden="true"></span>
-      <a href="options.html" class="nav-link nav-link-options active" aria-current="page">Options</a>
     </div>
-    <span class="nav-badge" title="Simulated capital on real historical prices">Paper trading</span>
   </nav>
 
   <main class="page-wrap" data-page="options" id="main" tabindex="-1">
-    <header class="opt-page-head">
-      <span class="opt-eyebrow">Options lab</span>
-      <h1 class="opt-title">Options strategy backtester</h1>
-      <p class="opt-lede">Backtests option contracts: calls, puts and multi-leg structures, priced day by day.
-        Separate from the stock backtester, which buys and sells shares.
-        <a href="backtest.html">Go to the stock backtester →</a></p>
+    <header class="page-header">
+      <h1>Options backtester</h1>
+      <p>Calls, puts and multi-leg structures, priced day by day on real market history with every cost charged.</p>
     </header>
     <div class="sidebar-layout">
 
       <!-- ── LEFT: settings ─────────────────────────────────────────────── -->
       <aside class="form-panel">
-        <h2>Configure options backtest</h2>
+        <h2>New options backtest</h2>
         <div class="opt-import" id="ob-import" hidden role="status"></div>
 
         <div class="form-group">
@@ -92,39 +84,36 @@
             <input type="number" id="ob-capital" value="100000" min="1000" max="10000000" step="1000">
           </div>
           <div class="form-group">
-            <label class="form-label" for="ob-dte">Days to expiry</label>
-            <input type="number" id="ob-dte" value="30" min="3" max="180" step="1">
+            <label class="form-label" for="ob-alloc">Per position, %</label>
+            <input type="number" id="ob-alloc" value="10" min="1" max="100" step="1"
+                   title="The most each position can lose, or the cash it ties up. A cash-secured put sets aside the strike; uncovered short calls reserve enough for a 30% rally.">
           </div>
         </div>
+
         <div class="form-group">
-          <label class="form-label" for="ob-expiries">Expiries</label>
-          <select id="ob-expiries">
-            <option value="weekly">Any Friday (weeklies), nearest to the days chosen</option>
-            <option value="monthly">Monthly only (third Friday), as Cboe's indices roll</option>
-          </select>
+          <label class="form-label" for="ob-dte">Days to expiry</label>
+          <input type="number" id="ob-dte" value="30" min="3" max="180" step="1">
           <div class="opt-quick" role="group" aria-label="Common setups">
             <button type="button" class="btn btn-sm" data-quick="hold">30 days, hold to expiry</button>
             <button type="button" class="btn btn-sm" data-quick="managed">45 days, close at 21 days or 50% profit</button>
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="ob-alloc">Capital per position (% of account)</label>
-          <input type="number" id="ob-alloc" value="10" min="1" max="100" step="1">
-          <p class="check-desc" style="margin-top:6px;">The most each position can lose, or the cash it ties up (a
-            cash-secured put sets aside the strike). Uncovered short calls reserve enough for a 30% rally.</p>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="ob-stagger">Open a new position every … days</label>
-          <input type="number" id="ob-stagger" min="1" max="90" step="1" placeholder="One at a time">
-          <p class="check-desc" style="margin-top:6px;">Empty: the next position opens when the last one closes. A number
-            staggers them (say 7 for a new one each week), each sized as above while capital is free.</p>
-        </div>
-
         <details class="collapsible" id="ob-exits">
-          <summary>Exit rules</summary>
+          <summary>Timing and exits</summary>
           <div class="collapsible-body">
+            <div class="form-group">
+              <label class="form-label" for="ob-expiries">Expiries</label>
+              <select id="ob-expiries">
+                <option value="weekly">Any Friday (weeklies), nearest to the days chosen</option>
+                <option value="monthly">Monthly only (third Friday), as Cboe's indices roll</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ob-stagger">Open a new position every … days</label>
+              <input type="number" id="ob-stagger" min="1" max="90" step="1" placeholder="One at a time">
+              <p class="check-desc" style="margin-top:6px;">Empty opens the next position when the last one closes. 7 opens one each week, while capital is free.</p>
+            </div>
             <div class="form-group">
               <label class="form-label" for="ob-exit-dte">Close this many days before expiry</label>
               <input type="number" id="ob-exit-dte" min="0" max="179" step="1" placeholder="Hold to expiry">
@@ -142,15 +131,13 @@
             <div class="form-group">
               <label class="form-label" for="ob-exit-delta">Close when a short option's delta reaches</label>
               <input type="number" id="ob-exit-delta" min="0.05" max="0.95" step="0.05" placeholder="Never">
-              <p class="check-desc" style="margin-top:6px;">0.50 closes a short strike once the price reaches it. When
-                positions open one at a time, the next opens the same day: a roll.</p>
+              <p class="check-desc" style="margin-top:6px;">0.50 closes a short strike once the price reaches it; the next position opens the same day, a roll.</p>
             </div>
             <label class="check">
               <input type="checkbox" id="ob-exit-earn">
               <span class="check-title">Close the day before earnings</span>
               <span class="check-desc">Single stocks only. The next position opens after the report.</span>
             </label>
-            <p class="check-desc">Both are a percent of what the position cost or collected. A new position opens the day the last one closes.</p>
           </div>
         </details>
 
@@ -193,8 +180,7 @@
                 <option value="only">Only positions that hold through one</option>
               </select>
             </div>
-            <p class="check-desc">New positions open only on days that pass every rule; open positions are never closed by them.
-              IV rank is where today's implied volatility sits in its past year, 0 to 100.</p>
+            <p class="check-desc">New positions open only on days that pass every rule. IV rank places today's implied volatility in its past year, 0 to 100.</p>
           </div>
         </details>
 
@@ -211,19 +197,18 @@
                 <input type="number" id="ob-spread" min="0" max="20" step="0.5" placeholder="Auto">
               </div>
             </div>
-            <p class="check-desc" style="margin-top:-8px;margin-bottom:12px;">Auto charges 1% a side on index ETFs and 3% on single stocks, at least one cent a share.</p>
+            <p class="check-desc" style="margin-top:-8px;margin-bottom:14px;">Auto charges 1% a side on index ETFs and 3% on single stocks, at least one cent a share.</p>
             <label class="check">
               <input type="checkbox" id="ob-skew" checked>
               <span class="check-title">Volatility skew</span>
-              <span class="check-desc">Price out-of-the-money puts richer and calls cheaper, as real chains do. Turn off for flat volatility.</span>
+              <span class="check-desc">Prices out-of-the-money puts richer and calls cheaper, as real chains do.</span>
             </label>
           </div>
         </details>
 
         <div class="form-actions">
           <button type="button" class="btn btn-primary btn-block btn-lg" id="ob-run">Run options backtest</button>
-          <button type="button" class="btn btn-block" id="ob-compare">Compare all strategies</button>
-          <p class="form-hint">Runs every preset on the same underlying and period, then ranks them.</p>
+          <button type="button" class="btn btn-block" id="ob-compare" title="Runs every preset on the same underlying and period, then ranks them">Compare all strategies</button>
         </div>
       </aside>
 
@@ -232,29 +217,16 @@
 
         <div id="ob-empty">
           <div class="empty-state">
-            <h2 class="empty-title">Backtest an options strategy on real history.</h2>
-            <p class="empty-sub">From a single call to a four-leg iron condor: AlphaGlyph opens the position, marks it every day, applies your exit rules and rolls it, with every commission and bid/ask cost charged.</p>
-            <div class="empty-preview">
-              <div class="empty-preview-card">
-                <span class="epc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h16"/><path d="M4 18l5-9 4 6 3-4 4 7"/></svg></span>
-                <strong>Any structure</strong>
-                <span>19 presets from one to four legs plus the wheel, or build your own with up to six legs, stock included.</span>
-              </div>
-              <div class="empty-preview-card">
-                <span class="epc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span>
-                <strong>Clear about what it tests</strong>
-                <span>Every run spells out its legs: a collar is a three-leg backtest of long stock, a long put and a short call.</span>
-              </div>
-              <div class="empty-preview-card">
-                <span class="epc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></span>
-                <strong>Honest about prices</strong>
-                <span>Free historical option quotes don't exist, so prices are modelled from each day's close and volatility, and labelled that way.</span>
-              </div>
-            </div>
+            <h2 class="empty-title">Test an options strategy on real history.</h2>
+            <p class="empty-sub">From a single call to an iron condor: each position is opened, marked every day, managed by your exit rules
+              and rolled. Prices come from a volatility model, and every run says so.</p>
             <p class="empty-hint">Pick a strategy and press <strong>Run options backtest</strong>.</p>
           </div>
-          <div class="card opt-check" id="ob-check" hidden>
-            <div class="section-header">How close are the model prices to real ones? <span class="badge badge-green">Six Cboe indices, out of sample</span></div>
+          <details class="collapsible opt-evidence">
+            <summary>How close are the model's prices to real ones?</summary>
+            <div class="collapsible-body">
+<div class="card opt-check" id="ob-check" hidden>
+            <div class="section-header">Against six Cboe indices <span class="badge">Out of sample</span></div>
             <p class="card-desc" id="ob-check-lede"></p>
             <div class="table-wrap" id="ob-check-idx" hidden><table class="data-table opt-check-table opt-check-idx">
               <thead><tr><th>Index</th><th>Strategy</th><th>Model</th><th>Real</th><th>Gap</th><th>Before skew fit</th><th>Correlation</th><th title="The same replica rolled every four to five weeks instead of on the third Friday">If rolled weekly</th></tr></thead>
@@ -266,7 +238,7 @@
             <p class="fine" id="ob-check-fine"></p>
           </div>
           <div class="card opt-check" id="ob-quotes" hidden>
-            <div class="section-header">And against real option quotes? <span class="badge badge-green" id="ob-quotes-badge"></span></div>
+            <div class="section-header">Against real option quotes <span class="badge" id="ob-quotes-badge"></span></div>
             <p class="card-desc" id="ob-quotes-lede"></p>
             <div class="stats-grid" id="ob-quotes-stats" style="margin-bottom:14px;"></div>
             <div class="opt-sub">By underlying, at the money about a month out</div>
@@ -279,6 +251,8 @@
               <tbody id="ob-quotes-grp"></tbody></table></div>
             <p class="fine" id="ob-quotes-fine"></p>
           </div>
+            </div>
+          </details>
         </div>
 
         <div id="ob-loading" hidden>
@@ -295,10 +269,9 @@
         <div id="ob-compare-out" hidden>
           <div class="wf-banner opt-model-banner"><strong>Model-priced.</strong> <span id="ob-cmp-model"></span></div>
           <div class="card">
-            <div class="section-header">Options strategy leaderboard <span id="ob-cmp-meta" class="text-muted" style="margin-left:auto;font-size:12px;font-weight:400;"></span></div>
-            <p class="card-desc">Every preset run on the same underlying, period, expiry and costs, each at its default capital per position.
-              Those differ (a cash-secured put ties up most of the account, a spread a tenth), so raw returns aren't like for like:
-              rank by Sharpe, and read the capital at risk next to each. Click a row to open it.</p>
+            <div class="section-header">Strategy leaderboard <span id="ob-cmp-meta" class="text-muted" style="margin-left:auto;font-size:12px;font-weight:400;"></span></div>
+            <p class="card-desc">Every preset on the same underlying, period, expiry and costs. Each uses its own default position size,
+              so rank by Sharpe and read the capital at risk alongside. Select a row to open it.</p>
             <div class="opt-sub">Rank by
               <span class="seg" role="group" aria-label="Rank by" id="ob-cmp-sort">
                 <button type="button" class="seg-btn active" data-sort="sharpe">Sharpe</button>
@@ -329,7 +302,7 @@
           </div>
 
           <div class="card">
-            <div class="section-header">What this backtest holds <span class="badge badge-green" id="ob-legs-badge"></span></div>
+            <div class="section-header">What this backtest holds <span class="badge" id="ob-legs-badge"></span></div>
             <p class="card-desc" id="ob-headline"></p>
             <ol class="opt-leg-list" id="ob-leg-list"></ol>
             <p class="card-desc" id="ob-rules"></p>
@@ -414,6 +387,18 @@
       </div>
     </div>
   </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <nav aria-label="More">
+        <a href="screener.html">Screener</a>
+        <a href="portfolio.html">Portfolio optimizer</a>
+        <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Technical report</a>
+        <a href="https://github.com/Danny-397/Alphaglyph" rel="noopener">Source</a>
+      </nav>
+      <p>An educational project: real historical prices, simulated money. Nothing here is financial advice.</p>
+    </div>
+  </footer>
 
   <script src="config.js" defer></script>
   <script src="app.js" defer></script>

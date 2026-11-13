@@ -52,15 +52,15 @@ async function enableMlOption(selectEl) {
 }
 
 const REGIME_COLORS = {
-  TRENDING_UP:     '#3fb950',
-  TRENDING_DOWN:   '#ff6b61',
-  RANGING:         '#e3b341',
-  HIGH_VOLATILITY: '#e3913b',
+  TRENDING_UP:     '#30d158',
+  TRENDING_DOWN:   '#ff453a',
+  RANGING:         '#ffd60a',
+  HIGH_VOLATILITY: '#ff9f0a',
 }
 
 // Every trade is turned into a plain-English reason a beginner can follow — what
 // the strategy saw, in which market regime, and why it acted. Used by the
-// backtest trades table and the animated replay.
+// backtest trades table.
 const REGIME_PHRASE = {
   TRENDING_UP:     'an up-trending market',
   TRENDING_DOWN:   'a down-trending market',
@@ -324,7 +324,7 @@ function weightBars(weights) {
 // globals. An unguarded reference here threw at module scope and took the whole
 // of app.js down with it, which on that page meant the watchlist never wired up.
 if (typeof Chart !== 'undefined') {
-  Chart.defaults.color       = '#9ba49f'
+  Chart.defaults.color       = '#86868b'
   Chart.defaults.borderColor = 'rgba(255,255,255,0.08)'
   Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif"
   Chart.defaults.font.size   = 11
@@ -332,8 +332,8 @@ if (typeof Chart !== 'undefined') {
   Chart.defaults.plugins.legend.labels.boxHeight = 10
   Chart.defaults.plugins.legend.labels.usePointStyle = true
   Object.assign(Chart.defaults.plugins.tooltip, {
-    backgroundColor: 'rgba(32,36,35,0.96)', borderColor: 'rgba(255,255,255,0.14)', borderWidth: 1,
-    titleColor: '#f1f3f2', bodyColor: '#c9d0cc', padding: 10, cornerRadius: 8,
+    backgroundColor: 'rgba(44,44,46,0.94)', borderColor: 'rgba(255,255,255,0.14)', borderWidth: 1,
+    titleColor: '#f5f5f7', bodyColor: '#d1d1d6', padding: 10, cornerRadius: 8,
     titleFont: { weight: '600' }, displayColors: true, boxPadding: 4,
   })
 }
@@ -447,88 +447,6 @@ function initBacktest() {
   let ff3Chart = null
   let cmpChart = null
   let btRules  = null   // custom rule builder (lazy)
-  let lastResult  = null   // latest backtest result, for the replay
-  let replayChart = null
-  let replayTimer = null
-
-  // ── Animated replay of the last backtest ───────────────────────────────
-  function resetReplay() {
-    clearInterval(replayTimer); replayTimer = null
-    replayChart = destroyChart(replayChart)
-    const feed = el('bt-replay-feed')
-    if (feed) feed.innerHTML = '<div class="feed-empty">Press Play to replay the run.</div>'
-    const btn = el('bt-replay-btn')
-    if (btn) btn.textContent = '▶ Play'
-    // The chart stays collapsed until a replay starts, so an unplayed replay
-    // isn't a large empty box in the middle of the results.
-    const card = el('bt-playback')
-    if (card) card.classList.remove('is-playing')
-  }
-
-  function pushReplayTrade(t) {
-    const feed = el('bt-replay-feed')
-    if (!feed.querySelector('.sb-feed-item')) feed.innerHTML = ''
-    const isBuy = t.action === 'BUY'
-    const pnl = (t.action === 'SELL' && t.pnl != null)
-      ? `<span class="sb-feed-pnl ${clr(t.pnl)}">${fmt$(t.pnl)} (${fmtPct(t.pnl_pct)})</span>` : ''
-    const item = document.createElement('div')
-    item.className = 'sb-feed-item'
-    item.innerHTML =
-      `<div class="sb-feed-row"><span class="sb-feed-time">${t.date}</span>` +
-      `<span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${t.action}</span>` +
-      `<span class="sb-feed-tkr">${t.ticker}</span>` +
-      `<span class="sb-feed-trade">${fmtN(t.shares, 0)} @ ${fmt$(t.price)}</span>${pnl}</div>` +
-      `<div class="sb-feed-why">${tradeWhy(t)}</div>`
-    feed.insertBefore(item, feed.firstChild)
-    while (feed.children.length > 150) feed.removeChild(feed.lastChild)
-  }
-
-  function startReplay() {
-    const d = lastResult
-    const curve = (d && d.equity_curve) || []
-    if (!curve.length) return
-    const spyMap = {}; (d.spy_curve || []).forEach(p => { spyMap[p.date] = p.value })
-    const trades = (d.trades || []).slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-    let cursor = 0, tp = 0
-    el('bt-replay-feed').innerHTML = ''
-    el('bt-playback').classList.add('is-playing')
-    replayChart = destroyChart(replayChart)
-    replayChart = new Chart(el('bt-replay-chart').getContext('2d'), {
-      type: 'line',
-      data: { labels: [], datasets: [
-        { label: 'Strategy', data: [], borderColor: '#3fb950', borderWidth: 2, backgroundColor: 'rgba(63,185,80,0.07)', fill: true, tension: 0.2, pointRadius: 0 },
-        { label: 'SPY', data: [], borderColor: '#e3b341', borderWidth: 1.5, borderDash: [4, 4], fill: false, tension: 0.2, pointRadius: 0, spanGaps: true },
-      ] },
-      options: {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } } },
-        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0 } }, y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' } } },
-      },
-    })
-    el('bt-replay-btn').textContent = '⏸ Pause'
-    const SP = { slow: { d: 1, ms: 200 }, normal: { d: 1, ms: 60 }, fast: { d: 5, ms: 30 } }
-    const sp = SP[el('bt-replay-speed').value] || SP.normal
-    replayTimer = setInterval(() => {
-      for (let k = 0; k < sp.d && cursor < curve.length; k++) {
-        const date = curve[cursor].date
-        while (tp < trades.length && trades[tp].date <= date) { pushReplayTrade(trades[tp]); tp++ }
-        cursor++
-      }
-      const slice = curve.slice(0, cursor)
-      replayChart.data.labels = slice.map(p => p.date)
-      replayChart.data.datasets[0].data = slice.map(p => p.value)
-      replayChart.data.datasets[1].data = slice.map(p => (spyMap[p.date] != null ? spyMap[p.date] : null))
-      replayChart.update('none')
-      if (cursor >= curve.length) { clearInterval(replayTimer); replayTimer = null; el('bt-replay-btn').textContent = '↻ Replay' }
-    }, sp.ms)
-  }
-
-  const replayBtn = el('bt-replay-btn')
-  if (replayBtn) replayBtn.addEventListener('click', () => {
-    if (replayTimer) { clearInterval(replayTimer); replayTimer = null; replayBtn.textContent = '▶ Play'; return }
-    startReplay()
-  })
-
   el('bt-start').value = daysAgo(365)
   el('bt-end').value   = today()
 
@@ -771,8 +689,8 @@ function initBacktest() {
 
   // ── Strategy leaderboard (compare all strategies) ──────────────────────────
   const CMP_COLORS = {
-    adaptive: '#3fb950', ma_crossover: '#58a6ff', rsi: '#d2a8ff',
-    macd: '#e3913b', ml: '#f778ba',
+    adaptive: '#30d158', ma_crossover: '#0a84ff', rsi: '#bf5af2',
+    macd: '#ff9f0a', ml: '#ff375f',
   }
   const cmpBtn = el('compare-btn')
   if (cmpBtn) cmpBtn.addEventListener('click', runCompare)
@@ -860,14 +778,14 @@ function initBacktest() {
       return {
         label: r.label,
         data: labels.map(d => (m[d] != null ? m[d] : null)),
-        borderColor: CMP_COLORS[r.strategy] || '#9ba49f',
+        borderColor: CMP_COLORS[r.strategy] || '#86868b',
         borderWidth: 2, fill: false, tension: 0.2, pointRadius: 0, spanGaps: true,
       }
     })
     const spyMap = byDate(data.spy_curve)
     datasets.push({
       label: 'SPY Benchmark', data: labels.map(d => (spyMap[d] != null ? spyMap[d] : null)),
-      borderColor: '#e3b341', borderWidth: 1.5, borderDash: [4, 4],
+      borderColor: '#86868b', borderWidth: 1.5, borderDash: [4, 4],
       fill: false, tension: 0.2, pointRadius: 0, spanGaps: true,
     })
 
@@ -952,8 +870,6 @@ function initBacktest() {
 
   function renderResults(data) {
     const m = data.metrics || {}
-    lastResult = data
-    resetReplay()
 
     const wfb = el('wf-banner')
     if (data.walk_forward?.enabled && data.walk_forward.split_date) {
@@ -1053,13 +969,13 @@ function initBacktest() {
     const datasets = [
       {
         label: 'Strategy', data: curve.map(p => p.value),
-        borderColor: '#3fb950', borderWidth: 2,
-        backgroundColor: 'rgba(63,185,80,0.06)', fill: true, tension: 0.2, pointRadius: 0,
+        borderColor: '#0a84ff', borderWidth: 2,
+        backgroundColor: 'rgba(10,132,255,0.10)', fill: true, tension: 0.2, pointRadius: 0,
       },
     ]
     if (spy.length) datasets.push({
       label: 'SPY Benchmark', data: spy.map(p => p.value),
-      borderColor: '#e3b341', borderWidth: 1.5, borderDash: [4, 4],
+      borderColor: '#86868b', borderWidth: 1.5, borderDash: [4, 4],
       fill: false, tension: 0.2, pointRadius: 0,
     })
     datasets.push({
@@ -1122,7 +1038,7 @@ function initBacktest() {
             <th>Regime</th><th>% of Time</th><th>Strategy</th><th>SPY</th><th>Excess</th><th>Sharpe</th>
           </tr></thead>
           <tbody>${cond.map(([r, v]) => `<tr>
-            <td><span style="color:${REGIME_COLORS[r] || '#9ba49f'};font-weight:700;">${v.label || r}</span></td>
+            <td><span style="color:${REGIME_COLORS[r] || '#86868b'};font-weight:700;">${v.label || r}</span></td>
             <td>${v.pct_of_time}%</td>
             <td class="${clr(v.strat_return)}">${fmtPct(v.strat_return)}</td>
             <td>${v.spy_return == null ? '—' : fmtPct(v.spy_return)}</td>
@@ -1142,7 +1058,7 @@ function initBacktest() {
             <th>Total P&L</th><th>Avg P&L</th><th>Best</th><th>Worst</th>
           </tr></thead>
           <tbody>${entries.map(([r, v]) => `<tr>
-            <td><span style="color:${REGIME_COLORS[r] || '#9ba49f'};font-weight:700;">${v.label || r}</span></td>
+            <td><span style="color:${REGIME_COLORS[r] || '#86868b'};font-weight:700;">${v.label || r}</span></td>
             <td>${v.trade_count}</td>
             <td>${v.win_rate}%</td>
             <td class="${clr(v.total_pnl)}">${fmt$(v.total_pnl)}</td>
@@ -1170,10 +1086,10 @@ function initBacktest() {
       data: {
         labels: fc.dates,
         datasets: [
-          { label: 'P95',          data: fc.p95, borderColor: 'transparent', backgroundColor: 'rgba(63,185,80,0.04)', fill: '+1', pointRadius: 0 },
-          { label: 'P75',          data: fc.p75, borderColor: 'transparent', backgroundColor: 'rgba(63,185,80,0.08)', fill: '+1', pointRadius: 0 },
-          { label: 'P50 (Median)', data: fc.p50, borderColor: 'rgba(63,185,80,0.5)', borderWidth: 1.5, borderDash: [4, 3], backgroundColor: 'rgba(63,185,80,0.08)', fill: '+1', pointRadius: 0 },
-          { label: 'P25',          data: fc.p25, borderColor: 'transparent', backgroundColor: 'rgba(63,185,80,0.04)', fill: '+1', pointRadius: 0 },
+          { label: 'P95',          data: fc.p95, borderColor: 'transparent', backgroundColor: 'rgba(10,132,255,0.10)', fill: '+1', pointRadius: 0 },
+          { label: 'P75',          data: fc.p75, borderColor: 'transparent', backgroundColor: 'rgba(10,132,255,0.20)', fill: '+1', pointRadius: 0 },
+          { label: 'P50 (Median)', data: fc.p50, borderColor: 'rgba(10,132,255,0.9)', borderWidth: 1.5, borderDash: [4, 3], backgroundColor: 'rgba(10,132,255,0.20)', fill: '+1', pointRadius: 0 },
+          { label: 'P25',          data: fc.p25, borderColor: 'transparent', backgroundColor: 'rgba(10,132,255,0.10)', fill: '+1', pointRadius: 0 },
           { label: 'P5',           data: fc.p5,  borderColor: 'transparent', backgroundColor: 'transparent', fill: false, pointRadius: 0 },
           {
             label: 'Actual Strategy',
@@ -1343,8 +1259,8 @@ function initBacktest() {
             labels: ['β Market', 'β SMB (Size)', 'β HML (Value)'],
             datasets: [{
               data:            [ff3.beta_market, ff3.beta_smb, ff3.beta_hml],
-              backgroundColor: ['rgba(63,185,80,0.55)', 'rgba(210,168,255,0.55)', 'rgba(227,179,65,0.55)'],
-              borderColor:     ['#3fb950', '#d2a8ff', '#e3b341'],
+              backgroundColor: ['rgba(48,209,88,0.55)', 'rgba(191,90,242,0.55)', 'rgba(255,214,10,0.55)'],
+              borderColor:     ['#30d158', '#bf5af2', '#ffd60a'],
               borderWidth:     1, borderRadius: 4,
             }],
           },
@@ -1486,13 +1402,13 @@ function initPortfolio() {
           {
             label: 'Efficient Frontier',
             data:  frontier.map(p => ({ x: p.volatility, y: p.return })),
-            borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.12)',
+            borderColor: '#30d158', backgroundColor: 'rgba(48,209,88,0.12)',
             showLine: true, tension: 0.3, pointRadius: 2.5, borderWidth: 2,
           },
           {
             label: '★ Max-Sharpe',
             data:  [{ x: ms.volatility, y: ms.expected_return }],
-            borderColor: '#e3b341', backgroundColor: '#e3b341',
+            borderColor: '#ffd60a', backgroundColor: '#ffd60a',
             pointRadius: 10, pointStyle: 'star', pointHoverRadius: 13,
           },
           {
@@ -1504,7 +1420,7 @@ function initPortfolio() {
           {
             label: 'Individual Assets',
             data:  Object.entries(assets).map(([t, a]) => ({ x: a.volatility, y: a.expected_return, label: t })),
-            borderColor: '#9ba49f', backgroundColor: 'rgba(138,151,143,0.5)',
+            borderColor: '#86868b', backgroundColor: 'rgba(134,134,139,0.5)',
             pointRadius: 5, pointHoverRadius: 7,
           },
         ],
@@ -1520,8 +1436,8 @@ function initPortfolio() {
           }}},
         },
         scales: {
-          x: { title: { display: true, text: 'Annualised Volatility (%)', color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
-          y: { title: { display: true, text: 'Annualised Return (%)',    color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
+          x: { title: { display: true, text: 'Annualised Volatility (%)', color: '#86868b' }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
+          y: { title: { display: true, text: 'Annualised Return (%)',    color: '#86868b' }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v.toFixed(1) + '%' } },
         },
       },
     })
@@ -1554,8 +1470,8 @@ function initPortfolio() {
     )
 
     const cellColor = v => v >= 0
-      ? `rgba(63,185,80,${0.08 + Math.abs(v) * 0.65})`
-      : `rgba(248,81,73,${0.08 + Math.abs(v) * 0.65})`
+      ? `rgba(48,209,88,${0.08 + Math.abs(v) * 0.65})`
+      : `rgba(255,69,58,${0.08 + Math.abs(v) * 0.65})`
 
     const textColor = v => Math.abs(v) > 0.45 ? 'var(--text)' : 'var(--muted)'
 
@@ -1877,24 +1793,24 @@ function initPredictor() {
         datasets: [
           { label: 'Perfect calibration', type: 'line',
             data: [{ x: axLo, y: axLo }, { x: axHi, y: axHi }],
-            borderColor: 'rgba(138,151,143,0.6)', borderDash: [6, 5], borderWidth: 1.5,
+            borderColor: 'rgba(134,134,139,0.6)', borderDash: [6, 5], borderWidth: 1.5,
             pointRadius: 0, fill: false },
           { label: 'Predicted vs actual',
             data: pts,
-            backgroundColor: 'rgba(63,185,80,0.75)', borderColor: '#3fb950', borderWidth: 1,
+            backgroundColor: 'rgba(10,132,255,0.75)', borderColor: '#0a84ff', borderWidth: 1,
             pointRadius: c => 4 + 8 * (c.raw.n / maxN), pointHoverRadius: c => 6 + 8 * (c.raw.n / maxN) },
         ],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { min: axLo, max: axHi, title: { display: true, text: 'Predicted P(up)', color: '#9ba49f' },
-               ticks: { color: '#9ba49f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
-          y: { min: axLo, max: axHi, title: { display: true, text: 'Actual frequency of up-moves', color: '#9ba49f' },
-               ticks: { color: '#9ba49f', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          x: { min: axLo, max: axHi, title: { display: true, text: 'Predicted P(up)', color: '#86868b' },
+               ticks: { color: '#86868b', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { min: axLo, max: axHi, title: { display: true, text: 'Actual frequency of up-moves', color: '#86868b' },
+               ticks: { color: '#86868b', callback: v => Math.round(v * 100) + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
-          legend: { labels: { color: '#9ba49f', usePointStyle: true, filter: i => i.text !== 'Perfect calibration' } },
+          legend: { labels: { color: '#86868b', usePointStyle: true, filter: i => i.text !== 'Perfect calibration' } },
           tooltip: { callbacks: { label: c => `pred ${Math.round(c.raw.x * 100)}% → actual ${Math.round(c.raw.y * 100)}% (n=${c.raw.n})` } },
         },
       },
@@ -1988,6 +1904,10 @@ function initPredictor() {
   run.addEventListener('click', predict)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); predict() } })
   renderQuick()
+  // Both records are saved files served with the site, so show them on arrival
+  // rather than behind a button; the button then refreshes them.
+  calBtn.click()
+  ledgerBtn.click()
 }
 
 // ── Research Lab (PEAD event study + Data-Mining Lab) ────────────────────────
@@ -1995,7 +1915,7 @@ function initResearch() {
   let peadChart = null, dmChart = null
 
   // ── PEAD event study ───────────────────────────────────────────────────────
-  const CURVE_COLOR = { beat: '#3fb950', inline: '#9ba49f', miss: '#ff6b61' }
+  const CURVE_COLOR = { beat: '#30d158', inline: '#86868b', miss: '#ff453a' }
 
   function renderPead(data) {
     const box = el('pead-result'); box.hidden = false
@@ -2033,10 +1953,10 @@ function initResearch() {
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { title: { display: true, text: 'Trading days after report', color: '#9ba49f' },
-               ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
-          y: { title: { display: true, text: 'Cumulative abnormal return (%)', color: '#9ba49f' },
-               ticks: { color: '#9ba49f', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          x: { title: { display: true, text: 'Trading days after report', color: '#86868b' },
+               ticks: { color: '#86868b' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { title: { display: true, text: 'Cumulative abnormal return (%)', color: '#86868b' },
+               ticks: { color: '#86868b', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: { legend: { labels: { color: '#c9d3cd', usePointStyle: true, boxWidth: 8 } } },
       },
@@ -2088,25 +2008,25 @@ function initResearch() {
     const vline = (x, color, text) => ({
       type: 'line', xMin: x, xMax: x, borderColor: color, borderWidth: 2, borderDash: [5, 4],
       label: { display: true, content: text, color: color, position: 'start',
-               font: { size: 10 }, backgroundColor: 'rgba(32,36,35,0.92)' },
+               font: { size: 10 }, backgroundColor: 'rgba(44,44,46,0.94)' },
     })
     if (dmChart) dmChart.destroy()
     dmChart = new Chart(el('dm-chart'), {
       type: 'bar',
       data: { labels, datasets: [{ label: 'Random strategies', data: counts,
-              backgroundColor: 'rgba(138,151,143,0.55)', borderWidth: 0, barPercentage: 1, categoryPercentage: 1 }] },
+              backgroundColor: 'rgba(134,134,139,0.55)', borderWidth: 0, barPercentage: 1, categoryPercentage: 1 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { type: 'linear', offset: false, title: { display: true, text: 'Backtested Sharpe ratio', color: '#9ba49f' },
-               ticks: { color: '#9ba49f', maxTicksLimit: 10 }, grid: { display: false } },
-          y: { title: { display: true, text: 'Count', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          x: { type: 'linear', offset: false, title: { display: true, text: 'Backtested Sharpe ratio', color: '#86868b' },
+               ticks: { color: '#86868b', maxTicksLimit: 10 }, grid: { display: false } },
+          y: { title: { display: true, text: 'Count', color: '#86868b' }, ticks: { color: '#86868b' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
           legend: { display: false },
           annotation: { annotations: {
-            best: vline(data.best_sharpe, '#e3b341', `best ${data.best_sharpe}`),
-            emax: data.expected_max_sharpe != null ? vline(data.expected_max_sharpe, '#9ba49f', `E[max] ${data.expected_max_sharpe}`) : {},
+            best: vline(data.best_sharpe, '#ffd60a', `best ${data.best_sharpe}`),
+            emax: data.expected_max_sharpe != null ? vline(data.expected_max_sharpe, '#86868b', `E[max] ${data.expected_max_sharpe}`) : {},
           } },
         },
       },
@@ -2166,7 +2086,7 @@ function initResearch() {
     // λ histogram
     const labels = data.logit_hist.map(h => h.x)
     const counts = data.logit_hist.map(h => h.count)
-    const bars = data.logit_hist.map(h => h.x < 0 ? 'rgba(248,81,73,0.55)' : 'rgba(63,185,80,0.55)')
+    const bars = data.logit_hist.map(h => h.x < 0 ? 'rgba(255,69,58,0.55)' : 'rgba(48,209,88,0.55)')
     if (cpcvHist) cpcvHist.destroy()
     cpcvHist = new Chart(el('cpcv-hist'), {
       type: 'bar',
@@ -2174,15 +2094,15 @@ function initResearch() {
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { type: 'linear', offset: false, title: { display: true, text: 'λ = logit(OOS rank)', color: '#9ba49f' },
-               ticks: { color: '#9ba49f', maxTicksLimit: 8 }, grid: { display: false } },
-          y: { title: { display: true, text: 'Splits', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          x: { type: 'linear', offset: false, title: { display: true, text: 'λ = logit(OOS rank)', color: '#86868b' },
+               ticks: { color: '#86868b', maxTicksLimit: 8 }, grid: { display: false } },
+          y: { title: { display: true, text: 'Splits', color: '#86868b' }, ticks: { color: '#86868b' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
           legend: { display: false },
           annotation: { annotations: { zero: {
-            type: 'line', xMin: 0, xMax: 0, borderColor: '#e3b341', borderWidth: 2, borderDash: [5, 4],
-            label: { display: true, content: 'overfit ◄ │ ► holds up', color: '#e3b341', position: 'end', font: { size: 10 }, backgroundColor: 'rgba(32,36,35,0.92)' } } } },
+            type: 'line', xMin: 0, xMax: 0, borderColor: '#ffd60a', borderWidth: 2, borderDash: [5, 4],
+            label: { display: true, content: 'overfit ◄ │ ► holds up', color: '#ffd60a', position: 'end', font: { size: 10 }, backgroundColor: 'rgba(44,44,46,0.94)' } } } },
         },
       },
     })
@@ -2197,17 +2117,17 @@ function initResearch() {
       type: 'scatter',
       data: { datasets: [
         { label: 'y = x (no decay)', type: 'line', data: [{ x: xLo, y: xLo }, { x: xHi, y: xHi }],
-          borderColor: 'rgba(138,151,143,0.6)', borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false },
-        { label: 'IS→OOS fit', type: 'line', data: reg, borderColor: '#58a6ff', borderWidth: 2, pointRadius: 0, fill: false },
-        { label: 'Selected champion', data: pts, backgroundColor: 'rgba(63,185,80,0.55)', borderColor: '#3fb950', borderWidth: 1, pointRadius: 3 },
+          borderColor: 'rgba(134,134,139,0.6)', borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false },
+        { label: 'IS→OOS fit', type: 'line', data: reg, borderColor: '#0a84ff', borderWidth: 2, pointRadius: 0, fill: false },
+        { label: 'Selected champion', data: pts, backgroundColor: 'rgba(48,209,88,0.55)', borderColor: '#30d158', borderWidth: 1, pointRadius: 3 },
       ] },
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { title: { display: true, text: 'In-sample Sharpe', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
-          y: { title: { display: true, text: 'Out-of-sample Sharpe', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          x: { title: { display: true, text: 'In-sample Sharpe', color: '#86868b' }, ticks: { color: '#86868b' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { title: { display: true, text: 'Out-of-sample Sharpe', color: '#86868b' }, ticks: { color: '#86868b' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
-        plugins: { legend: { labels: { color: '#9ba49f', usePointStyle: true, boxWidth: 8, filter: i => i.text !== 'y = x (no decay)' } } },
+        plugins: { legend: { labels: { color: '#86868b', usePointStyle: true, boxWidth: 8, filter: i => i.text !== 'y = x (no decay)' } } },
       },
     })
   }
@@ -2247,24 +2167,24 @@ function initResearch() {
     const pts = data.points
     const labels = pts.map(p => p.cost_bps)
     const anns = {}
-    if (beBench != null) anns.beB = { type: 'line', xMin: beBench, xMax: beBench, borderColor: '#e3b341', borderWidth: 2, borderDash: [5, 4],
-      label: { display: true, content: `edge dies @ ${beBench}bp`, color: '#e3b341', position: 'start', font: { size: 10 }, backgroundColor: 'rgba(32,36,35,0.92)' } }
+    if (beBench != null) anns.beB = { type: 'line', xMin: beBench, xMax: beBench, borderColor: '#ffd60a', borderWidth: 2, borderDash: [5, 4],
+      label: { display: true, content: `edge dies @ ${beBench}bp`, color: '#ffd60a', position: 'start', font: { size: 10 }, backgroundColor: 'rgba(44,44,46,0.94)' } }
     if (costChart) costChart.destroy()
     costChart = new Chart(el('cost-chart'), {
       type: 'line',
       data: { labels, datasets: [
-        { label: 'Strategy net return', data: pts.map(p => p.net_return), borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.08)', borderWidth: 2, fill: true, tension: 0.2, pointRadius: 3 },
-        { label: 'Buy & hold (SPY)', data: pts.map(() => data.benchmark_return), borderColor: '#e3b341', borderWidth: 1.5, borderDash: [5, 4], fill: false, pointRadius: 0 },
+        { label: 'Strategy net return', data: pts.map(p => p.net_return), borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.10)', borderWidth: 2, fill: true, tension: 0.2, pointRadius: 3 },
+        { label: 'Buy & hold (SPY)', data: pts.map(() => data.benchmark_return), borderColor: '#86868b', borderWidth: 1.5, borderDash: [5, 4], fill: false, pointRadius: 0 },
       ] },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         scales: {
-          x: { title: { display: true, text: 'Transaction cost per side (basis points)', color: '#9ba49f' }, ticks: { color: '#9ba49f' }, grid: { display: false } },
-          y: { title: { display: true, text: 'Total return (%)', color: '#9ba49f' }, ticks: { color: '#9ba49f', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          x: { title: { display: true, text: 'Transaction cost per side (basis points)', color: '#86868b' }, ticks: { color: '#86868b' }, grid: { display: false } },
+          y: { title: { display: true, text: 'Total return (%)', color: '#86868b' }, ticks: { color: '#86868b', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
         plugins: {
-          legend: { labels: { color: '#9ba49f', usePointStyle: true, boxWidth: 10 } },
+          legend: { labels: { color: '#86868b', usePointStyle: true, boxWidth: 10 } },
           tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${fmtPct(c.parsed.y)}` } },
           annotation: { annotations: anns },
         },
