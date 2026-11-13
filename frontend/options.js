@@ -15,6 +15,7 @@ Object.assign(GLOSSARY, {
   'Longest Drawdown': 'The longest stretch, in calendar days, spent below a previous high.',
 })
 
+const OB_CUSTOM_ALLOC = 10        // capital per position for custom legs, % (the backend's default)
 const OB_GROUPS = ['Single leg', 'Two legs', 'Three legs', 'Four legs', 'Cycle']
 const OB_STRIKE_MODES = [['atm', 'At the money'], ['pct', '% from price'], ['delta', 'Delta'], ['offset', '% from leg']]
 const obState = { presets: [], byKey: {}, legs: [], result: null, charts: {} }
@@ -129,6 +130,10 @@ function obRenderWhat() {
 function obPickStrategy() {
   const key = el('ob-strategy').value
   if (key !== 'custom' && obState.byKey[key]) el('ob-alloc').value = obState.byKey[key].alloc
+  // Custom legs size like the backend's default (10% per position). Without this they kept the
+  // previous preset's share: the page opens on the collar at 100%, so a strategy imported from
+  // Tradeski put the whole account into each position. A share link's own size is applied after this.
+  if (key === 'custom') el('ob-alloc').value = OB_CUSTOM_ALLOC
   if (key === 'custom' && !obState.legs.length) {
     obState.legs = [{ type: 'put', side: 'short', qty: 1, strike: { mode: 'delta', value: 0.3 } },
                     { type: 'put', side: 'long', qty: 1, strike: { mode: 'offset', leg: 0, value: -5 } }]
