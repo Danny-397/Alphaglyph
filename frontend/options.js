@@ -89,6 +89,11 @@ function obEntry(num) {
 // ── strategy picker and the "what this holds" box ──────────────────────────
 
 function obRenderWhat() {
+  obRenderWhatBox()
+  obRenderLearn()
+}
+
+function obRenderWhatBox() {
   const key = el('ob-strategy').value
   const custom = key === 'custom'
   el('ob-custom').hidden = !custom
@@ -807,6 +812,7 @@ async function initOptionsBacktest() {
       `<option value="${p.key}">${p.name}</option>`).join('')}</optgroup>` : ''
   }).join('') + '<optgroup label="Your own"><option value="custom">Custom (build the legs)</option></optgroup>'
   sel.value = obState.byKey.collar ? 'collar' : sel.options[0].value
+  obBuildGallery()
   obPickStrategy()
   obApplyImport()
 
@@ -869,3 +875,228 @@ async function initOptionsBacktest() {
 }
 
 if (document.body.dataset.page === 'options') initOptionsBacktest()
+
+// ══ Strategy gallery and explainer ═══════════════════════════════════════
+// The page is for learning what each structure does, so strategies are picked
+// from cards that show their shape, and the space where results will appear
+// first explains the chosen one in plain words.
+
+const OB_CATS = [
+  ['all', 'All'], ['bullish', 'Bullish'], ['bearish', 'Bearish'], ['income', 'Income'],
+  ['range', 'Range-bound'], ['move', 'Big move'], ['protect', 'Protection'],
+]
+
+const OB_LEARN = {
+  long_call:        { cat: 'bullish', idea: "Pay a premium for the right to buy the stock at today's price.",
+    wins: 'The stock rises by more than the premium before expiry.',
+    risk: "If it doesn't rise enough, the whole premium is lost, and time decay costs you every day." },
+  long_put:         { cat: 'bearish', idea: "Pay a premium for the right to sell the stock at today's price.",
+    wins: 'The stock falls by more than the premium before expiry.',
+    risk: "If it doesn't fall enough, the whole premium is lost, and time decay costs you every day." },
+  short_put:        { cat: 'income', idea: "Get paid to promise to buy the stock a little below today's price, with the cash set aside.",
+    wins: 'The stock stays flat or rises: the put expires and you keep the premium.',
+    risk: 'In a sharp fall you buy the shares at the strike, well above where they trade.' },
+  short_call:       { cat: 'income', idea: "Get paid to promise to sell shares you don't own, above today's price.",
+    wins: 'The stock stays flat or falls: you keep the premium.',
+    risk: 'A strong rally. The loss has no ceiling, which is why this one reserves extra capital.' },
+  covered_call:     { cat: 'income', idea: 'Own 100 shares and sell a call above the price for income.',
+    wins: "Flat or gently rising markets, where the premium adds to the stock's return.",
+    risk: "You keep all of the stock's downside but give up its gains above the strike." },
+  protective_put:   { cat: 'protect', idea: 'Own 100 shares and buy a put below the price as insurance.',
+    wins: 'A strong rally, or a crash the put protects you from.',
+    risk: 'The insurance costs something every month, a steady drag in calm markets.' },
+  bull_call_spread: { cat: 'bullish', idea: 'Buy a call and sell a higher one, so the bet costs less.',
+    wins: 'A moderate rise up to the upper strike.',
+    risk: "The premium is lost if the stock doesn't rise, and the gain is capped at the upper strike." },
+  bear_put_spread:  { cat: 'bearish', idea: 'Buy a put and sell a lower one, so the bet costs less.',
+    wins: 'A moderate fall down to the lower strike.',
+    risk: "The premium is lost if the stock doesn't fall, and the gain is capped at the lower strike." },
+  bull_put_spread:  { cat: 'bullish', idea: "Sell a put and buy a lower one as a floor. You're paid up front.",
+    wins: 'The stock stays above the short strike.',
+    risk: 'A fall through both strikes loses the gap between them, less the premium.' },
+  bear_call_spread: { cat: 'bearish', idea: "Sell a call and buy a higher one as a ceiling. You're paid up front.",
+    wins: 'The stock stays below the short strike.',
+    risk: 'A rally through both strikes loses the gap between them, less the premium.' },
+  long_straddle:    { cat: 'move', idea: 'Buy a call and a put at the same strike: a bet on movement, not direction.',
+    wins: 'A big move either way, larger than the two premiums.',
+    risk: 'A quiet market, where both options lose value every day.' },
+  short_straddle:   { cat: 'range', idea: 'Sell a call and a put at the same strike and collect both premiums.',
+    wins: 'The price stays pinned near the strike.',
+    risk: 'A big move either way; on the upside the loss has no ceiling.' },
+  long_strangle:    { cat: 'move', idea: 'Buy a call above and a put below the price. Cheaper than a straddle.',
+    wins: 'A move big enough to get past either strike by more than the cost.',
+    risk: 'Needs a bigger move than a straddle; a quiet market loses both premiums.' },
+  short_strangle:   { cat: 'range', idea: 'Sell a call above and a put below the price, for a wide range.',
+    wins: 'The price stays between the two strikes.',
+    risk: 'A breakout past either strike, with no limit on the upside.' },
+  calendar_call:    { cat: 'range', idea: 'Sell a near-month call and buy a later one at the same strike.',
+    wins: 'The price stays near the strike while the near option decays faster.',
+    risk: 'A big move either way, which erases the difference between the two.' },
+  collar:           { cat: 'protect', idea: 'Own 100 shares, buy a put below and sell a call above to pay for it.',
+    wins: 'Any market where you want a known band of outcomes.',
+    risk: 'Gains above the call are given up in exchange for the protection.' },
+  call_butterfly:   { cat: 'range', idea: 'Three strikes: a cheap bet that the price ends near the middle one.',
+    wins: "The price finishes close to today's.",
+    risk: 'The small premium is lost if the price ends outside the outer strikes.' },
+  iron_condor:      { cat: 'range', idea: 'Sell a put spread below and a call spread above the price.',
+    wins: 'The price stays inside the range between the short strikes.',
+    risk: 'A breakout past either side loses the width of that spread, less the premium.' },
+  iron_butterfly:   { cat: 'range', idea: 'Sell a put and a call at the price and buy protection on both sides.',
+    wins: 'The price stays very close to where it started.',
+    risk: 'A move out to either wing loses the width, less the premium.' },
+  wheel:            { cat: 'income', idea: "Sell puts until you're assigned shares, then sell calls on them until they're called away.",
+    wins: 'Steady or rising markets, collecting premium at every step.',
+    risk: 'You hold the shares through a decline, with only the premiums as a cushion.' },
+}
+const OB_CUSTOM_LEARN = { idea: 'Your own combination of up to six legs: calls, puts and shares.',
+  wins: 'Read the shape: green is where the position profits at the first expiry.',
+  risk: 'Red is where it loses. A line still sloping at the edge keeps going.' }
+
+// ── payoff at the first expiry, priced with Black-Scholes ─────────────────
+// A teaching picture, not the backtest's pricing: flat 20% volatility, a
+// 4% rate, the price at 100. The backtest itself prices from each day's data.
+const OB_VOL = 0.2, OB_RATE = 0.04
+
+function obNorm(x) {                        // standard normal CDF (Abramowitz-Stegun 7.1.26)
+  const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2)
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
+    t * Math.exp(-x * x / 2)
+  return x >= 0 ? (1 + y) / 2 : (1 - y) / 2
+}
+
+function obBS(type, S, K, T) {
+  if (T <= 0) return Math.max(type === 'call' ? S - K : K - S, 0)
+  const sq = OB_VOL * Math.sqrt(T)
+  const d1 = (Math.log(S / K) + (OB_RATE + OB_VOL * OB_VOL / 2) * T) / sq, d2 = d1 - sq
+  return type === 'call' ? S * obNorm(d1) - K * Math.exp(-OB_RATE * T) * obNorm(d2)
+                         : K * Math.exp(-OB_RATE * T) * obNorm(-d2) - S * obNorm(-d1)
+}
+
+function obStrikeFor(leg, ks, T) {
+  const s = leg.strike || { mode: 'atm' }, v = Number(s.value) || 0
+  if (s.mode === 'pct') return 100 * (1 + v / 100)
+  if (s.mode === 'offset') return (ks[s.leg] ?? 100) + v
+  if (s.mode === 'delta' && v > 0 && v < 1) {   // the strike whose delta matches, by bisection
+    let lo = 40, hi = 250
+    for (let i = 0; i < 60; i++) {
+      const K = (lo + hi) / 2
+      const d1 = (Math.log(100 / K) + (OB_RATE + OB_VOL * OB_VOL / 2) * T) / (OB_VOL * Math.sqrt(T))
+      const delta = leg.type === 'call' ? obNorm(d1) : 1 - obNorm(d1)   // put delta, as a positive number
+      if (leg.type === 'call' ? delta > v : delta < v) lo = K; else hi = K
+    }
+    return (lo + hi) / 2
+  }
+  return 100
+}
+
+function obPayoff(legs, dte) {
+  const opts = legs.filter(l => l.type !== 'stock')
+  const front = opts.length ? Math.min(...opts.map(l => l.dte || dte)) : dte
+  const ks = [], prem = []
+  legs.forEach((l, i) => {
+    if (l.type === 'stock') { ks.push(null); prem.push(100); return }
+    const T = (l.dte || dte) / 365
+    ks.push(obStrikeFor(l, ks, T))
+    prem.push(obBS(l.type, 100, ks[i], T))
+  })
+  const xs = [], ys = []
+  for (let S = 70; S <= 130.001; S += 0.75) {
+    let pnl = 0
+    legs.forEach((l, i) => {
+      const sign = (l.side === 'short' ? -1 : 1) * Number(l.qty || 1)
+      const val = l.type === 'stock' ? S : obBS(l.type, S, ks[i], ((l.dte || dte) - front) / 365)
+      pnl += sign * (val - prem[i])
+    })
+    xs.push(S); ys.push(pnl)
+  }
+  return { xs, ys, strikes: ks.filter(k => k != null) }
+}
+
+let obSvgId = 0
+function obPayoffSVG(legs, dte, big) {
+  if (!legs || !legs.length) return ''
+  const { xs, ys, strikes } = obPayoff(legs, dte)
+  const W = big ? 560 : 120, H = big ? 200 : 52, pad = big ? 12 : 3
+  const m = Math.max(...ys.map(Math.abs), 0.01)
+  const X = x => pad + (x - 70) / 60 * (W - 2 * pad)
+  const Y = y => H / 2 - y / m * (H / 2 - pad)
+  const pts = xs.map((x, i) => `${X(x).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join(' ')
+  const area = `${X(70)},${H / 2} ${pts} ${X(130)},${H / 2}`
+  const id = `obp${++obSvgId}`
+  const marks = !big ? '' :
+    strikes.filter(k => k > 70 && k < 130).map(k =>
+      `<line x1="${X(k)}" x2="${X(k)}" y1="${pad}" y2="${H - pad}" class="opt-pay-strike"/>`).join('') +
+    `<line x1="${X(100)}" x2="${X(100)}" y1="${pad}" y2="${H - pad}" class="opt-pay-now"/>`
+  return `<svg class="opt-pay${big ? ' opt-pay-big' : ''}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><clipPath id="${id}u"><rect x="0" y="0" width="${W}" height="${H / 2}"/></clipPath>
+      <clipPath id="${id}d"><rect x="0" y="${H / 2}" width="${W}" height="${H / 2}"/></clipPath></defs>
+    ${marks}
+    <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="opt-pay-zero"/>
+    <g clip-path="url(#${id}u)"><polygon points="${area}" class="opt-pay-up-fill"/><polyline points="${pts}" class="opt-pay-up"/></g>
+    <g clip-path="url(#${id}d)"><polygon points="${area}" class="opt-pay-dn-fill"/><polyline points="${pts}" class="opt-pay-dn"/></g>
+  </svg>`
+}
+
+function obLegsFor(key) {
+  if (key === 'custom') return obState.legs
+  const p = obState.byKey[key]
+  return p ? p.legs : []
+}
+
+function obBuildGallery() {
+  const wrap = el('ob-cards'), bar = el('ob-filter')
+  if (!wrap || !bar) return
+  bar.innerHTML = OB_CATS.map(([k, t], i) =>
+    `<button type="button" class="seg-btn${i ? '' : ' active'}" data-cat="${k}" aria-pressed="${!i}">${t}</button>`).join('')
+  wrap.innerHTML = obState.presets.map(p => `<button type="button" class="opt-card" data-key="${p.key}"
+      data-cat="${(OB_LEARN[p.key] || {}).cat || ''}" aria-pressed="false">
+      ${obPayoffSVG(p.legs, 30, false)}
+      <span class="opt-card-name">${p.name}</span>
+      <span class="opt-card-view">${p.view}</span>
+    </button>`).join('') +
+    `<button type="button" class="opt-card opt-card-own" data-key="custom" data-cat="" aria-pressed="false">
+      <span class="opt-card-plus" aria-hidden="true">+</span>
+      <span class="opt-card-name">Build your own</span>
+      <span class="opt-card-view">Up to six legs</span>
+    </button>`
+  bar.addEventListener('click', e => {
+    const b = e.target.closest('[data-cat]')
+    if (!b) return
+    bar.querySelectorAll('.seg-btn').forEach(x => {
+      x.classList.toggle('active', x === b)
+      x.setAttribute('aria-pressed', String(x === b))
+    })
+    wrap.querySelectorAll('.opt-card').forEach(c => {
+      c.hidden = !(b.dataset.cat === 'all' || c.dataset.cat === b.dataset.cat || c.dataset.key === 'custom')
+    })
+  })
+  wrap.addEventListener('click', e => {
+    const c = e.target.closest('.opt-card')
+    if (!c) return
+    el('ob-strategy').value = c.dataset.key
+    obPickStrategy()
+    obShow('empty')                          // a result on screen no longer matches the strategy
+    el('ob-tool').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function obRenderLearn() {
+  const key = el('ob-strategy').value
+  const p = obState.byKey[key]
+  const custom = key === 'custom'
+  if (!custom && !p) return
+  const L = custom ? OB_CUSTOM_LEARN : (OB_LEARN[key] || {})
+  const name = custom ? (el('ob-name').value.trim() || 'Your own strategy') : p.name
+  el('ob-learn-name').textContent = name
+  el('ob-learn-view').textContent = custom ? 'Custom' : p.view
+  el('ob-learn-idea').textContent = L.idea || ''
+  el('ob-learn-wins').textContent = L.wins || ''
+  el('ob-learn-risk').textContent = L.risk || ''
+  el('ob-learn-chart').innerHTML = obPayoffSVG(obLegsFor(key), Number(el('ob-dte').value) || 30, true)
+  el('ob-picked').textContent = name
+  document.querySelectorAll('.opt-card').forEach(c => {
+    const on = c.dataset.key === key
+    c.classList.toggle('active', on)
+    c.setAttribute('aria-pressed', String(on))
+  })
+}

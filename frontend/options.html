@@ -34,23 +34,35 @@
 
   <main class="page-wrap" data-page="options" id="main" tabindex="-1">
     <header class="page-header">
-      <h1>Options backtester</h1>
-      <p>Calls, puts and multi-leg structures, priced day by day on real market history with every cost charged.</p>
+      <h1>Options</h1>
+      <p>Learn how option strategies behave by testing them on real market history.
+        Pick one to see what it holds, when it pays, and how it would actually have done.</p>
     </header>
-    <div class="sidebar-layout">
+
+    <section class="opt-gallery" id="ob-gallery" aria-labelledby="ob-gallery-h">
+      <div class="opt-gallery-head">
+        <h2 id="ob-gallery-h">Choose a strategy</h2>
+        <div class="seg" id="ob-filter" role="group" aria-label="Filter by outlook"></div>
+      </div>
+      <div class="opt-cards" id="ob-cards"></div>
+      <p class="fine">Each shape is the profit or loss at the first expiry, from 30% below today's price to 30% above.
+        Green is profit, red is loss.</p>
+    </section>
+
+    <div class="sidebar-layout" id="ob-tool">
 
       <!-- ── LEFT: settings ─────────────────────────────────────────────── -->
       <aside class="form-panel">
-        <h2>New options backtest</h2>
+        <h2>Test it on history</h2>
         <div class="opt-import" id="ob-import" hidden role="status"></div>
 
-        <div class="form-group">
+        <!-- The gallery is the picker; this select keeps the state that share links and imports set. -->
+        <div class="form-group" hidden>
           <label class="form-label" for="ob-strategy">Strategy</label>
           <select id="ob-strategy"></select>
         </div>
-
-        <!-- What this backtest holds: filled from the strategy (opt-what) -->
-        <div class="opt-what" id="ob-what" aria-live="polite"></div>
+        <p class="opt-picked"><span class="form-label">Strategy</span>
+          <strong id="ob-picked">Loading…</strong> <a href="#ob-gallery">Change</a></p>
 
         <!-- Custom legs -->
         <div class="form-group" id="ob-custom" hidden>
@@ -216,12 +228,20 @@
       <div class="results-area">
 
         <div id="ob-empty">
-          <div class="empty-state">
-            <h2 class="empty-title">Test an options strategy on real history.</h2>
-            <p class="empty-sub">From a single call to an iron condor: each position is opened, marked every day, managed by your exit rules
-              and rolled. Prices come from a volatility model, and every run says so.</p>
-            <p class="empty-hint">Pick a strategy and press <strong>Run options backtest</strong>.</p>
-          </div>
+          <article class="card opt-learn" aria-live="polite">
+            <p class="opt-learn-view" id="ob-learn-view"></p>
+            <h2 class="opt-learn-name" id="ob-learn-name"></h2>
+            <p class="opt-learn-idea" id="ob-learn-idea"></p>
+            <div class="opt-learn-chart" id="ob-learn-chart"></div>
+            <div class="opt-learn-axis"><span>Price 30% lower</span><span>Today</span><span>30% higher</span></div>
+            <div class="opt-learn-grid">
+              <div><h3>Works when</h3><p id="ob-learn-wins"></p></div>
+              <div><h3>The risk</h3><p id="ob-learn-risk"></p></div>
+            </div>
+            <h3>What it holds</h3>
+            <div class="opt-what" id="ob-what"></div>
+            <p class="opt-learn-cta">Press <strong>Run options backtest</strong> to see how it would have done on real prices.</p>
+          </article>
           <details class="collapsible opt-evidence">
             <summary>How close are the model's prices to real ones?</summary>
             <div class="collapsible-body">

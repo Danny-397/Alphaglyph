@@ -944,6 +944,74 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 40px; cu
 .opt-cmp-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .opt-example > div { min-width: 0; }
 
+/* Strategy gallery: pick by shape, filtered by outlook. */
+.opt-gallery { margin-bottom: var(--s7); }
+.opt-gallery-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
+.opt-gallery-head h2 { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.opt-gallery-head .seg { margin-left: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.opt-gallery-head .seg::-webkit-scrollbar { display: none; }
+.opt-gallery-head .seg-btn { font-size: 13px; padding: 6px 13px; white-space: nowrap; }
+.opt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: var(--s3); }
+.opt-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 14px 14px 12px;
+  background: var(--surface); color: var(--text);
+  border: none; border-radius: 16px;
+  font-family: var(--font-ui); text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: background var(--fast) var(--ease), box-shadow var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.opt-card[hidden] { display: none; }
+.opt-card:hover { background: #18181a; }
+.opt-card:active { transform: scale(0.98); }
+.opt-card.active { background: #151a22; box-shadow: inset 0 0 0 2px var(--accent); }
+.opt-card .opt-pay { width: 100%; height: 44px; margin-bottom: 10px; }
+.opt-card-name { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.opt-card-view { font-size: 12px; color: var(--faint); }
+.opt-card-own { justify-content: flex-end; }
+.opt-card-plus { display: flex; align-items: center; justify-content: center; width: 100%; height: 44px; margin-bottom: 10px;
+  font-size: 26px; font-weight: 300; color: var(--accent); background: var(--accent-dim); border-radius: 10px; }
+
+/* Payoff shapes (drawn in options.js) */
+.opt-pay { display: block; overflow: visible; }
+.opt-pay-zero { stroke: rgba(255,255,255,0.18); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.opt-pay-up, .opt-pay-dn { fill: none; stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.opt-pay-up { stroke: var(--green); }
+.opt-pay-dn { stroke: var(--red); }
+.opt-pay-up-fill { fill: rgba(48,209,88,0.14); }
+.opt-pay-dn-fill { fill: rgba(255,69,58,0.14); }
+.opt-pay-strike { stroke: rgba(255,255,255,0.10); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.opt-pay-now { stroke: rgba(255,255,255,0.35); stroke-width: 1; vector-effect: non-scaling-stroke; }
+
+/* The chosen strategy, explained, where its results will appear */
+.opt-picked { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 20px; font-size: 15px; }
+.opt-picked .form-label { width: 100%; margin-bottom: 0; }
+.opt-picked a { font-size: 13px; }
+.opt-learn { padding: var(--s6); }
+.opt-learn-view { font-size: 13px; color: var(--accent); font-weight: 500; margin-bottom: 4px; }
+.opt-learn-name { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; }
+.opt-learn-idea { font-size: 16px; line-height: 1.55; color: var(--muted); margin-top: var(--s2); max-width: 620px; }
+.opt-learn-chart { margin-top: var(--s5); }
+.opt-learn-chart .opt-pay { width: 100%; height: 200px; }
+.opt-learn-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); margin-top: 6px; }
+.opt-learn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); margin: var(--s5) 0; }
+.opt-learn-grid > div { background: var(--surface2); border-radius: 14px; padding: var(--s4); }
+.opt-learn h3 { font-size: 12px; font-weight: 600; color: var(--faint); margin-bottom: 6px; }
+.opt-learn-grid p { font-size: 14px; line-height: 1.55; color: var(--text); }
+.opt-learn .opt-what { margin: 0; background: none; padding: 0; }
+.opt-learn .opt-what-head, .opt-learn .opt-what-title { display: none; }
+.opt-learn .opt-what-legs li { font-size: 14px; color: var(--text); }
+.opt-learn-cta { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--border); font-size: 13px; color: var(--faint); }
+.opt-learn-cta strong { color: var(--text); font-weight: 500; }
+@media (max-width: 640px) {
+  .opt-learn { padding: 20px; }
+  .opt-learn-name { font-size: 24px; }
+  .opt-learn-grid { grid-template-columns: 1fr; }
+  .opt-learn-chart .opt-pay { height: 150px; }
+  .opt-cards { grid-template-columns: 1fr 1fr; gap: var(--s2); }
+}
+
 /* Model vs real prices: secondary evidence, folded away under the empty state. */
 .opt-evidence { margin-top: var(--s4); background: var(--surface); border-radius: var(--radius); padding: 0 var(--s5); border-top: none; }
 .opt-evidence > summary { padding: 18px 0; font-size: 14px; }
