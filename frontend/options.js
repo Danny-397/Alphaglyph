@@ -508,7 +508,7 @@ function obDrawEquity(r) {
   obState.charts.eq = new Chart(el('ob-chart'), {
     type: 'line',
     data: { labels, datasets: [
-      { label: r.strategy.name, data: r.equity.map(e => e.value), borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.10)',
+      { label: r.strategy.name, data: r.equity.map(e => e.value), borderColor: '#30d158', backgroundColor: 'rgba(48,209,88,0.10)',
         borderWidth: 2, pointRadius: 0, fill: true, tension: 0.15 },
       { label: r.benchmark.label, data: r.equity.map(e => e.benchmark), borderColor: '#86868b', borderDash: [5, 4],
         borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.15 },

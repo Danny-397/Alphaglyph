@@ -969,8 +969,8 @@ function initBacktest() {
     const datasets = [
       {
         label: 'Strategy', data: curve.map(p => p.value),
-        borderColor: '#0a84ff', borderWidth: 2,
-        backgroundColor: 'rgba(10,132,255,0.10)', fill: true, tension: 0.2, pointRadius: 0,
+        borderColor: '#30d158', borderWidth: 2,
+        backgroundColor: 'rgba(48,209,88,0.10)', fill: true, tension: 0.2, pointRadius: 0,
       },
     ]
     if (spy.length) datasets.push({
@@ -1086,10 +1086,10 @@ function initBacktest() {
       data: {
         labels: fc.dates,
         datasets: [
-          { label: 'P95',          data: fc.p95, borderColor: 'transparent', backgroundColor: 'rgba(10,132,255,0.10)', fill: '+1', pointRadius: 0 },
-          { label: 'P75',          data: fc.p75, borderColor: 'transparent', backgroundColor: 'rgba(10,132,255,0.20)', fill: '+1', pointRadius: 0 },
-          { label: 'P50 (Median)', data: fc.p50, borderColor: 'rgba(10,132,255,0.9)', borderWidth: 1.5, borderDash: [4, 3], backgroundColor: 'rgba(10,132,255,0.20)', fill: '+1', pointRadius: 0 },
-          { label: 'P25',          data: fc.p25, borderColor: 'transparent', backgroundColor: 'rgba(10,132,255,0.10)', fill: '+1', pointRadius: 0 },
+          { label: 'P95',          data: fc.p95, borderColor: 'transparent', backgroundColor: 'rgba(48,209,88,0.10)', fill: '+1', pointRadius: 0 },
+          { label: 'P75',          data: fc.p75, borderColor: 'transparent', backgroundColor: 'rgba(48,209,88,0.20)', fill: '+1', pointRadius: 0 },
+          { label: 'P50 (Median)', data: fc.p50, borderColor: 'rgba(48,209,88,0.9)', borderWidth: 1.5, borderDash: [4, 3], backgroundColor: 'rgba(48,209,88,0.20)', fill: '+1', pointRadius: 0 },
+          { label: 'P25',          data: fc.p25, borderColor: 'transparent', backgroundColor: 'rgba(48,209,88,0.10)', fill: '+1', pointRadius: 0 },
           { label: 'P5',           data: fc.p5,  borderColor: 'transparent', backgroundColor: 'transparent', fill: false, pointRadius: 0 },
           {
             label: 'Actual Strategy',
@@ -1797,7 +1797,7 @@ function initPredictor() {
             pointRadius: 0, fill: false },
           { label: 'Predicted vs actual',
             data: pts,
-            backgroundColor: 'rgba(10,132,255,0.75)', borderColor: '#0a84ff', borderWidth: 1,
+            backgroundColor: 'rgba(48,209,88,0.75)', borderColor: '#30d158', borderWidth: 1,
             pointRadius: c => 4 + 8 * (c.raw.n / maxN), pointHoverRadius: c => 6 + 8 * (c.raw.n / maxN) },
         ],
       },
@@ -2174,7 +2174,7 @@ function initResearch() {
     costChart = new Chart(el('cost-chart'), {
       type: 'line',
       data: { labels, datasets: [
-        { label: 'Strategy net return', data: pts.map(p => p.net_return), borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.10)', borderWidth: 2, fill: true, tension: 0.2, pointRadius: 3 },
+        { label: 'Strategy net return', data: pts.map(p => p.net_return), borderColor: '#30d158', backgroundColor: 'rgba(48,209,88,0.10)', borderWidth: 2, fill: true, tension: 0.2, pointRadius: 3 },
         { label: 'Buy & hold (SPY)', data: pts.map(() => data.benchmark_return), borderColor: '#86868b', borderWidth: 1.5, borderDash: [5, 4], fill: false, pointRadius: 0 },
       ] },
       options: {
