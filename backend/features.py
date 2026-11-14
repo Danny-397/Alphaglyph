@@ -112,6 +112,14 @@ def _try_tiingo(ticker, period, start, end):
             return None, 'skip'
         resp.raise_for_status()
         rows = resp.json()
+        if isinstance(rows, dict):
+            # Tiingo answers some errors with 200 and {"detail": "..."}, the
+            # hourly allocation among them.
+            detail = str(rows.get('detail', '')).lower()
+            if 'allocation' in detail or 'limit' in detail or 'too many' in detail:
+                return None, 'rate_limited'
+            logger.warning('Tiingo: unexpected reply for %s: %s', ticker, detail[:120])
+            return None, 'skip'
         if not rows:
             return None, 'nodata'
         df = pd.DataFrame(rows)
@@ -213,8 +221,151 @@ def _try_stooq(ticker, period, start, end):
 
 # ── Combined fetch with caching ───────────────────────────────────────────────
 
+# ── Shared daily price store ──────────────────────────────────────────────────
+# In production one source carries every request: Tiingo's free plan allows
+# about 50 requests an hour, Yahoo blocks cloud IPs and Stooq now answers with a
+# browser check. So each ticker's daily history is fetched once, _STORE_YEARS
+# deep, kept in memory (and in Postgres, so it survives restarts and is shared
+# by every worker), and each request is served as a slice of it. When every
+# source fails, a saved copy of any age is served rather than nothing: a
+# backtest on yesterday's closes beats an error.
+_STORE: dict = {}                  # ticker -> (fetched_at, lo date, DataFrame)
+_STORE_FRESH_SECS = 6 * 3600
+_STORE_YEARS = 12
+_store_db_ready = False
+_RATE_LIMITED: dict = {}           # ticker -> time a request for it was refused
+
+
+def _store_db():
+    """The database module when the store should persist (Postgres only), else None."""
+    global _store_db_ready
+    try:
+        import database as db
+        if not db.is_postgres():
+            return None
+        if not _store_db_ready:
+            conn = db.get_connection()
+            try:
+                conn.executescript('''CREATE TABLE IF NOT EXISTS price_store (
+                    ticker TEXT PRIMARY KEY, fetched_at DOUBLE PRECISION NOT NULL,
+                    lo TEXT NOT NULL, payload TEXT NOT NULL)''')
+                conn.commit()
+            finally:
+                conn.close()
+            _store_db_ready = True
+        return db
+    except Exception as exc:       # the store is an optimisation; never fail a request on it
+        logger.warning('price store: database unavailable (%s)', exc)
+        return None
+
+
+def _store_get(ticker: str):
+    hit = _STORE.get(ticker)
+    if hit:
+        return hit
+    db = _store_db()
+    if db is None:
+        return None
+    try:
+        conn = db.get_connection()
+        try:
+            row = conn.execute('SELECT fetched_at, lo, payload FROM price_store WHERE ticker = ?',
+                               (ticker,)).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        df = pd.read_csv(io.StringIO(row['payload']), index_col=0, parse_dates=True)
+        hit = (float(row['fetched_at']), pd.Timestamp(row['lo']).date(), df)
+        _STORE[ticker] = hit
+        return hit
+    except Exception as exc:
+        logger.warning('price store: read failed for %s (%s)', ticker, exc)
+        return None
+
+
+def _store_put(ticker: str, fetched_at: float, lo, df: pd.DataFrame) -> None:
+    _STORE[ticker] = (fetched_at, lo, df)
+    db = _store_db()
+    if db is None:
+        return
+    try:
+        conn = db.get_connection()
+        try:
+            conn.execute(
+                'INSERT INTO price_store (ticker, fetched_at, lo, payload) VALUES (?, ?, ?, ?) '
+                'ON CONFLICT (ticker) DO UPDATE SET fetched_at = excluded.fetched_at, '
+                'lo = excluded.lo, payload = excluded.payload',
+                (ticker, fetched_at, lo.isoformat(), df.to_csv()))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning('price store: write failed for %s (%s)', ticker, exc)
+
+
+def _requested_range(period, start, end):
+    today = datetime.now().date()
+    e = pd.Timestamp(end).date() if end else today
+    s = pd.Timestamp(start).date() if start else today - timedelta(days=_PERIOD_DAYS.get(period, 220))
+    return s, e
+
+
+def _slice(df: pd.DataFrame, s, e) -> pd.DataFrame | None:
+    out = df.loc[pd.Timestamp(s):pd.Timestamp(e)]
+    return out.copy() if not out.empty else None
+
+
+def _download_daily(ticker: str, period: str, start: str, end: str) -> pd.DataFrame | None:
+    """Daily bars for the range, as a slice of the ticker's stored history."""
+    s, e = _requested_range(period, start, end)
+    saved = _store_get(ticker)
+    covers = bool(saved) and saved[1] <= s
+    if covers and time.time() - saved[0] < _STORE_FRESH_SECS:
+        return _slice(saved[2], s, e)
+
+    today = datetime.now().date()
+    lo = min(s, today - timedelta(days=365 * _STORE_YEARS))
+    try:
+        df = _download_sources(ticker, period, '1d', lo.isoformat(), today.isoformat())
+    except RuntimeError:
+        if covers:
+            logger.warning('price store: sources busy, serving %s saved %.1f h ago',
+                           ticker, (time.time() - saved[0]) / 3600)
+            return _slice(saved[2], s, e)
+        _RATE_LIMITED[ticker] = time.time()
+        raise
+    if df is None or df.empty:
+        return _slice(saved[2], s, e) if covers else None
+    df = df.copy()
+    df.index = pd.to_datetime(df.index)
+    if df.index.tz is not None:
+        df.index = df.index.tz_localize(None)
+    df = df.sort_index()
+    _store_put(ticker, time.time(), lo, df)
+    return _slice(df, s, e)
+
+
+BUSY_MSG = ('The free price-data source is at its hourly limit right now. '
+            'Try again in a few minutes.')
+
+
+def was_rate_limited(ticker: str, within: float = 600) -> bool:
+    """True if a request for this ticker was refused by every source in the last `within` seconds."""
+    t = _RATE_LIMITED.get((ticker or '').strip().upper())
+    return t is not None and time.time() - t < within
+
+
 def _download(ticker: str, period: str, interval: str,
               start: str, end: str) -> pd.DataFrame | None:
+    """Daily bars come from the shared store; other intervals go straight to the sources."""
+    if interval == '1d':
+        return _download_daily(ticker, period, start, end)
+    return _download_sources(ticker, period, interval, start, end)
+
+
+def _download_sources(ticker: str, period: str, interval: str,
+                      start: str, end: str) -> pd.DataFrame | None:
     """
     Fetch OHLCV with caching, trying yfinance first and Stooq as a fallback.
 
@@ -240,6 +391,7 @@ def _download(ticker: str, period: str, interval: str,
         return _cache_return(df)
     if st != 'skip':
         statuses.append(st)
+    tiingo_limited = st == 'rate_limited'
 
     # 2. yfinance (free, no key, but heavily rate-limited)
     df, st = _try_yfinance(ticker, period, interval, start, end)
@@ -256,6 +408,10 @@ def _download(ticker: str, period: str, interval: str,
     # Nothing returned data. A definitive 'nodata' (e.g. Tiingo 404) wins —
     # treat the symbol as invalid. Otherwise, if any source was rate-limited,
     # surface that so the UI can say "try again" rather than "doesn't exist".
+    if tiingo_limited:
+        # Yahoo blocks cloud IPs and Stooq now serves a browser check, so with
+        # Tiingo out of quota an empty answer says nothing about the symbol.
+        raise RuntimeError('rate_limited')
     if 'nodata' in statuses:
         return None
     if 'rate_limited' in statuses:

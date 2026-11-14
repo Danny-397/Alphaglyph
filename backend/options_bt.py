@@ -910,6 +910,8 @@ def load_market(ticker: str, start: str, end: str) -> dict:
     lo = (pd.Timestamp(start) - pd.Timedelta(days=WARMUP_DAYS)).strftime('%Y-%m-%d')
     df = feat.fetch_ohlcv(ticker, start=lo, end=end)
     if df is None or df.empty:
+        if feat.was_rate_limited(ticker):
+            return {'error': feat.BUSY_MSG}
         return {'error': f'No price history for {ticker}'}
     close = df['Close'].astype(float).dropna()      # Yahoo adds today's row with no close yet
     if close.empty:

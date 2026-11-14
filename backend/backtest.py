@@ -354,6 +354,8 @@ def run_backtest(
             data[ticker] = _add_signals(raw, strategy, ticker, custom_rules)
 
     if not data:
+        if any(feat.was_rate_limited(t) for t in tickers):
+            return {'error': feat.BUSY_MSG}
         return {'error': 'No sufficient data for the selected tickers and date range.'}
 
     # 52-week range, for optional dip-weighted sizing. Trailing rolling window
