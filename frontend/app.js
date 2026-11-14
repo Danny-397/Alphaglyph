@@ -1938,6 +1938,7 @@ function initPredictor() {
     const bssTag = s.brier_skill == null ? '' : s.brier_skill > 0.02 ? 'positive' : s.brier_skill < -0.02 ? 'negative' : ''
 
     const outcomeCell = r => {
+      if (r.status === 'void') return '<span class="text-muted">void · no entry price recorded</span>'
       if (r.status !== 'graded') return `<span class="text-muted">pending · due ${r.due_date}</span>`
       if (r.correct == null) return `<span class="text-muted">${fmtPct(r.realized_pct, 1)} · n/a</span>`
       const mark = r.correct ? '<span class="positive">✓</span>' : '<span class="negative">✗</span>'

@@ -27,6 +27,7 @@ external ping to /api/predict/ledger still helps it stay fresh).
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -103,7 +104,11 @@ def log_prediction(prediction: dict) -> int | None:
         return None
     price = prediction.get('price')
     pred  = prediction.get('prediction') or {}
-    if not price or price <= 0 or 'p_up' not in pred:
+    try:
+        ok = math.isfinite(float(price)) and float(price) > 0 and math.isfinite(float(pred['p_up']))
+    except (KeyError, TypeError, ValueError):
+        ok = False
+    if not ok:                                  # NaN passes `not price` and `price <= 0`
         return None
 
     _ensure_schema()

@@ -27,6 +27,7 @@ import argparse
 import csv
 import io
 import json
+import math
 import os
 import sys
 from datetime import date, datetime, time, timezone
@@ -87,13 +88,23 @@ def write_rows(rows: list[dict], path: str = CSV_PATH) -> None:
 
 # ── Logging ─────────────────────────────────────────────────────────────────
 
+def _usable_price(v, allow_zero: bool = False) -> bool:
+    """A finite, positive number. NaN slips past `not v` and `v <= 0`, which is
+    how the 2026-11-09 batch was logged with no entry price."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(x) and (x >= 0 if allow_zero else x > 0)
+
+
 def row_from_prediction(pred: dict, now: datetime, model_version: str) -> dict | None:
     """A ledger row from one /api/predict response, or None if it is not loggable."""
     if not pred or not pred.get('available'):
         return None
     call = pred.get('prediction') or {}
     price = pred.get('price')
-    if not price or price <= 0 or 'p_up' not in call:
+    if not _usable_price(price) or not _usable_price(call.get('p_up'), allow_zero=True):
         return None
     today = now.astimezone(NY).date()
     horizon = int(pred.get('horizon') or 5)
@@ -140,6 +151,13 @@ def grade_rows(rows: list[dict], close_on_or_after, today: date, now: datetime) 
     graded = []
     closes: dict = {}
     for r in rows:
+        if r['status'] == 'pending' and not _usable_price(r['price_at_pred']):
+            # No entry price was recorded, so the call can never be graded.
+            # Graded as a miss it would be NaN; it is set aside instead, kept
+            # in the file but out of every count.
+            r['status'] = 'void'
+            graded.append(f'{r["ticker"]} {r["created_date"]} (void: no entry price)')
+            continue
         if r['status'] != 'pending' or r['due_date'] > today.isoformat():
             continue
         key = (r['ticker'], r['due_date'])
@@ -167,7 +185,10 @@ def grade_rows(rows: list[dict], close_on_or_after, today: date, now: datetime) 
 
 def _typed(r: dict) -> dict:
     def num(v):
-        return None if v in ('', None) else float(v)
+        if v in ('', None):
+            return None
+        x = float(v)
+        return x if math.isfinite(x) else None
     out = dict(r)
     out['p_up'] = num(r['p_up'])
     out['price_at_pred'] = num(r['price_at_pred'])
@@ -193,6 +214,7 @@ def summary_json(rows: list[dict], now: datetime, recent: int = 50) -> dict:
         'basket': BASKET,
         'n_total': len(typed),
         'n_pending': sum(r['status'] == 'pending' for r in typed),
+        'n_void': sum(r['status'] == 'void' for r in typed),
         'summary': track_record.summary(graded),
         'rows': newest[:recent],
         'note': ('Logged automatically every trading day near the close for a fixed basket, and '
@@ -271,7 +293,7 @@ def main() -> int:
 
     write_rows(rows)
     with open(JSON_PATH, 'w', encoding='utf-8') as fh:
-        json.dump(summary_json(rows, now), fh, indent=1)
+        json.dump(summary_json(rows, now), fh, indent=1, allow_nan=False)   # the site parses it strictly
         fh.write('\n')
     return 0
 
