@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
-    :root { --bg: #0b0c0c; --text: #f1f3f2; --muted: #9ba49f; --green: #3fb950; --border-lt: rgba(255,255,255,0.14); }
+    :root { --bg: #000; --text: #f5f5f7; --muted: #a1a1a6; --accent: #0a84ff; --fill: #0071e3; --surface: #2c2c2e; }
     * { box-sizing: border-box; }
     body {
       margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
@@ -16,14 +16,14 @@
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
     }
     main { max-width: 34rem; text-align: center; }
-    .code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; color: var(--green); font-size: 13px; margin: 0 0 10px; }
-    h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 12px; }
+    .code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+    h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 12px; }
     p { color: var(--muted); margin: 0 0 24px; }
     .links { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    a { color: var(--text); text-decoration: none; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border-lt); font-weight: 500; }
-    a.primary { background: var(--green); border-color: var(--green); color: #06180a; }
-    a:hover { border-color: var(--green); }
-    a:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+    a { color: var(--text); text-decoration: none; padding: 10px 16px; border-radius: 999px; background: var(--surface); font-weight: 500; }
+    a.primary { background: var(--fill); color: #fff; }
+    a:hover { filter: brightness(1.15); }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   </style>
 </head>
 <body>

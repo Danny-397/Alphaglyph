@@ -375,7 +375,7 @@ Band Width**, and **30-day realized volatility**:
 Day-by-day simulation over any date range and ticker set, with **walk-forward
 cross-validation** (train 70% / evaluate 30%), configurable **transaction costs**,
 **rolling Kelly sizing** (no look-ahead), **regime tagging** on every trade, a **SPY
-benchmark**, and a **client-side animated replay** of every explained trade.
+benchmark**, and a plain-English reason for every trade.
 
 ---
 
@@ -561,7 +561,7 @@ alphaglyph/
 ├── frontend/                 (vanilla HTML/CSS/JS + Chart.js — green dark theme)
 │   ├── index.html · backtest.html · options.html · predict.html
 │   ├── screener.html · portfolio.html · research.html
-│   └── landing.css · style.css · config.js · app.js · options.js
+│   └── style.css · config.js · app.js · options.js
 ├── .github/workflows/   ci.yml · keepwarm.yml
 └── render.yaml · .flake8 · .env.example · README.md
 ```

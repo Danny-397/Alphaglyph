@@ -25,258 +25,147 @@
   <!-- Fonts are self-hosted: the Google Fonts stylesheet blocked first paint for ~0.9 s on a mobile connection (Lighthouse, 2026-10-30). -->
   <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <style>@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-greek.woff2) format('woff2');unicode-range:U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF}</style>
-  <meta name="theme-color" content="#0b0c0c">
+  <meta name="theme-color" content="#000000">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="landing.css">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-page="home">
 <a class="skip-link" href="#main">Skip to content</a>
 
-  <!-- ── Navbar ─────────────────────────────────────────────────────────── -->
-  <nav class="lp-nav" aria-label="Main">
-    <div class="lp-nav-inner">
-      <a href="index.html" class="lp-brand" aria-label="AlphaGlyph home">
-        <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
-          <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
-          <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
-        </svg>
-        <span class="lp-brand-mark">AlphaGlyph</span>
-      </a>
-      <div class="lp-nav-links">
-        <a href="#how"        class="lp-nav-link">How it works</a>
-        <a href="#validation" class="lp-nav-link">Validation</a>
-        <a href="options.html" class="lp-nav-link">Options</a>
-        <a href="predict.html" class="lp-nav-link">Predictor</a>
-        <a href="research.html" class="lp-nav-link">Research</a>
-        <a href="https://github.com/Danny-397/Alphaglyph" class="lp-nav-link" target="_blank" rel="noopener">Source</a>
-      </div>
-      <a href="backtest.html" class="btn btn-primary btn-sm lp-nav-cta">Open the Backtester</a>
+  <nav class="navbar" aria-label="Main">
+    <a class="nav-brand" href="index.html" aria-label="AlphaGlyph home">
+      <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
+      </svg>
+      <span class="nav-brand-name">AlphaGlyph</span>
+    </a>
+    <div class="nav-links">
+      <a href="backtest.html" class="nav-link">Backtest</a>
+      <a href="options.html" class="nav-link">Options</a>
+      <a href="predict.html" class="nav-link">Predictor</a>
+      <a href="research.html" class="nav-link">Research</a>
     </div>
   </nav>
 
   <main id="main" tabindex="-1">
-    <!-- ── Hero ─────────────────────────────────────────────────────────── -->
-    <header class="hero">
-      <div class="container hero-inner">
-        <p class="eyebrow">Backtesting and statistical validation</p>
-        <h1>Backtest any strategy. <br>Then find out if the edge is <span class="accent">real</span>.</h1>
-        <p class="hero-sub">
-          AlphaGlyph runs quant and machine-learning strategies on real historical prices with simulated
-          capital, then checks whether the result is skill or luck, using the tests quant funds use.
-        </p>
-        <div class="hero-cta">
-          <a href="backtest.html" class="btn btn-primary btn-lg">Open the Backtester</a>
-          <a href="predict.html" class="btn btn-quiet btn-lg">Try the predictor <span aria-hidden="true">›</span></a>
-        </div>
-        <p class="hero-note">No account. No real money. Every trade explained in plain English.</p>
-      </div>
-
-      <!-- The real result, not a flattering example: AlphaGlyph's validation of its own grid -->
+    <header class="lp-hero">
       <div class="container">
-        <figure class="verdict" aria-label="AlphaGlyph's validation of its own strategy grid">
-          <div class="verdict-top">
-            <span>Validation report: AlphaGlyph's own strategy grid</span>
-            <span class="verdict-tag">Real result · SPY, 2026-08-01</span>
-          </div>
-          <div class="verdict-headline is-warn">
-            <span class="tick" aria-hidden="true">!</span> Likely overfit
-          </div>
-          <div class="verdict-rows">
-            <div class="verdict-row">
-              <span class="lbl">Overfitting risk</span>
-              <span class="val">72%</span>
-              <span class="ctx">chance the in-sample winner lands in the bottom half out of sample</span>
-            </div>
-            <div class="verdict-row">
-              <span class="lbl">In-sample Sharpe</span>
-              <span class="val">1.26</span>
-              <span class="ctx">median: looks like a good strategy</span>
-            </div>
-            <div class="verdict-row">
-              <span class="lbl">Out-of-sample Sharpe</span>
-              <span class="val">0.65</span>
-              <span class="ctx">median: about half the edge survives</span>
-            </div>
-          </div>
-          <figcaption class="verdict-note">What AlphaGlyph found when it tested its own 42 strategy variants with
-            combinatorially-symmetric cross-validation. Picking the best backtest was worse than a coin flip.
-            Your own backtests get three checks of their own: Monte Carlo, deflated Sharpe and Fama-French.
-            <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Read the report</a></figcaption>
-        </figure>
+        <h1>Backtest any strategy. <span class="dim">Then find out if the edge is real.</span></h1>
+        <p class="lp-sub">Run stock and options strategies on real market history, then put the result through
+          the statistical tests quant funds use to tell skill from luck.</p>
+        <div class="lp-cta">
+          <a href="backtest.html" class="btn btn-primary btn-lg">Open the Backtester</a>
+          <a href="options.html" class="btn btn-quiet btn-lg">Backtest options ›</a>
+        </div>
+        <p class="lp-note">No account. No real money.</p>
       </div>
     </header>
 
-    <!-- ── Figures ──────────────────────────────────────────────────────── -->
-    <section class="figures" aria-label="At a glance">
-      <div class="container figures-inner">
-        <div class="figure"><span class="figure-num">6</span><span class="figure-lbl">strategies, plus a custom rule builder</span></div>
-        <div class="figure"><span class="figure-num">1,000</span><span class="figure-lbl">Monte Carlo paths per run</span></div>
-        <div class="figure"><span class="figure-num">3</span><span class="figure-lbl">independent validation tests</span></div>
-        <div class="figure"><span class="figure-num">358</span><span class="figure-lbl">automated tests in CI</span></div>
+    <!-- The real result, not a flattering example: AlphaGlyph's validation of its own grid -->
+    <section class="lp-section" aria-labelledby="proof-h">
+      <div class="container">
+        <div class="lp-head">
+          <h2 id="proof-h">Most backtests look good. Few hold up.</h2>
+          <p>AlphaGlyph ran its own 42 strategy variants through the same test you get.
+            Picking the best backtest was worse than a coin flip.</p>
+        </div>
+        <figure class="verdict" aria-label="AlphaGlyph's validation of its own strategy grid">
+          <div class="verdict-top">
+            <span>Validation report · AlphaGlyph's strategy grid</span>
+            <span>SPY · 2026-08-01</span>
+          </div>
+          <div class="verdict-headline"><span class="verdict-dot" aria-hidden="true"></span> Likely overfit</div>
+          <div class="verdict-rows">
+            <div class="verdict-row">
+              <span class="val">72%</span>
+              <span class="lbl">Overfitting risk</span>
+              <span class="ctx">Chance the in-sample winner lands in the bottom half out of sample</span>
+            </div>
+            <div class="verdict-row">
+              <span class="val">1.26</span>
+              <span class="lbl">In-sample Sharpe</span>
+              <span class="ctx">Looks like a good strategy</span>
+            </div>
+            <div class="verdict-row">
+              <span class="val">0.65</span>
+              <span class="lbl">Out-of-sample Sharpe</span>
+              <span class="ctx">About half the edge survives</span>
+            </div>
+          </div>
+          <figcaption class="verdict-note">Measured with combinatorially symmetric cross-validation.
+            <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Read the report ›</a></figcaption>
+        </figure>
       </div>
     </section>
 
-    <!-- ── How it works ─────────────────────────────────────────────────── -->
-    <section class="section" id="how">
+    <section class="lp-section" aria-labelledby="how-h">
       <div class="container">
-        <div class="section-head">
-          <h2>Run a strategy. See the trades. <br>Get an honest verdict.</h2>
-          <p>The whole flow lives on one page, the Backtester, with every step explained.</p>
+        <div class="lp-head">
+          <h2 id="how-h">One page. Three steps. An honest answer.</h2>
         </div>
-
-        <ol class="steps">
-          <li class="step">
-            <span class="step-n">1</span>
-            <h3>Pick a strategy and run it</h3>
-            <p>Choose one of six strategies or build your own buy and sell rules. Pick stocks and dates, and it simulates day by day on real prices, with transaction costs.</p>
+        <ol class="lp-grid" style="list-style:none;">
+          <li class="lp-tile">
+            <span class="lp-tile-n">1</span>
+            <h3>Run it</h3>
+            <p>Pick a strategy, or write your own buy and sell rules, and it trades day by day on real prices with costs charged.</p>
           </li>
-          <li class="step">
-            <span class="step-n">2</span>
-            <h3>See every trade explained</h3>
-            <p>The equity curve against the S&amp;P 500, each trade with a plain-English reason, and an optional animated replay of the whole run.</p>
+          <li class="lp-tile">
+            <span class="lp-tile-n">2</span>
+            <h3>See every trade</h3>
+            <p>The equity curve against the S&amp;P 500, and every trade with a plain-English reason.</p>
           </li>
-          <li class="step">
-            <span class="step-n">3</span>
-            <h3>Learn if it's real</h3>
-            <p>Three statistical tests combine into one verdict: <em>significant</em>, <em>promising</em>, or <em>inconclusive</em>.</p>
+          <li class="lp-tile">
+            <span class="lp-tile-n">3</span>
+            <h3>Get a verdict</h3>
+            <p>Monte Carlo, the deflated Sharpe ratio and Fama-French combine into one call: significant, promising or inconclusive.</p>
           </li>
         </ol>
       </div>
     </section>
 
-    <!-- ── Validation ───────────────────────────────────────────────────── -->
-    <section class="section section-alt" id="validation">
-      <div class="container split">
-        <div>
-          <div class="section-head section-head-left">
-            <h2>Most backtests stop at a Sharpe ratio. This one asks if it's real.</h2>
-            <p>Any strategy can look good on historical data by chance. AlphaGlyph runs three
-              independent tests and combines them into a single verdict.</p>
-          </div>
-          <ul class="split-list">
-            <li>
-              <h3>Resample reality</h3>
-              <p>1,000 bootstrap paths build a distribution. Your result either stands out or it doesn't.</p>
-            </li>
-            <li>
-              <h3>Correct for luck</h3>
-              <p>The Deflated Sharpe Ratio penalises testing many strategies, the way good science corrects for multiple comparisons.</p>
-            </li>
-            <li>
-              <h3>Isolate true skill</h3>
-              <p>Factor decomposition strips out market, size, and value exposure to show whether any genuine alpha remains.</p>
-            </li>
-          </ul>
+    <section class="lp-section" aria-labelledby="tools-h">
+      <div class="container">
+        <div class="lp-head">
+          <h2 id="tools-h">Two backtesters.</h2>
         </div>
-
-        <div class="code-panel">
-          <div class="code-bar">stats.py</div>
-          <pre class="code-body"><span class="c"># Probability the Sharpe is real after</span>
-<span class="c"># testing N strategies on noisy data</span>
-<span class="k">def</span> deflated_sharpe_ratio(returns, n_strategies):
-    sr   = annualized_sharpe(returns)
-    skew = <span class="n">scipy</span>.stats.skew(returns)
-    kurt = <span class="n">scipy</span>.stats.kurtosis(returns)
-
-    <span class="c"># expected max Sharpe from pure luck</span>
-    sr_star = expected_max_sharpe(n_strategies)
-
-    <span class="k">return</span> psr(sr, sr_star, skew, kurt)
-    <span class="c"># → 0.964  significant</span></pre>
+        <div class="lp-products">
+          <a class="lp-product" href="backtest.html">
+            <h3>Stocks</h3>
+            <p>Six strategies from moving averages to a transformer model, or your own rules. Compare them all on the same data in one click.</p>
+            <span class="lp-go">Backtest stocks</span>
+          </a>
+          <a class="lp-product" href="options.html">
+            <h3>Options</h3>
+            <p>From a single call to an iron condor or the wheel. Every leg priced daily, every cost charged, every run clear about what it holds.</p>
+            <span class="lp-go">Backtest options</span>
+          </a>
+        </div>
+        <div class="lp-more">
+          <a href="predict.html">Predictor, with its live track record</a>
+          <a href="research.html">Research lab</a>
         </div>
       </div>
     </section>
 
-    <!-- ── Toolkit ──────────────────────────────────────────────────────── -->
-    <section class="section" id="features">
+    <section class="lp-final">
       <div class="container">
-        <div class="section-head">
-          <h2>A quantitative toolkit, built from first principles.</h2>
-          <p>Every indicator, model, and statistical method is implemented from scratch. No black-box TA libraries.</p>
-        </div>
-
-        <div class="features">
-          <div class="feature">
-            <h3>Six strategies and a rule builder</h3>
-            <p>MA Crossover, RSI, MACD, a patient Dip Buyer, an ML transformer, and a no-code builder for your own buy and sell rules.</p>
-          </div>
-          <div class="feature">
-            <h3>An ML transformer, evaluated honestly</h3>
-            <p>Trained on a chronological 60/20/20 split, with backtests run strictly out of sample. The win is the rigour, not a magic edge.</p>
-          </div>
-          <div class="feature">
-            <h3>Adaptive regime detection</h3>
-            <p>ADX, Bollinger Band width, and realized volatility sort the market into four regimes, and the adaptive strategy switches to match.</p>
-          </div>
-          <div class="feature">
-            <h3>Trailing stops and Kelly sizing</h3>
-            <p>Wide trailing stops let winners run, and the Kelly criterion sizes positions by historical edge. No look-ahead, and it's tested.</p>
-          </div>
-          <div class="feature">
-            <h3>Walk-forward and real costs</h3>
-            <p>Grade only on a held-out final 30%, with commission and slippage charged on every buy and sell.</p>
-          </div>
-          <div class="feature">
-            <h3>Leaderboard and optimizer</h3>
-            <p>Rank every strategy on the same data, and compute the Markowitz efficient frontier in Tools.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── CTA ──────────────────────────────────────────────────────────── -->
-    <section class="cta">
-      <div class="container">
-        <h2>Backtest a strategy now.</h2>
-        <p>Run it on real history in seconds and see whether the edge holds up.</p>
-        <div class="cta-btns">
-          <a href="backtest.html" class="btn btn-primary btn-lg">Open the Backtester</a>
-          <a href="predict.html" class="btn btn-quiet btn-lg">Try the predictor <span aria-hidden="true">›</span></a>
-        </div>
+        <h2>See if your strategy holds up.</h2>
+        <a href="backtest.html" class="btn btn-primary btn-lg">Open the Backtester</a>
       </div>
     </section>
   </main>
 
-  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
-  <footer class="lp-footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="index.html" class="lp-brand">
-            <svg class="brand-logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M18.1 11.3 C17.6 8.2 14.6 5.9 11.2 6.7 C7.4 7.6 5.3 11.6 6.6 14.8 C7.9 18 12.2 19.3 15.2 17.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
-              <path d="M14.6 18.6 L20.2 6.9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
-              <circle cx="20.7" cy="5.4" r="1.7" fill="currentColor"/>
-            </svg>
-            <span class="lp-brand-mark">AlphaGlyph</span>
-          </a>
-          <p class="footer-tagline">A backtesting and strategy-validation lab.</p>
-        </div>
-        <div class="footer-links">
-          <div class="footer-col">
-            <h2>App</h2>
-            <a href="backtest.html">Stock backtester</a>
-            <a href="options.html">Options lab</a>
-            <a href="predict.html">Predictor</a>
-            <a href="screener.html">Screener</a>
-            <a href="portfolio.html">Portfolio optimizer</a>
-            <a href="research.html">Research lab</a>
-          </div>
-          <div class="footer-col">
-            <h2>Project</h2>
-            <a href="https://github.com/Danny-397/Alphaglyph" target="_blank" rel="noopener">Source code</a>
-            <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Technical report</a>
-            <a href="https://danny-397.github.io/">More projects</a>
-          </div>
-        </div>
-      </div>
-      <p class="disclaimer">
-        AlphaGlyph is an educational project. It backtests strategies at real market prices with simulated cash.
-        No real money is ever involved, and nothing here is financial advice. Past backtested performance does
-        not guarantee future results.
-      </p>
-      <p class="disclaimer">© 2026 AlphaGlyph · Built by <a href="https://danny-397.github.io/">Dan Lichtenberger</a></p>
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <nav aria-label="More">
+        <a href="screener.html">Screener</a>
+        <a href="portfolio.html">Portfolio optimizer</a>
+        <a href="https://github.com/Danny-397/Alphaglyph/blob/main/docs/technical-report.md">Technical report</a>
+        <a href="https://github.com/Danny-397/Alphaglyph" rel="noopener">Source</a>
+      </nav>
+      <p>An educational project: real historical prices, simulated money. Nothing here is financial advice.</p>
     </div>
   </footer>
 
@@ -293,7 +182,7 @@
       var woke = false
       function wake(e) {
         var a = e.target.closest && e.target.closest('a[href]')
-        if (woke || !a || !/(backtest|predict|research|screener|portfolio|tools)\.html/.test(a.getAttribute('href'))) return
+        if (woke || !a || !/(backtest|options|predict|research|screener|portfolio|tools)\.html/.test(a.getAttribute('href'))) return
         woke = true
         // No mode:'no-cors': /health sends access-control-allow-origin for this
         // site, and no-cors was getting the request cancelled (net::ERR_ABORTED).
