@@ -576,6 +576,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 40px; cu
   margin-bottom: 10px;
 }
 .chip-x {
+  /* The glyph is small, but the button fills the chip's height and reaches its
+     right edge, so it is a 28 x 30 px target a thumb can hit. */
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 30px; margin: 0 -12px 0 -6px;
   border: none; background: transparent;
   color: inherit;
   font-size: 15px; line-height: 1;
@@ -932,6 +936,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 40px; cu
 .opt-leg-row select, .opt-leg-row input { height: 34px; min-width: 0; font-size: 12.5px; padding: 0 10px; background-color: var(--surface3); }
 .opt-leg-row select { flex: 1 1 0; padding-right: 26px; background-position: right 9px center; }
 .opt-leg-row input[type="number"] { flex: 0 0 66px; }
+.opt-leg-row .chip-x { margin: 0; min-width: 30px; height: 34px; flex: 0 0 auto; }
+@media (max-width: 480px) {
+  /* Room for the remove button without truncating "Short": quantity is 1-10. */
+  .opt-leg-row input[data-f="qty"] { flex-basis: 48px; padding: 0 8px; }
+}
 .opt-leg-n { flex: 0 0 18px; font-size: 12px; font-weight: 600; color: var(--faint); text-align: center; }
 .opt-legs-help { margin-top: var(--s2); }
 .opt-model-banner strong { color: var(--yellow); }

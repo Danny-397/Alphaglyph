@@ -520,7 +520,7 @@ function initBacktest() {
       return
     }
     el('bt-tickers').innerHTML = btTickers.map(t =>
-      `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`
+      `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}" aria-label="Remove ${t}">×</button></span>`
     ).join('')
     el('bt-tickers').querySelectorAll('.chip-x').forEach(b =>
       b.addEventListener('click', () => {
@@ -1515,7 +1515,7 @@ function initSignals() {
   function renderChips() {
     const box = el('sig-tickers')
     box.innerHTML = tickers.length
-      ? tickers.map(t => `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}">×</button></span>`).join('')
+      ? tickers.map(t => `<span class="ticker-chip selected" data-ticker="${t}">${t}<button class="chip-x" data-ticker="${t}" title="Remove ${t}" aria-label="Remove ${t}">×</button></span>`).join('')
       : '<span style="font-size:12px;color:var(--muted);">No tickers — add some above.</span>'
     box.querySelectorAll('.chip-x').forEach(b => b.addEventListener('click', () => {
       tickers = tickers.filter(x => x !== b.dataset.ticker); save(); renderChips(); scan()
