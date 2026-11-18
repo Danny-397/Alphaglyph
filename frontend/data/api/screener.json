@@ -1,15 +1,15 @@
 {
- "generated_at": "2026-11-17T09:29Z",
+ "generated_at": "2026-11-18T03:04Z",
  "regime": {
-  "adx": 14.15,
-  "bb_width": 0.062,
+  "adx": 15.0,
+  "bb_width": 0.0672,
   "description": "No clear trend (ADX < 20, price oscillating)",
   "label": "Ranging / Sideways",
-  "minus_di": 32.43,
-  "plus_di": 23.44,
+  "minus_di": 36.69,
+  "plus_di": 21.56,
   "regime": "RANGING",
   "strategy": "rsi",
-  "vol_30d": 19.37
+  "vol_30d": 19.41
  },
  "scan": {
   "count": 7,
@@ -17,9 +17,9 @@
   "scanned": [
    {
     "buys": 2,
-    "p_up": 0.5452,
-    "price": 352.78,
-    "q50": -0.05,
+    "p_up": 0.5455,
+    "price": 351.91,
+    "q50": -0.04,
     "sells": 0,
     "signals": {
      "ma_crossover": "BUY",
@@ -30,14 +30,14 @@
     "ticker": "AAPL"
    },
    {
-    "buys": 2,
-    "p_up": 0.5523,
-    "price": 517.99,
-    "q50": -0.01,
-    "sells": 0,
+    "buys": 1,
+    "p_up": 0.5535,
+    "price": 506.24,
+    "q50": 0.04,
+    "sells": 1,
     "signals": {
      "ma_crossover": "BUY",
-     "macd": "BUY",
+     "macd": "SELL",
      "ml": "HOLD",
      "rsi": "HOLD"
     },
@@ -45,8 +45,8 @@
    },
    {
     "buys": 0,
-    "p_up": 0.5699,
-    "price": 156.14,
+    "p_up": 0.571,
+    "price": 155.46,
     "q50": -0.43,
     "sells": 3,
     "signals": {
@@ -59,9 +59,9 @@
    },
    {
     "buys": 0,
-    "p_up": 0.5686,
-    "price": 283.72,
-    "q50": -0.13,
+    "p_up": 0.5681,
+    "price": 280.2,
+    "q50": -0.17,
     "sells": 3,
     "signals": {
      "ma_crossover": "SELL",
@@ -73,9 +73,9 @@
    },
    {
     "buys": 2,
-    "p_up": 0.5381,
-    "price": 379.74,
-    "q50": -0.4,
+    "p_up": 0.5385,
+    "price": 380.11,
+    "q50": -0.33,
     "sells": 0,
     "signals": {
      "ma_crossover": "BUY",
@@ -87,23 +87,23 @@
    },
    {
     "buys": 1,
-    "p_up": 0.5568,
-    "price": 338.21,
+    "p_up": 0.5575,
+    "price": 329.96,
     "q50": -0.05,
-    "sells": 1,
+    "sells": 0,
     "signals": {
      "ma_crossover": "HOLD",
      "macd": "BUY",
      "ml": "HOLD",
-     "rsi": "SELL"
+     "rsi": "HOLD"
     },
     "ticker": "JPM"
    },
    {
     "buys": 0,
-    "p_up": 0.562,
-    "price": 739.95,
-    "q50": -0.04,
+    "p_up": 0.5631,
+    "price": 732.44,
+    "q50": -0.01,
     "sells": 2,
     "signals": {
      "ma_crossover": "HOLD",
