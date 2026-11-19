@@ -1,0 +1,116 @@
+{
+ "generated": "2026-11-19",
+ "days": [
+  "2026-11-06",
+  "2026-11-17"
+ ],
+ "n_days": 8,
+ "tickers": {
+  "AAPL": {
+   "factor": 1.043,
+   "contracts": 272
+  },
+  "AMZN": {
+   "factor": 0.975,
+   "contracts": 301
+  },
+  "GOOGL": {
+   "factor": 1.497,
+   "contracts": 312
+  },
+  "JPM": {
+   "factor": 1.005,
+   "contracts": 258
+  },
+  "META": {
+   "factor": 1.385,
+   "contracts": 813
+  },
+  "MSFT": {
+   "factor": 0.942,
+   "contracts": 497
+  },
+  "RDW": {
+   "factor": 1.044,
+   "contracts": 131
+  },
+  "SOFI": {
+   "factor": 1.132,
+   "contracts": 234
+  },
+  "TSLA": {
+   "factor": 0.924,
+   "contracts": 594
+  }
+ },
+ "validation": {
+  "fit_days": [
+   "2026-11-06",
+   "2026-11-11"
+  ],
+  "test_days": [
+   "2026-11-12",
+   "2026-11-17"
+  ],
+  "before": 6.05,
+  "after": 4.37,
+  "improved": 4,
+  "by_symbol": {
+   "AAPL": {
+    "fit_factor": 1.097,
+    "before": 1.49,
+    "after": 2.05,
+    "contracts": 735
+   },
+   "AMZN": {
+    "fit_factor": 0.949,
+    "before": 3.51,
+    "after": 3.56,
+    "contracts": 742
+   },
+   "GOOGL": {
+    "fit_factor": 1.522,
+    "before": 12.64,
+    "after": 7.03,
+    "contracts": 720
+   },
+   "JPM": {
+    "fit_factor": 1.007,
+    "before": 1.7,
+    "after": 1.84,
+    "contracts": 413
+   },
+   "META": {
+    "fit_factor": 1.338,
+    "before": 14.23,
+    "after": 7.37,
+    "contracts": 1728
+   },
+   "MSFT": {
+    "fit_factor": 0.904,
+    "before": 2.5,
+    "after": 4.02,
+    "contracts": 1130
+   },
+   "RDW": {
+    "fit_factor": 1.067,
+    "before": 9.44,
+    "after": 11.35,
+    "contracts": 96
+   },
+   "SOFI": {
+    "fit_factor": 1.041,
+    "before": 9.23,
+    "after": 7.59,
+    "contracts": 281
+   },
+   "TSLA": {
+    "fit_factor": 0.907,
+    "before": 5.61,
+    "after": 4.01,
+    "contracts": 1301
+   }
+  }
+ },
+ "method": "Median ratio of market to model implied volatility, near-the-money contracts (25-60 delta) 11-60 days out that do not span a report; single stocks only."
+}

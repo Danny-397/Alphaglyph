@@ -365,6 +365,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 40px; cu
 .check-title { font-size: 13px; font-weight: 500; color: var(--text); }
 .check-desc  { grid-column: 2; font-size: 12px; color: var(--faint); line-height: 1.5; margin-top: 2px; }
 .check-desc strong { color: var(--muted); font-weight: 500; }
+.check.is-disabled { cursor: default; }
+.check.is-disabled input { cursor: not-allowed; opacity: 0.4; }
+.check.is-disabled .check-title { color: var(--faint); }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 .btn {

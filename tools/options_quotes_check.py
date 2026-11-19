@@ -11,7 +11,9 @@ measured on real quotes and keeps being measured as the archive grows.
     python tools/options_quotes_check.py                  # read the archive from GitHub
     python tools/options_quotes_check.py --source DIR     # or from a local copy
 
-Writes frontend/data/options_quotes_check.json, which the Options page shows.
+Writes frontend/data/options_quotes_check.json, which the Options page shows, and
+backend/options_iv_calibration.json: an opt-in volatility factor per single stock (see
+calibration() below), which the backtester applies when the user asks for it.
 
 What is compared: out-of-the-money calls and puts (in-the-money options are mostly
 intrinsic value and early exercise; out of the money is where the volatility model
@@ -45,6 +47,9 @@ DTE_BUCKETS = ((2, 10, '2-10 days'), (11, 35, '11-35 days'), (36, 75, '36-75 day
 DELTA_BUCKETS = ((0.40, 0.60, 'at the money (40-60 delta)'), (0.15, 0.40, '15-40 delta'),
                  (0.0, 0.15, 'under 15 delta'))
 ATM_TARGET_DAYS = 30
+CALIBRATION_OUT = ROOT / 'backend' / 'options_iv_calibration.json'
+CAL_MIN_CONTRACTS = 20
+CAL_CLIP = (0.7, 2.0)
 
 
 def read(source: str, name: str) -> dict:
@@ -117,6 +122,62 @@ def atm_point(rows: list) -> dict | None:
             'market': round(float(np.mean([r['market_iv'] for r in near])) * 100, 1)}
 
 
+def calib_row(r: dict) -> bool:
+    """The contracts that set a stock's volatility level: near the money (25-60 delta), 11-60
+    days out, and not spanning a report (the model prices reports separately)."""
+    return 11 <= r['dte'] <= 60 and 0.25 <= r['delta'] <= 0.60 and not r['report'] and r['model_iv'] > 0
+
+
+def fit_factors(rows: list) -> dict:
+    """Per single stock: the median market/model IV ratio over its calibration contracts."""
+    out = {}
+    for sym in sorted({r['symbol'] for r in rows} - set(ob.INDEX_ETFS)):
+        x = [r['market_iv'] / r['model_iv'] for r in rows if r['symbol'] == sym and calib_row(r)]
+        if len(x) >= CAL_MIN_CONTRACTS:
+            out[sym] = {'factor': round(float(np.clip(np.median(x), *CAL_CLIP)), 3), 'contracts': len(x)}
+    return out
+
+
+def _miss(rows: list, factor: float) -> float:
+    return round(float(np.median([abs(r['model_iv'] * factor - r['market_iv']) for r in rows])) * 100, 2)
+
+
+def calibration(rows: list) -> dict | None:
+    """Fit the factors on the first half of the days and score them on the second half (every
+    usable contract, not only the calibration set), then refit on every day for use.
+
+    Index funds are left out: SPY's level is fitted to Cboe's indices over 2007-2015, and on
+    held-out days a factor made the index funds worse, not better.
+    """
+    days = sorted({r['day'] for r in rows})
+    if len(days) < 4:
+        return None
+    fit_days = set(days[:(len(days) + 1) // 2])
+    fit = fit_factors([r for r in rows if r['day'] in fit_days])
+    test = [r for r in rows if r['day'] not in fit_days and r['symbol'] not in ob.INDEX_ETFS]
+    by_symbol, before, after = {}, [], []
+    for sym, f in fit.items():
+        t = [r for r in test if r['symbol'] == sym]
+        if not t:
+            continue
+        by_symbol[sym] = {'fit_factor': f['factor'], 'before': _miss(t, 1.0), 'after': _miss(t, f['factor']),
+                          'contracts': len(t)}
+        before += [abs(r['model_iv'] - r['market_iv']) for r in t]
+        after += [abs(r['model_iv'] * f['factor'] - r['market_iv']) for r in t]
+    return {
+        'days': [days[0], days[-1]], 'n_days': len(days),
+        'tickers': fit_factors(rows),
+        'validation': {'fit_days': [min(fit_days), max(fit_days)],
+                       'test_days': [min(set(days) - fit_days), max(set(days) - fit_days)],
+                       'before': round(float(np.median(before)) * 100, 2) if before else None,
+                       'after': round(float(np.median(after)) * 100, 2) if after else None,
+                       'improved': sum(1 for v in by_symbol.values() if v['after'] < v['before']),
+                       'by_symbol': by_symbol},
+        'method': ('Median ratio of market to model implied volatility, near-the-money contracts (25-60 delta) '
+                   '11-60 days out that do not span a report; single stocks only.'),
+    }
+
+
 def build(source: str) -> dict:
     days = read(source, 'index.json')['days']
     archive = {d: read(source, f'{d}.json') for d in days}
@@ -175,6 +236,7 @@ def build(source: str) -> dict:
         'by_moneyness': [g for g in groups if g], 'by_dte': [g for g in by_dte if g],
         'by_report': [g for g in by_report if g], 'by_symbol': per_symbol,
         'atm': atm, 'skipped': skipped,
+        'calibration': calibration(rows),
         'filters': (f'Out-of-the-money calls and puts within 20% of the price with a two-sided quote, a spread under '
                     f'{MAX_REL_SPREAD * 100:.0f}% of the midpoint, a midpoint of at least ${MIN_MID:.2f} and at '
                     f'least {MIN_DAYS} days to expiry.'),
@@ -192,6 +254,17 @@ def main() -> int:
     if not out['overall']:
         print('No usable quotes; file left unchanged.')
         return 1
+    cal = out.get('calibration')
+    try:
+        old_cal = json.loads(CALIBRATION_OUT.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        old_cal = {}
+    if cal and {**old_cal, 'generated': None} != {**cal, 'generated': None}:
+        CALIBRATION_OUT.write_text(json.dumps({'generated': out['generated'], **cal}, indent=1) + '\n',
+                                   encoding='utf-8', newline='\n')
+        v = cal['validation']
+        print(f"calibration: {len(cal['tickers'])} stocks; held-out typical miss {v['before']} -> {v['after']} pts, "
+              f"{v['improved']} of {len(v['by_symbol'])} improved")
     try:
         old = json.loads(OUT.read_text(encoding='utf-8'))
     except (OSError, ValueError):

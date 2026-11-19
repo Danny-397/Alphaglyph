@@ -692,6 +692,7 @@ def _options_args(data: dict) -> dict:
         'spread_pct': None if spread is None else spread / 100.0,
         'commission': _num(data, 'commission', 0.65, 0, 10, 'Commission per contract'),
         'skew': bool(data.get('skew', True)),
+        'calibrate': bool(data.get('calibrate')),
         'entry': options_bt.clean_entry(data.get('entry')),
         'expiries': _expiries(data.get('expiries')),
         'exit_earnings': bool(data.get('exit_earnings')),

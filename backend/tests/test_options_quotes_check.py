@@ -81,3 +81,29 @@ def test_atm_point_picks_the_expiry_nearest_a_month():
     pt = qc.atm_point(rows)
     assert pt['expiry'] == '2026-12-04'
     assert math.isclose(pt['market'], 25.0, abs_tol=0.5)
+
+
+def _row(sym, day, model_iv, market_iv, dte=30, delta=0.45, report=False):
+    return {'symbol': sym, 'day': day, 'dte': dte, 'delta': delta, 'report': report,
+            'model_iv': model_iv, 'market_iv': market_iv}
+
+
+def test_calibration_rows_are_near_the_money_and_skip_reports():
+    assert qc.calib_row(_row('X', 'd', 0.2, 0.25))
+    assert not qc.calib_row(_row('X', 'd', 0.2, 0.25, dte=5))            # too close to expiry
+    assert not qc.calib_row(_row('X', 'd', 0.2, 0.25, delta=0.10))       # far out of the money
+    assert not qc.calib_row(_row('X', 'd', 0.2, 0.25, report=True))      # the model prices reports separately
+
+
+def test_calibration_is_fitted_early_scored_late_and_leaves_index_funds_alone():
+    days = [f'2026-11-{d:02d}' for d in (2, 3, 4, 5, 6, 9)]
+    rows = []
+    for d in days:
+        rows += [_row('XYZ', d, 0.20, 0.25) for _ in range(30)]            # the model is 20% low, every day
+        rows += [_row('SPY', d, 0.15, 0.16) for _ in range(30)]
+    cal = qc.calibration(rows)
+    assert cal['tickers'] == {'XYZ': {'factor': 1.25, 'contracts': 180}}  # index funds left out
+    v = cal['validation']
+    assert v['fit_days'] == ['2026-11-02', '2026-11-04'] and v['test_days'] == ['2026-11-05', '2026-11-09']
+    assert v['before'] == pytest.approx(5.0) and v['after'] == pytest.approx(0.0) and v['improved'] == 1
+    assert qc.calibration(rows[:60]) is None                              # under four days: nothing to test on
