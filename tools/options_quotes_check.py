@@ -241,6 +241,11 @@ def earnings_moves(base: str = OPTIONS_DATA) -> dict | None:
         if not react:
             continue
         react = react[0].date()
+        q = float(d.get('dividend_yield') or 0.0)
+        # Price history costs a request against the data source's hourly quota (Tiingo's free
+        # plan is about 50), so load it only for stocks whose chains price a report move.
+        if not implied_move(d['chains'], today, react, float(d['spot']), 0.04, q):
+            continue
         m = ob.load_market(sym, (today - timedelta(days=3 * 365)).isoformat(), today.isoformat())
         if 'error' in m:
             continue
@@ -250,7 +255,7 @@ def earnings_moves(base: str = OPTIONS_DATA) -> dict | None:
             continue
         model = math.sqrt(ctx['ev_var'][pd.Timestamp(fut[0])])
         r = float(ctx['r'].iloc[-1])
-        market = implied_move(d['chains'], today, react, float(d['spot']), r, float(d.get('dividend_yield') or 0.0))
+        market = implied_move(d['chains'], today, react, float(d['spot']), r, q)
         if market and model > 0:
             rows.append({'symbol': sym, 'report': e['date'].date().isoformat(), 'market': round(market * 100, 2),
                          'model': round(model * 100, 2), 'ratio': round(market / model, 3)})
