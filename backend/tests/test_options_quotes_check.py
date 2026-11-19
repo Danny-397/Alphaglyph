@@ -107,3 +107,23 @@ def test_calibration_is_fitted_early_scored_late_and_leaves_index_funds_alone():
     assert v['fit_days'] == ['2026-11-02', '2026-11-04'] and v['test_days'] == ['2026-11-05', '2026-11-09']
     assert v['before'] == pytest.approx(5.0) and v['after'] == pytest.approx(0.0) and v['improved'] == 1
     assert qc.calibration(rows[:60]) is None                              # under four days: nothing to test on
+
+
+def test_implied_move_recovers_the_report_variance():
+    """Expiries priced with a flat 30% plus a known 8% report move after day 10: the estimate
+    takes the after-report expiry's extra variance at the before-report expiry's volatility."""
+    from datetime import date
+    today, react = date(2026, 11, 18), date(2026, 11, 28)
+    S, r, base, move = 100.0, 0.04, 0.30, 0.08
+
+    def chain(days, with_report):
+        T = days / 365
+        sig = math.sqrt(base * base + (move * move / T if with_report else 0.0))
+        rows = {}
+        for kind, key in (('call', 'calls'), ('put', 'puts')):
+            p = ob.bs_price(kind, S, 100.0, T, r, sig)
+            rows[key] = [{'strike': 100.0, 'bid': round(p - 0.01, 2), 'ask': round(p + 0.01, 2)}]
+        return rows
+    chains = {'2026-11-25': chain(7, False), '2026-12-04': chain(16, True)}
+    assert qc.implied_move(chains, today, react, S, r, 0.0) == pytest.approx(move, abs=0.004)
+    assert qc.implied_move({'2026-12-04': chain(16, True)}, today, react, S, r, 0.0) is None   # nothing before

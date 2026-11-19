@@ -632,6 +632,13 @@ function obRenderCalibration() {
   el('ob-calibrate-desc').textContent = r.text
 }
 
+// Which stocks' reports the archived quotes held through, in words.
+function obReportNames(d) {
+  const names = [...new Set((d.report_symbols || []))]
+  if (!names.length) return 'a few reports'
+  return names.length === 1 ? `one report (${names[0]})` : `${names.length} stocks' reports (${names.join(', ')})`
+}
+
 async function obLoadQuotes() {
   let d
   try {
@@ -650,13 +657,17 @@ async function obLoadQuotes() {
   const pre = d.by_report.find(g => g.label.startsWith('single stocks, expiring before'))
   const thru = d.by_report.find(g => g.label.startsWith('single stocks, holding through'))
   const cv = d.calibration && d.calibration.validation
+  const em = d.earnings_moves
   el('ob-quotes-lede').textContent = `The same model, pricing every out-of-the-money option quoted at the close for
     ${d.symbols.length} underlyings on ${nd === 1 ? d.days[0] : `${nd} trading days, ${d.days[0]} to ${d.days[nd - 1]}`}, against the
     midpoint of the real bid and ask. ${etf ? `On the index funds its volatility is typically ${etf.iv_mae.toFixed(1)} points off.` : ''}
     ${pre ? `On single stocks it is typically ${pre.iv_mae.toFixed(1)} points off: a stock's own implied volatility often
     sits far from what its recent moves suggest, so read single-stock backtests as rougher than SPY's.` : ''}
-    ${thru ? `Options that hold through an earnings report miss by ${thru.iv_mae.toFixed(1)} points: the market prices
-    the coming report more richly than the stock's past reactions suggest.` : ''}
+    ${thru ? `Options that hold through an earnings report miss by ${thru.iv_mae.toFixed(1)} points, but only
+    ${obReportNames(d)} fell inside the archive, so it says little about earnings in general.` : ''}
+    ${em ? `Across ${em.n} stocks with a report ahead, the move the market prices is ${em.median_ratio.toFixed(2)}× the
+    one the model assumes at the median (${em.iqr[0].toFixed(2)}-${em.iqr[1].toFixed(2)}× for the middle half): right on
+    average, off for individual stocks.` : ''}
     ${cv && cv.before != null ? `A per-stock factor fitted on ${cv.fit_days[0]} to ${cv.fit_days[1]} cut the typical miss on
     ${cv.test_days[0]} to ${cv.test_days[1]} from ${cv.before.toFixed(1)} to ${cv.after.toFixed(1)} points, though it helped only
     ${cv.improved} of ${Object.keys(cv.by_symbol).length} stocks; it is an option under Costs and pricing, off by default.` : ''}

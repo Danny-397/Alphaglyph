@@ -34,6 +34,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'backend'))
@@ -48,6 +49,9 @@ DELTA_BUCKETS = ((0.40, 0.60, 'at the money (40-60 delta)'), (0.15, 0.40, '15-40
                  (0.0, 0.15, 'under 15 delta'))
 ATM_TARGET_DAYS = 30
 CALIBRATION_OUT = ROOT / 'backend' / 'options_iv_calibration.json'
+# Tradeski's nightly chains for ~90 symbols (one day, replaced each night): the source for the
+# earnings-move check, which needs reports ahead of many stocks, not the archive's twelve.
+OPTIONS_DATA = 'https://raw.githubusercontent.com/Danny-397/Tradeski/options-data/options/'
 CAL_MIN_CONTRACTS = 20
 CAL_CLIP = (0.7, 2.0)
 
@@ -178,6 +182,86 @@ def calibration(rows: list) -> dict | None:
     }
 
 
+def atm_market_iv(chain: dict, S: float, T: float, r: float, q: float) -> float | None:
+    """Mean implied volatility of the call and the put nearest the money, from their midpoints."""
+    ivs = []
+    for kind, key in (('call', 'calls'), ('put', 'puts')):
+        quoted = [x for x in chain.get(key, []) if quote_ok(x.get('bid'), x.get('ask'))]
+        if quoted:
+            x = min(quoted, key=lambda x: abs(x['strike'] - S))
+            iv = ob.implied_vol(kind, 0.5 * (x['bid'] + x['ask']), S, x['strike'], T, r, q)
+            if iv:
+                ivs.append(iv)
+    return float(np.mean(ivs)) if ivs else None
+
+
+def implied_move(chains: dict, today: date, react: date, S: float, r: float, q: float) -> float | None:
+    """The report move the market prices: the variance the first expiry after the reaction day
+    carries beyond the last expiry before it, at that earlier expiry's volatility (the usual
+    straddle-free estimate). None without an expiry on each side or a positive difference."""
+    exps = sorted(chains)
+    before = [e for e in exps if (date.fromisoformat(e) - today).days >= 3 and date.fromisoformat(e) < react]
+    after = [e for e in exps if date.fromisoformat(e) >= react]
+    if not before or not after:
+        return None
+    e1, e2 = before[-1], after[0]
+    T1, T2 = ((date.fromisoformat(e) - today).days / 365.0 for e in (e1, e2))
+    s1, s2 = atm_market_iv(chains[e1], S, T1, r, q), atm_market_iv(chains[e2], S, T2, r, q)
+    if not s1 or not s2:
+        return None
+    ev = (s2 * s2 - s1 * s1) * T2
+    return math.sqrt(ev) if ev > 0 else None
+
+
+def earnings_moves(base: str = OPTIONS_DATA) -> dict | None:
+    """The report move the market prices tonight against the one the model assumes (the mean
+    square of the previous eight reactions), for every single stock with a report between two
+    saved expiries. Measures whether the model's earnings premium is right on average."""
+    try:
+        symbols = sorted(read(base, 'index.json')['symbols'])
+    except Exception:
+        return None
+    rows = []
+    for sym in symbols:
+        if sym in ob.INDEX_ETFS:
+            continue
+        events = ob.earnings_events(sym)
+        if not events:
+            continue
+        try:
+            d = read(base, f'{sym}.json')
+        except Exception:
+            continue
+        today = datetime.fromisoformat(d['captured_at']).astimezone(timezone.utc).date()
+        nxt = [e for e in events if e['date'].date() >= today]
+        if not nxt or not d.get('spot'):
+            continue
+        e = nxt[0]
+        react = ob.upcoming_reactions(pd.Series([1.0], index=[pd.Timestamp(today)]), [e])
+        if not react:
+            continue
+        react = react[0].date()
+        m = ob.load_market(sym, (today - timedelta(days=3 * 365)).isoformat(), today.isoformat())
+        if 'error' in m:
+            continue
+        ctx = ob.pricing_context(m, sym)
+        fut = [x for x in ctx['react'] if x >= react]
+        if not fut:
+            continue
+        model = math.sqrt(ctx['ev_var'][pd.Timestamp(fut[0])])
+        r = float(ctx['r'].iloc[-1])
+        market = implied_move(d['chains'], today, react, float(d['spot']), r, float(d.get('dividend_yield') or 0.0))
+        if market and model > 0:
+            rows.append({'symbol': sym, 'report': e['date'].date().isoformat(), 'market': round(market * 100, 2),
+                         'model': round(model * 100, 2), 'ratio': round(market / model, 3)})
+    if not rows:
+        return None
+    ratios = np.array([x['ratio'] for x in rows])
+    return {'n': len(rows), 'median_ratio': round(float(np.median(ratios)), 2),
+            'iqr': [round(float(np.percentile(ratios, 25)), 2), round(float(np.percentile(ratios, 75)), 2)],
+            'rows': rows}
+
+
 def build(source: str) -> dict:
     days = read(source, 'index.json')['days']
     archive = {d: read(source, f'{d}.json') for d in days}
@@ -237,6 +321,8 @@ def build(source: str) -> dict:
         'by_report': [g for g in by_report if g], 'by_symbol': per_symbol,
         'atm': atm, 'skipped': skipped,
         'calibration': calibration(rows),
+        'earnings_moves': earnings_moves(),
+        'report_symbols': sorted({r['symbol'] for r in rows if r['report']}),
         'filters': (f'Out-of-the-money calls and puts within 20% of the price with a two-sided quote, a spread under '
                     f'{MAX_REL_SPREAD * 100:.0f}% of the midpoint, a midpoint of at least ${MIN_MID:.2f} and at '
                     f'least {MIN_DAYS} days to expiry.'),
