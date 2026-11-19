@@ -1,12 +1,12 @@
 {
- "generated_at": "2026-11-18T03:04Z",
+ "generated_at": "2026-11-19T09:04Z",
  "regime": {
-  "adx": 15.0,
-  "bb_width": 0.0672,
+  "adx": 15.79,
+  "bb_width": 0.0703,
   "description": "No clear trend (ADX < 20, price oscillating)",
   "label": "Ranging / Sideways",
-  "minus_di": 36.69,
-  "plus_di": 21.56,
+  "minus_di": 34.9,
+  "plus_di": 20.43,
   "regime": "RANGING",
   "strategy": "rsi",
   "vol_30d": 19.41
@@ -17,9 +17,9 @@
   "scanned": [
    {
     "buys": 2,
-    "p_up": 0.5455,
-    "price": 351.91,
-    "q50": -0.04,
+    "p_up": 0.546,
+    "price": 352.45,
+    "q50": -0.01,
     "sells": 0,
     "signals": {
      "ma_crossover": "BUY",
@@ -31,9 +31,9 @@
    },
    {
     "buys": 1,
-    "p_up": 0.5535,
-    "price": 506.24,
-    "q50": 0.04,
+    "p_up": 0.5539,
+    "price": 508.29,
+    "q50": 0.02,
     "sells": 1,
     "signals": {
      "ma_crossover": "BUY",
@@ -45,9 +45,9 @@
    },
    {
     "buys": 0,
-    "p_up": 0.571,
-    "price": 155.46,
-    "q50": -0.43,
+    "p_up": 0.5722,
+    "price": 150.96,
+    "q50": -0.47,
     "sells": 3,
     "signals": {
      "ma_crossover": "SELL",
@@ -59,9 +59,9 @@
    },
    {
     "buys": 0,
-    "p_up": 0.5681,
-    "price": 280.2,
-    "q50": -0.17,
+    "p_up": 0.5689,
+    "price": 282.44,
+    "q50": -0.15,
     "sells": 3,
     "signals": {
      "ma_crossover": "SELL",
@@ -73,9 +73,9 @@
    },
    {
     "buys": 2,
-    "p_up": 0.5385,
-    "price": 380.11,
-    "q50": -0.33,
+    "p_up": 0.539,
+    "price": 383.72,
+    "q50": -0.35,
     "sells": 0,
     "signals": {
      "ma_crossover": "BUY",
@@ -87,26 +87,26 @@
    },
    {
     "buys": 1,
-    "p_up": 0.5575,
-    "price": 329.96,
+    "p_up": 0.5582,
+    "price": 324.11,
     "q50": -0.05,
-    "sells": 0,
+    "sells": 1,
     "signals": {
      "ma_crossover": "HOLD",
-     "macd": "BUY",
+     "macd": "SELL",
      "ml": "HOLD",
-     "rsi": "HOLD"
+     "rsi": "BUY"
     },
     "ticker": "JPM"
    },
    {
     "buys": 0,
-    "p_up": 0.5631,
-    "price": 732.44,
-    "q50": -0.01,
-    "sells": 2,
+    "p_up": 0.5638,
+    "price": 730.2,
+    "q50": -0.04,
+    "sells": 3,
     "signals": {
-     "ma_crossover": "HOLD",
+     "ma_crossover": "SELL",
      "macd": "SELL",
      "ml": "HOLD",
      "rsi": "SELL"
