@@ -2208,6 +2208,28 @@ function initResearch() {
   })
 }
 
+// ── Settings panel ─────────────────────────────────────────────────────────
+// On wide screens the settings panel is sticky, with its Run button pinned to
+// the bottom. When the panel is taller than the window (most laptops, or once a
+// section is opened) that pinned button covers the last settings, so the panel
+// becomes an ordinary column that scrolls with the page instead. scrollHeight is
+// the content's height in either mode, so the check can't flip-flop.
+function fitFormPanel(panel) {
+  const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 64
+  const room = window.innerHeight - nav - 48
+  panel.classList.toggle('is-flowing', panel.scrollHeight > room + 1)
+}
+
+function initFormPanel() {
+  const panel = document.querySelector('.form-panel')
+  if (!panel) return
+  const fit = () => fitFormPanel(panel)
+  fit()
+  window.addEventListener('resize', fit)
+  panel.addEventListener('toggle', fit, true)          // a <details> section opened or closed
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(panel)
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 // One page per area, so a visitor lands on the thing they came for instead of
 // hunting for it inside a tab strip. Only the current page's init runs; each
@@ -2220,3 +2242,4 @@ if (PAGE === 'screener')  initSignals()
 if (PAGE === 'portfolio') initPortfolio()
 if (PAGE === 'research')  { initTabs(document.body); initResearch() }
 if (['backtest', 'predict', 'screener', 'portfolio', 'research', 'options'].includes(PAGE)) wakeOnIntent()
+initFormPanel()
