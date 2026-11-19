@@ -38,6 +38,10 @@ jobs:
         run: pip install -r backend/requirements.txt
 
       - name: Compare
+        # Yahoo rate-limits GitHub's runners, so prices come from Tiingo when the
+        # TIINGO_API_KEY secret is set (features.py tries it first).
+        env:
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
         run: python tools/options_quotes_check.py
 
       - name: Commit
