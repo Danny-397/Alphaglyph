@@ -566,8 +566,21 @@ backtests themselves were unaffected: a past report's reaction day is in the pri
 `pricing_context` now estimates an upcoming report's reaction day from the calendar and
 prices its move by the same rule as any other report. Over 2026-11-06 to 11-17, NVDA's 1,343
 contracts spanning its 11-17 report are now flagged, and the honest split is: single stocks
-miss by 6.0 points on expiries before their next report and by 16.2 points through one. The
-market prices a coming report more richly than the mean square of past reactions.
+miss by 6.0 points on expiries before their next report and by 16.2 points through one.
+
+That second figure is one report: NVDA's was the only one inside the archive's expiries, and
+NVDA's options were already 22 points under the market before it. Measured directly, the
+market priced NVDA's report as a 7-9% move against the model's 4-5% (the mean square of its
+last eight reactions). An earlier version of this section generalised that into "the market
+prices a coming report more richly than past reactions"; a cross-section says otherwise.
+`earnings_moves()` takes every single stock in Tradeski's nightly chains with a report between
+two saved expiries and compares the move the market prices (the variance the first expiry
+after the report carries beyond the last one before it) with the model's. On 2026-11-18,
+across 13 stocks, the median ratio was 1.0 (0.80-1.21 for the middle half, 0.42 for MU to
+1.73 for JPM): the model's earnings premium is right on average and wrong for individual
+stocks, and a market-wide factor fitted on the other stocks, scored on each in turn, cut the
+typical move error only from 1.8 to 1.7 points (better for 7 of 13). So the earnings model is unchanged; the check reruns
+nightly and the Options page shows it.
 
 **An opt-in factor per stock.** Most of a single stock's miss is a level the model doesn't
 know: META's options trade well above its recent realized volatility times the market's

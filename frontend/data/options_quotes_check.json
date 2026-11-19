@@ -943,7 +943,20 @@
    }
   ]
  },
- "skipped": [],
+ "skipped": [
+  "AAPL 2026-11-18: no close in the price data yet",
+  "AMZN 2026-11-18: no close in the price data yet",
+  "GOOGL 2026-11-18: no close in the price data yet",
+  "JPM 2026-11-18: no close in the price data yet",
+  "META 2026-11-18: no close in the price data yet",
+  "MSFT 2026-11-18: no close in the price data yet",
+  "NVDA 2026-11-18: no close in the price data yet",
+  "QQQ 2026-11-18: no close in the price data yet",
+  "RDW 2026-11-18: no close in the price data yet",
+  "SOFI 2026-11-18: no close in the price data yet",
+  "SPY 2026-11-18: no close in the price data yet",
+  "TSLA 2026-11-18: no close in the price data yet"
+ ],
  "calibration": {
   "days": [
    "2026-11-06",
@@ -1059,5 +1072,110 @@
   },
   "method": "Median ratio of market to model implied volatility, near-the-money contracts (25-60 delta) 11-60 days out that do not span a report; single stocks only."
  },
+ "earnings_moves": {
+  "n": 13,
+  "median_ratio": 1.0,
+  "iqr": [
+   0.8,
+   1.21
+  ],
+  "rows": [
+   {
+    "symbol": "ADBE",
+    "report": "2026-12-09",
+    "market": 9.73,
+    "model": 8.56,
+    "ratio": 1.137
+   },
+   {
+    "symbol": "AVGO",
+    "report": "2026-12-09",
+    "market": 8.39,
+    "model": 11.25,
+    "ratio": 0.746
+   },
+   {
+    "symbol": "BAC",
+    "report": "2027-01-15",
+    "market": 3.75,
+    "model": 3.11,
+    "ratio": 1.206
+   },
+   {
+    "symbol": "C",
+    "report": "2027-01-14",
+    "market": 4.49,
+    "model": 4.35,
+    "ratio": 1.032
+   },
+   {
+    "symbol": "COST",
+    "report": "2026-12-10",
+    "market": 3.23,
+    "model": 3.24,
+    "ratio": 0.996
+   },
+   {
+    "symbol": "CRM",
+    "report": "2026-12-02",
+    "market": 10.56,
+    "model": 8.7,
+    "ratio": 1.214
+   },
+   {
+    "symbol": "JPM",
+    "report": "2027-01-14",
+    "market": 4.3,
+    "model": 2.48,
+    "ratio": 1.731
+   },
+   {
+    "symbol": "MS",
+    "report": "2027-01-14",
+    "market": 4.33,
+    "model": 3.53,
+    "ratio": 1.229
+   },
+   {
+    "symbol": "MU",
+    "report": "2026-12-23",
+    "market": 4.01,
+    "model": 9.51,
+    "ratio": 0.421
+   },
+   {
+    "symbol": "NKE",
+    "report": "2026-12-17",
+    "market": 5.38,
+    "model": 9.45,
+    "ratio": 0.569
+   },
+   {
+    "symbol": "ORCL",
+    "report": "2026-12-14",
+    "market": 10.79,
+    "model": 13.45,
+    "ratio": 0.802
+   },
+   {
+    "symbol": "SNOW",
+    "report": "2026-12-02",
+    "market": 16.14,
+    "model": 18.28,
+    "ratio": 0.883
+   },
+   {
+    "symbol": "WFC",
+    "report": "2027-01-14",
+    "market": 4.19,
+    "model": 4.95,
+    "ratio": 0.846
+   }
+  ]
+ },
+ "report_symbols": [
+  "JPM",
+  "NVDA"
+ ],
  "filters": "Out-of-the-money calls and puts within 20% of the price with a two-sided quote, a spread under 50% of the midpoint, a midpoint of at least $0.05 and at least 2 days to expiry."
 }
