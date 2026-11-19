@@ -72,6 +72,7 @@ function obSettings() {
     initial_capital: num('ob-capital'), dte: num('ob-dte'), alloc_pct: num('ob-alloc'),
     exit_dte: num('ob-exit-dte'), profit_take: num('ob-pt'), stop_loss: num('ob-sl'),
     commission: num('ob-commission'), spread_pct: num('ob-spread'), skew: el('ob-skew').checked,
+    calibrate: el('ob-calibrate').checked && !el('ob-calibrate').disabled,
     entry: obEntry(num),
     expiries: el('ob-expiries').value,
     exit_earnings: el('ob-exit-earn').checked,
@@ -246,9 +247,10 @@ function obSensLine(r) {
   const s = r.sensitivity
   if (!s || !s.variants.length) return ''
   const v = k => s.variants.find(x => x.label === k)
-  const lo = v('IV 10% lower'), hi = v('IV 10% higher')
+  const lo = v('IV 10% lower'), hi = v('IV 10% higher'), plain = v('Without the quote match')
   const wide = s.cagr_range >= 5
   return `<p class="summary-body opt-sens ${wide ? 'opt-sens-wide' : ''}"><strong>How much is the model?</strong>
+    ${plain ? `Priced with the default model instead of ${obEsc(r.ticker)}'s recent quotes, it returns ${fmtPct(plain.cagr, 1)} a year.` : ''}
     With implied volatility 10% lower or higher throughout, the same backtest returns
     ${lo ? fmtPct(lo.cagr, 1) : '—'} or ${hi ? fmtPct(hi.cagr, 1) : '—'} a year${wide
     ? `: a spread of ${s.cagr_range.toFixed(1)} points, so read the headline as a range, not a number.` : '.'}
@@ -273,7 +275,9 @@ const obMoney0 = n => n == null ? '—' : (n < 0 ? '−$' : '$') + Math.abs(Math
 function obRenderResult(r) {
   obShow('results')
   const m = r.metrics, b = r.benchmark, s = r.strategy
-  el('ob-model-line').textContent = `Option prices are reconstructed with Black-Scholes from each day's close; implied volatility is ${r.model.iv}. Not real quotes.`
+  const cal = r.model.calibration
+  el('ob-model-line').textContent = `Option prices are reconstructed with Black-Scholes from each day's close; implied volatility is ${r.model.iv}` +
+    (cal ? `, × ${cal.factor.toFixed(2)} to match ${r.ticker}'s recent real quotes` : '') + '. Not real quotes.'
   const first = r.equity[0].date, last = r.equity[r.equity.length - 1].date
   const beat = m.total_return - b.total_return
   el('ob-summary').innerHTML = `<p class="summary-body"><strong>${obEsc(s.name)} on ${obEsc(r.ticker)}</strong>, ${first} to ${last}:
@@ -604,6 +608,30 @@ const OB_QUICK = {
 
 // How close the model gets to Cboe's real PutWrite index (tools/options_validation.py).
 // The model priced against real closing quotes archived by Tradeski (tools/options_quotes_check.py).
+// The opt-in volatility factor for the ticker in the box, explained with its held-out test.
+function obCalibrationText(cal, ticker) {
+  if (!cal || !cal.tickers) return { ok: false, text: "Scales a stock's volatility to what its options have actually traded at lately." }
+  const t = cal.tickers[ticker]
+  const names = Object.keys(cal.tickers).join(', ')
+  if (!t) {
+    return { ok: false, text: `Available for single stocks with enough archived quotes: ${names}. Index funds keep the model ` +
+      "fitted to Cboe's indices." }
+  }
+  const v = (cal.validation && cal.validation.by_symbol || {})[ticker]
+  const test = v ? ` Fitted on earlier days, it moved ${ticker}'s typical miss on later days from ${v.before.toFixed(1)} to ` +
+    `${v.after.toFixed(1)} points.` : ''
+  return { ok: true, text: `${ticker}'s options have traded at ${t.factor.toFixed(2)}× the model's volatility over ` +
+    `${cal.n_days} recent days.${test} Applied to the whole history, which assumes that premium held.` }
+}
+
+function obRenderCalibration() {
+  const r = obCalibrationText(obState.calibration, el('ob-ticker').value.trim().toUpperCase())
+  el('ob-calibrate').disabled = !r.ok
+  if (!r.ok) el('ob-calibrate').checked = false
+  el('ob-calibrate-row').classList.toggle('is-disabled', !r.ok)
+  el('ob-calibrate-desc').textContent = r.text
+}
+
 async function obLoadQuotes() {
   let d
   try {
@@ -611,19 +639,27 @@ async function obLoadQuotes() {
     if (!res.ok) return
     d = await res.json()
   } catch (e) { return }
+  obState.calibration = d.calibration || null
+  obRenderCalibration()
   const o = d.overall
   if (!o) return
   const pts = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + ' pts'
   const nd = d.days.length
   el('ob-quotes-badge').textContent = `${o.n.toLocaleString('en-US')} real contracts`
   const etf = d.by_report.find(g => g.label.startsWith('index'))
-  const stk = d.by_report.filter(g => g.label.startsWith('single'))
-  const stkMiss = stk.length ? Math.max(...stk.map(g => g.iv_mae)) : null
+  const pre = d.by_report.find(g => g.label.startsWith('single stocks, expiring before'))
+  const thru = d.by_report.find(g => g.label.startsWith('single stocks, holding through'))
+  const cv = d.calibration && d.calibration.validation
   el('ob-quotes-lede').textContent = `The same model, pricing every out-of-the-money option quoted at the close for
     ${d.symbols.length} underlyings on ${nd === 1 ? d.days[0] : `${nd} trading days, ${d.days[0]} to ${d.days[nd - 1]}`}, against the
     midpoint of the real bid and ask. ${etf ? `On the index funds its volatility is typically ${etf.iv_mae.toFixed(1)} points off.` : ''}
-    ${stkMiss != null ? `On single stocks it is typically ${stkMiss.toFixed(1)} points off: a stock's own implied volatility often
+    ${pre ? `On single stocks it is typically ${pre.iv_mae.toFixed(1)} points off: a stock's own implied volatility often
     sits far from what its recent moves suggest, so read single-stock backtests as rougher than SPY's.` : ''}
+    ${thru ? `Options that hold through an earnings report miss by ${thru.iv_mae.toFixed(1)} points: the market prices
+    the coming report more richly than the stock's past reactions suggest.` : ''}
+    ${cv && cv.before != null ? `A per-stock factor fitted on ${cv.fit_days[0]} to ${cv.fit_days[1]} cut the typical miss on
+    ${cv.test_days[0]} to ${cv.test_days[1]} from ${cv.before.toFixed(1)} to ${cv.after.toFixed(1)} points, though it helped only
+    ${cv.improved} of ${Object.keys(cv.by_symbol).length} stocks; it is an option under Costs and pricing, off by default.` : ''}
     The archive grows every trading day.`
   el('ob-quotes-stats').innerHTML = [
     statCard('Model minus market IV', pts(o.iv_bias)),
@@ -748,6 +784,7 @@ function obApplyImport() {
   put('ob-commission', set.commission); put('ob-spread', set.spread_pct)
   put('ob-exit-delta', set.exit_delta); put('ob-stagger', set.stagger_days)
   if (set.skew === false) el('ob-skew').checked = false
+  if (set.calibrate) { el('ob-calibrate').checked = true; el('ob-advanced').open = true }
   if (set.expiries) el('ob-expiries').value = set.expiries
   const e = set.entry || {}
   put('ob-vix-min', e.vix_min); put('ob-vix-max', e.vix_max); put('ob-ivr-min', e.ivr_min); put('ob-ivr-max', e.ivr_max)
@@ -822,6 +859,7 @@ async function initOptionsBacktest() {
 
   sel.addEventListener('change', obPickStrategy)
   el('ob-dte').addEventListener('input', obRenderWhat)
+  el('ob-ticker').addEventListener('input', obRenderCalibration)
   el('ob-name').addEventListener('input', obRenderWhat)
   el('ob-legs').addEventListener('change', obLegChange)
   el('ob-legs').addEventListener('click', e => {

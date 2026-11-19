@@ -904,6 +904,57 @@ def event_moves(close: pd.Series, days: list, rv: pd.Series) -> dict:
     return out
 
 
+def upcoming_reactions(close: pd.Series, events: list) -> list:
+    """Reaction days, estimated from the calendar, of reports whose reaction comes after the
+    last close: the next business day after an after-the-close report, else the report's day."""
+    if not len(close):
+        return []
+    last = close.index[-1]
+    out = set()
+    for e in events or ():
+        d = pd.Timestamp(e['date'])
+        day = d + pd.offsets.BDay(1) if e['when'] == 'amc' else (d if d.dayofweek < 5 else d + pd.offsets.BDay(1))
+        if day > last:
+            out.add(day.normalize())
+    return sorted(out)
+
+
+def future_event_var(close: pd.Series, past_days: list, rv: pd.Series) -> float:
+    """The expected move, as a variance, of a report not in the prices yet: event_moves' rule
+    applied after every reaction so far."""
+    rets = np.log(close).diff()
+    past = [float(rets.get(d, np.nan)) for d in past_days]
+    past = [r for r in past if math.isfinite(r)][-EARN_LOOKBACK:]
+    if past:
+        return float(np.mean(np.square(past)))
+    daily = float(rv.dropna().iloc[-1]) / math.sqrt(TRADING_DAYS) if rv.notna().any() else float('nan')
+    return (EARN_FALLBACK_DAYS * daily) ** 2 if math.isfinite(daily) else 0.0025
+
+
+IV_CALIBRATION_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'options_iv_calibration.json')
+_IV_CALIBRATION: dict | None = None
+
+
+def iv_calibration(ticker: str) -> dict | None:
+    """The opt-in volatility factor for a single stock (tools/options_quotes_check.py), or None.
+
+    The factor is the median ratio of market to model implied volatility over near-the-money
+    contracts quoted in Tradeski's archive that don't span a report. It is measured on recent
+    days only: applying it to a whole backtest assumes the stock's premium held, so it is off
+    unless the user asks for it.
+    """
+    global _IV_CALIBRATION
+    if _IV_CALIBRATION is None:
+        try:
+            with open(IV_CALIBRATION_PATH, encoding='utf-8') as f:
+                _IV_CALIBRATION = json.load(f)
+        except (OSError, ValueError):
+            _IV_CALIBRATION = {}
+    t = (_IV_CALIBRATION.get('tickers') or {}).get(ticker.upper())
+    return {**t, 'days': _IV_CALIBRATION.get('days'), 'validation': (_IV_CALIBRATION.get('validation') or {})
+            .get('by_symbol', {}).get(ticker.upper())} if t else None
+
+
 def load_market(ticker: str, start: str, end: str) -> dict:
     """Closes for the ticker (and SPY), the VIX, its term structure and T-bill rates, with a warm-up."""
     # A year and more of warm-up: the 200-day average and a 252-day IV rank need it.
@@ -1156,7 +1207,14 @@ def pricing_context(m: dict, ticker: str) -> dict:
     ev_list = m.get('earnings')
     react = reaction_days(close, ev_list) if ev_list else []
     iv_all, _ = implied_vol_series(close, ticker, m.get('vix'), m.get('spy'), exclude=react or None)
-    ev_var = event_moves(close, react, realized_vol(close, exclude=react)) if react else {}
+    rv_ex = realized_vol(close, exclude=react or None)
+    ev_var = event_moves(close, react, rv_ex) if react else {}
+    # Reports after the last close have no reaction day in the prices yet, so reaction_days
+    # leaves them out; priced on the day before, an option spanning one needs it. Its reaction
+    # day is estimated from the calendar and its move uses the same rule as any other report.
+    for day in upcoming_reactions(close, ev_list or []):
+        react.append(day)
+        ev_var[day] = future_event_var(close, [d for d in react if d <= close.index[-1]], rv_ex)
     curve = m.get('curve')
     curve = curve.reindex(close.index).ffill(limit=5) if curve is not None else None
     rate = m.get('rate')
@@ -1224,7 +1282,7 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
         exit_dte: int | None = None, profit_take: float | None = None, stop_loss: float | None = None,
         spread_pct: float | None = None, commission: float = 0.65, stock_slip: float = 0.0003,
         skew: bool = True, market: dict | None = None, entry: dict | None = None,
-        iv_scale: float = 1.0, sizing: str = 'risk', expiries: str = 'weekly',
+        iv_scale: float = 1.0, sizing: str = 'risk', expiries: str = 'weekly', calibrate: bool = False,
         exit_earnings: bool = False, exit_delta: float | None = None, stagger_days: int | None = None,
         wheel: dict | None = None) -> dict:
     """Backtest `legs` on `ticker` between start and end. See the module docstring."""
@@ -1252,6 +1310,9 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
     react_d = [d.date() for d in react]
     react_set = set(react_d)
     earn_rule = (rules or {}).get('earnings')
+    calibration = iv_calibration(ticker) if calibrate else None
+    if calibration:
+        iv_scale = iv_scale * calibration['factor']
     if iv_scale != 1.0:
         iv_all = (iv_all * iv_scale).clip(*IV_CLIP)
     real_curve = m.get('curve')
@@ -1663,6 +1724,8 @@ def run(ticker: str, start: str, end: str, legs: list, name: str = 'Custom strat
             out['strategy']['exit_earnings'] = True
     if iv_scale != 1.0 and 'model' in out:
         out['model']['iv_scale'] = iv_scale
+    if calibration and 'model' in out:
+        out['model']['calibration'] = calibration
     if 'model' in out:
         out['model']['term'] = term_note
         out['model']['rf_daily'] = round(rf_daily, 10)

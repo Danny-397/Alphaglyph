@@ -67,7 +67,10 @@ def model_sensitivity(run_kw: dict, base: dict) -> dict:
     return figures and the spread of annual returns across all of them.
     """
     rows = []
-    for label, change in SENSITIVITY:
+    variants = list(SENSITIVITY)
+    if base.get('model', {}).get('calibration'):         # the opt-in quote match: show the default model too
+        variants.insert(0, ('Without the quote match', {'calibrate': False}))
+    for label, change in variants:
         if change.get('skew') is False and not run_kw.get('skew', True):
             continue
         r = ob.run(**{**run_kw, **change})

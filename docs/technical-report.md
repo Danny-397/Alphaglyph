@@ -558,6 +558,31 @@ and the misses don't cancel within a stock. One day is a snapshot (the VIX was 2
 job reruns after every close as the archive grows, and the Options page shows the current
 figures.
 
+**A report the prices hadn't reached.** Until 2026-11-18 the check never priced an upcoming
+earnings report: `reaction_days` places each report on the trading day the price reacts, and
+a report after the last close has no such day yet, so it was dropped. Every archived
+contract counted as "not spanning a report" and was priced without the report's move (the
+backtests themselves were unaffected: a past report's reaction day is in the prices).
+`pricing_context` now estimates an upcoming report's reaction day from the calendar and
+prices its move by the same rule as any other report. Over 2026-11-06 to 11-17, NVDA's 1,343
+contracts spanning its 11-17 report are now flagged, and the honest split is: single stocks
+miss by 6.0 points on expiries before their next report and by 16.2 points through one. The
+market prices a coming report more richly than the mean square of past reactions.
+
+**An opt-in factor per stock.** Most of a single stock's miss is a level the model doesn't
+know: META's options trade well above its recent realized volatility times the market's
+ratio. `calibration()` fits, per single stock, the median ratio of market to model IV over
+near-the-money contracts (25-60 delta, 11-60 days, no report inside), on the first half of
+the archived days, and scores it on the second half over every usable contract. On
+2026-11-12 to 11-17 the typical single-stock miss fell from 6.0 to 4.4 points, but only 4 of 9
+stocks improved: large, persistent gaps (META 14.2 to 7.4, GOOGL 12.6 to 7.0, TSLA 5.6 to 4.0)
+shrink, while stocks the model already priced well (AAPL, MSFT, JPM, RDW) get slightly worse.
+Index funds got worse too, so they are left out. Eight days can't say whether a stock's
+premium held over a five-year backtest, so the factor is off by default; ticking "Match
+recent real quotes" applies it (refit on every archived day), and the result shows the
+default model's figures beside it. It matters: META short puts 2021-2026 return +17.4% a
+year with the default model and +39.6% with the factor (×1.39); long calls +10.7% and −12.0%.
+
 ### 9.2 Results on SPY
 
 On SPY over 2021-11-08 → 2026-11-06 (30 days to expiry, weekly expiries, default sizing
