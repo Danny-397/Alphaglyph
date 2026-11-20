@@ -7,43 +7,43 @@
  "n_days": 10,
  "tickers": {
   "AAPL": {
-   "factor": 1.039,
+   "factor": 1.023,
    "contracts": 354
   },
   "AMZN": {
-   "factor": 0.967,
+   "factor": 0.958,
    "contracts": 395
   },
   "GOOGL": {
-   "factor": 1.47,
+   "factor": 1.44,
    "contracts": 409
   },
   "JPM": {
-   "factor": 0.999,
+   "factor": 0.991,
    "contracts": 319
   },
   "META": {
-   "factor": 1.382,
+   "factor": 1.363,
    "contracts": 1029
   },
   "MSFT": {
-   "factor": 0.945,
+   "factor": 0.933,
    "contracts": 654
   },
   "NVDA": {
-   "factor": 1.11,
+   "factor": 1.011,
    "contracts": 98
   },
   "RDW": {
-   "factor": 0.802,
+   "factor": 0.793,
    "contracts": 163
   },
   "SOFI": {
-   "factor": 1.162,
+   "factor": 1.136,
    "contracts": 295
   },
   "TSLA": {
-   "factor": 0.926,
+   "factor": 0.912,
    "contracts": 754
   }
  },
@@ -56,62 +56,62 @@
    "2026-11-13",
    "2026-11-19"
   ],
-  "before": 5.9,
-  "after": 4.16,
+  "before": 5.95,
+  "after": 4.27,
   "improved": 6,
   "by_symbol": {
    "AAPL": {
     "fit_factor": 1.088,
-    "before": 1.41,
-    "after": 1.83,
+    "before": 1.49,
+    "after": 2.22,
     "contracts": 932
    },
    "AMZN": {
     "fit_factor": 0.958,
-    "before": 3.67,
-    "after": 3.2,
+    "before": 4.01,
+    "after": 3.84,
     "contracts": 937
    },
    "GOOGL": {
     "fit_factor": 1.546,
-    "before": 12.14,
-    "after": 6.81,
+    "before": 11.09,
+    "after": 7.04,
     "contracts": 881
    },
    "JPM": {
     "fit_factor": 1.012,
-    "before": 1.8,
-    "after": 1.97,
+    "before": 1.92,
+    "after": 2.04,
     "contracts": 475
    },
    "META": {
     "fit_factor": 1.371,
-    "before": 13.86,
-    "after": 7.1,
+    "before": 12.53,
+    "after": 7.08,
     "contracts": 2122
    },
    "MSFT": {
     "fit_factor": 0.92,
-    "before": 2.49,
-    "after": 3.61,
+    "before": 2.78,
+    "after": 3.04,
     "contracts": 1468
    },
    "RDW": {
     "fit_factor": 0.85,
-    "before": 27.55,
-    "after": 11.08,
+    "before": 29.44,
+    "after": 13.86,
     "contracts": 111
    },
    "SOFI": {
     "fit_factor": 1.065,
-    "before": 9.69,
-    "after": 6.74,
+    "before": 8.59,
+    "after": 5.7,
     "contracts": 339
    },
    "TSLA": {
     "fit_factor": 0.917,
-    "before": 5.48,
-    "after": 3.81,
+    "before": 6.26,
+    "after": 4.41,
     "contracts": 1600
    }
   }
