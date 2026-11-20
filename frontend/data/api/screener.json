@@ -1,15 +1,15 @@
 {
- "generated_at": "2026-11-19T09:04Z",
+ "generated_at": "2026-11-20T14:21Z",
  "regime": {
-  "adx": 15.79,
-  "bb_width": 0.0703,
+  "adx": 17.17,
+  "bb_width": 0.0823,
   "description": "No clear trend (ADX < 20, price oscillating)",
   "label": "Ranging / Sideways",
-  "minus_di": 34.9,
-  "plus_di": 20.43,
+  "minus_di": 36.47,
+  "plus_di": 17.53,
   "regime": "RANGING",
   "strategy": "rsi",
-  "vol_30d": 19.41
+  "vol_30d": 20.07
  },
  "scan": {
   "count": 7,
@@ -17,9 +17,9 @@
   "scanned": [
    {
     "buys": 2,
-    "p_up": 0.546,
-    "price": 352.45,
-    "q50": -0.01,
+    "p_up": 0.5457,
+    "price": 349.21,
+    "q50": -0.03,
     "sells": 0,
     "signals": {
      "ma_crossover": "BUY",
@@ -31,23 +31,23 @@
    },
    {
     "buys": 1,
-    "p_up": 0.5539,
-    "price": 508.29,
-    "q50": 0.02,
+    "p_up": 0.555,
+    "price": 498.3,
+    "q50": 0.05,
     "sells": 1,
     "signals": {
-     "ma_crossover": "BUY",
+     "ma_crossover": "HOLD",
      "macd": "SELL",
      "ml": "HOLD",
-     "rsi": "HOLD"
+     "rsi": "BUY"
     },
     "ticker": "MSFT"
    },
    {
     "buys": 0,
-    "p_up": 0.5722,
-    "price": 150.96,
-    "q50": -0.47,
+    "p_up": 0.5734,
+    "price": 145.98,
+    "q50": -0.4,
     "sells": 3,
     "signals": {
      "ma_crossover": "SELL",
@@ -59,9 +59,9 @@
    },
    {
     "buys": 0,
-    "p_up": 0.5689,
-    "price": 282.44,
-    "q50": -0.15,
+    "p_up": 0.5703,
+    "price": 272.66,
+    "q50": -0.12,
     "sells": 3,
     "signals": {
      "ma_crossover": "SELL",
@@ -73,9 +73,9 @@
    },
    {
     "buys": 2,
-    "p_up": 0.539,
-    "price": 383.72,
-    "q50": -0.35,
+    "p_up": 0.5402,
+    "price": 374.41,
+    "q50": -0.32,
     "sells": 0,
     "signals": {
      "ma_crossover": "BUY",
@@ -86,29 +86,29 @@
     "ticker": "TSLA"
    },
    {
-    "buys": 1,
-    "p_up": 0.5582,
-    "price": 324.11,
-    "q50": -0.05,
-    "sells": 1,
+    "buys": 0,
+    "p_up": 0.5588,
+    "price": 320.22,
+    "q50": -0.04,
+    "sells": 2,
     "signals": {
      "ma_crossover": "HOLD",
      "macd": "SELL",
      "ml": "HOLD",
-     "rsi": "BUY"
+     "rsi": "SELL"
     },
     "ticker": "JPM"
    },
    {
-    "buys": 0,
-    "p_up": 0.5638,
-    "price": 730.2,
-    "q50": -0.04,
+    "buys": 1,
+    "p_up": 0.5646,
+    "price": 715.87,
+    "q50": 0.01,
     "sells": 3,
     "signals": {
      "ma_crossover": "SELL",
      "macd": "SELL",
-     "ml": "HOLD",
+     "ml": "BUY",
      "rsi": "SELL"
     },
     "ticker": "SPY"
