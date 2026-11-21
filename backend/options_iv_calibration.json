@@ -1,118 +1,118 @@
 {
- "generated": "2026-11-20",
+ "generated": "2026-11-21",
  "days": [
   "2026-11-06",
-  "2026-11-19"
+  "2026-11-20"
  ],
- "n_days": 10,
+ "n_days": 11,
  "tickers": {
   "AAPL": {
-   "factor": 1.023,
-   "contracts": 354
+   "factor": 1.04,
+   "contracts": 407
   },
   "AMZN": {
-   "factor": 0.958,
-   "contracts": 395
+   "factor": 0.972,
+   "contracts": 453
   },
   "GOOGL": {
-   "factor": 1.44,
-   "contracts": 409
+   "factor": 1.488,
+   "contracts": 472
   },
   "JPM": {
-   "factor": 0.991,
-   "contracts": 319
+   "factor": 1.006,
+   "contracts": 358
   },
   "META": {
-   "factor": 1.363,
-   "contracts": 1029
+   "factor": 1.372,
+   "contracts": 1156
   },
   "MSFT": {
-   "factor": 0.933,
-   "contracts": 654
+   "factor": 0.944,
+   "contracts": 758
   },
   "NVDA": {
-   "factor": 1.011,
-   "contracts": 98
+   "factor": 1.18,
+   "contracts": 196
   },
   "RDW": {
-   "factor": 0.793,
-   "contracts": 163
+   "factor": 0.786,
+   "contracts": 176
   },
   "SOFI": {
-   "factor": 1.136,
-   "contracts": 295
+   "factor": 1.162,
+   "contracts": 325
   },
   "TSLA": {
-   "factor": 0.912,
-   "contracts": 754
+   "factor": 0.923,
+   "contracts": 860
   }
  },
  "validation": {
   "fit_days": [
    "2026-11-06",
-   "2026-11-12"
+   "2026-11-13"
   ],
   "test_days": [
-   "2026-11-13",
-   "2026-11-19"
+   "2026-11-16",
+   "2026-11-20"
   ],
-  "before": 5.95,
-  "after": 4.27,
-  "improved": 6,
+  "before": 6.62,
+  "after": 4.97,
+  "improved": 5,
   "by_symbol": {
    "AAPL": {
-    "fit_factor": 1.088,
-    "before": 1.49,
-    "after": 2.22,
-    "contracts": 932
+    "fit_factor": 1.081,
+    "before": 2.09,
+    "after": 2.56,
+    "contracts": 960
    },
    "AMZN": {
-    "fit_factor": 0.958,
-    "before": 4.01,
-    "after": 3.84,
-    "contracts": 937
+    "fit_factor": 0.965,
+    "before": 4.8,
+    "after": 5.29,
+    "contracts": 966
    },
    "GOOGL": {
-    "fit_factor": 1.546,
-    "before": 11.09,
-    "after": 7.04,
-    "contracts": 881
+    "fit_factor": 1.548,
+    "before": 13.53,
+    "after": 6.34,
+    "contracts": 908
    },
    "JPM": {
-    "fit_factor": 1.012,
-    "before": 1.92,
-    "after": 2.04,
-    "contracts": 475
+    "fit_factor": 1.011,
+    "before": 2.54,
+    "after": 2.61,
+    "contracts": 485
    },
    "META": {
-    "fit_factor": 1.371,
-    "before": 12.53,
-    "after": 7.08,
-    "contracts": 2122
+    "fit_factor": 1.379,
+    "before": 14.22,
+    "after": 6.42,
+    "contracts": 2131
    },
    "MSFT": {
-    "fit_factor": 0.92,
-    "before": 2.78,
-    "after": 3.04,
-    "contracts": 1468
+    "fit_factor": 0.925,
+    "before": 4.0,
+    "after": 4.46,
+    "contracts": 1546
    },
    "RDW": {
-    "fit_factor": 0.85,
-    "before": 29.44,
-    "after": 13.86,
-    "contracts": 111
+    "fit_factor": 0.851,
+    "before": 33.67,
+    "after": 16.44,
+    "contracts": 106
    },
    "SOFI": {
-    "fit_factor": 1.065,
-    "before": 8.59,
-    "after": 5.7,
-    "contracts": 339
+    "fit_factor": 1.086,
+    "before": 10.26,
+    "after": 6.5,
+    "contracts": 330
    },
    "TSLA": {
-    "fit_factor": 0.917,
-    "before": 6.26,
-    "after": 4.41,
-    "contracts": 1600
+    "fit_factor": 0.923,
+    "before": 5.88,
+    "after": 5.72,
+    "contracts": 1653
    }
   }
  },

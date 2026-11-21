@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-20",
+ "generated": "2026-11-21",
  "source": "Tradeski data/options-archive (closing chains saved after each US close)",
  "days": [
   "2026-11-06",
@@ -11,7 +11,8 @@
   "2026-11-16",
   "2026-11-17",
   "2026-11-18",
-  "2026-11-19"
+  "2026-11-19",
+  "2026-11-20"
  ],
  "symbols": [
   "AAPL",
@@ -28,317 +29,317 @@
   "TSLA"
  ],
  "overall": {
-  "n": 43418,
-  "iv_bias": -0.91,
-  "iv_mae": 2.98,
-  "price_bias": -9.4,
-  "price_mae": 29.2,
-  "inside_spread": 7.1
+  "n": 48500,
+  "iv_bias": -1.62,
+  "iv_mae": 3.45,
+  "price_bias": -15.1,
+  "price_mae": 31.2,
+  "inside_spread": 6.8
  },
  "by_moneyness": [
   {
    "label": "puts, at the money (40-60 delta)",
-   "n": 2071,
-   "iv_bias": 0.73,
-   "iv_mae": 3.31,
-   "price_bias": 3.3,
-   "price_mae": 12.9,
-   "inside_spread": 9.7
+   "n": 2316,
+   "iv_bias": 0.32,
+   "iv_mae": 3.59,
+   "price_bias": 1.2,
+   "price_mae": 13.3,
+   "inside_spread": 10.5
   },
   {
    "label": "calls, at the money (40-60 delta)",
-   "n": 3422,
-   "iv_bias": 0.6,
-   "iv_mae": 3.27,
-   "price_bias": 2.5,
-   "price_mae": 14.2,
-   "inside_spread": 7.2
+   "n": 3872,
+   "iv_bias": -0.31,
+   "iv_mae": 4.07,
+   "price_bias": -1.2,
+   "price_mae": 15.9,
+   "inside_spread": 7.1
   },
   {
    "label": "puts, 15-40 delta",
-   "n": 8237,
-   "iv_bias": 0.3,
-   "iv_mae": 2.9,
-   "price_bias": 2.2,
-   "price_mae": 17.0,
-   "inside_spread": 9.3
+   "n": 9326,
+   "iv_bias": -0.07,
+   "iv_mae": 3.35,
+   "price_bias": -0.5,
+   "price_mae": 18.3,
+   "inside_spread": 9.2
   },
   {
    "label": "calls, 15-40 delta",
-   "n": 7804,
-   "iv_bias": -2.29,
-   "iv_mae": 3.54,
-   "price_bias": -17.5,
-   "price_mae": 28.9,
-   "inside_spread": 6.1
+   "n": 8991,
+   "iv_bias": -3.59,
+   "iv_mae": 4.47,
+   "price_bias": -25.9,
+   "price_mae": 33.1,
+   "inside_spread": 5.4
   },
   {
    "label": "puts, under 15 delta",
-   "n": 11615,
-   "iv_bias": -1.93,
-   "iv_mae": 3.32,
-   "price_bias": -22.3,
-   "price_mae": 36.4,
-   "inside_spread": 7.6
+   "n": 12346,
+   "iv_bias": -2.23,
+   "iv_mae": 3.58,
+   "price_bias": -25.2,
+   "price_mae": 37.6,
+   "inside_spread": 7.3
   },
   {
    "label": "calls, under 15 delta",
-   "n": 10269,
-   "iv_bias": -0.93,
-   "iv_mae": 2.29,
-   "price_bias": -22.5,
-   "price_mae": 55.4,
-   "inside_spread": 5.1
+   "n": 11649,
+   "iv_bias": -1.79,
+   "iv_mae": 2.67,
+   "price_bias": -33.5,
+   "price_mae": 58.1,
+   "inside_spread": 4.6
   }
  ],
  "by_dte": [
   {
    "label": "2-10 days",
-   "n": 17934,
-   "iv_bias": -2.41,
-   "iv_mae": 3.36,
-   "price_bias": -24.5,
-   "price_mae": 32.3,
+   "n": 19883,
+   "iv_bias": -2.97,
+   "iv_mae": 3.9,
+   "price_bias": -27.6,
+   "price_mae": 34.3,
    "inside_spread": 6.9
   },
   {
    "label": "11-35 days",
-   "n": 17999,
-   "iv_bias": 0.3,
-   "iv_mae": 2.36,
-   "price_bias": 3.2,
-   "price_mae": 26.5,
-   "inside_spread": 7.0
+   "n": 20544,
+   "iv_bias": -0.34,
+   "iv_mae": 2.86,
+   "price_bias": -3.3,
+   "price_mae": 29.5,
+   "inside_spread": 6.5
   },
   {
    "label": "36-75 days",
-   "n": 7485,
-   "iv_bias": 0.21,
-   "iv_mae": 3.68,
-   "price_bias": 1.8,
-   "price_mae": 29.2,
-   "inside_spread": 7.8
+   "n": 8073,
+   "iv_bias": -0.36,
+   "iv_mae": 3.8,
+   "price_bias": -2.8,
+   "price_mae": 29.9,
+   "inside_spread": 7.6
   }
  ],
  "by_report": [
   {
    "label": "single stocks, expiring before the next report",
-   "n": 18833,
-   "iv_bias": -3.71,
-   "iv_mae": 5.98,
-   "price_bias": -24.3,
-   "price_mae": 36.8,
-   "inside_spread": 9.5
+   "n": 20950,
+   "iv_bias": -4.47,
+   "iv_mae": 6.32,
+   "price_bias": -27.0,
+   "price_mae": 37.1,
+   "inside_spread": 9.4
   },
   {
    "label": "single stocks, holding through a report",
-   "n": 1466,
-   "iv_bias": -16.07,
-   "iv_mae": 16.07,
-   "price_bias": -41.5,
-   "price_mae": 41.5,
-   "inside_spread": 5.4
+   "n": 1487,
+   "iv_bias": -15.81,
+   "iv_mae": 15.81,
+   "price_bias": -41.3,
+   "price_mae": 41.3,
+   "inside_spread": 5.3
   },
   {
    "label": "index ETFs (no reports)",
-   "n": 23119,
-   "iv_bias": 0.09,
-   "iv_mae": 1.78,
-   "price_bias": 0.8,
-   "price_mae": 23.4,
-   "inside_spread": 5.3
+   "n": 26063,
+   "iv_bias": -0.36,
+   "iv_mae": 2.05,
+   "price_bias": -3.7,
+   "price_mae": 26.3,
+   "inside_spread": 4.8
   }
  ],
  "by_symbol": [
   {
    "symbol": "AAPL",
-   "n": 1934,
-   "iv_bias": -1.64,
-   "iv_mae": 2.16,
-   "price_bias": -16.3,
-   "price_mae": 20.8,
-   "inside_spread": 20.8,
+   "n": 2140,
+   "iv_bias": -2.03,
+   "iv_mae": 2.4,
+   "price_bias": -19.3,
+   "price_mae": 22.5,
+   "inside_spread": 19.8,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 27.2,
-    "market": 24.9
+    "model": 26.0,
+    "market": 31.5
    },
    "note": null
   },
   {
    "symbol": "AMZN",
-   "n": 1889,
-   "iv_bias": 0.48,
-   "iv_mae": 4.12,
-   "price_bias": 2.4,
-   "price_mae": 29.5,
+   "n": 2089,
+   "iv_bias": -0.49,
+   "iv_mae": 4.44,
+   "price_bias": -2.5,
+   "price_mae": 29.3,
    "inside_spread": 12.7,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 47.3,
-    "market": 38.7
+    "model": 41.8,
+    "market": 46.7
    },
    "note": null
   },
   {
    "symbol": "GOOGL",
-   "n": 1808,
-   "iv_bias": -11.71,
-   "iv_mae": 11.71,
-   "price_bias": -64.1,
-   "price_mae": 64.1,
-   "inside_spread": 0.8,
+   "n": 2009,
+   "iv_bias": -12.83,
+   "iv_mae": 12.83,
+   "price_bias": -65.6,
+   "price_mae": 65.6,
+   "inside_spread": 0.7,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 33.1,
-    "market": 37.8
+    "model": 28.6,
+    "market": 45.8
    },
    "note": null
   },
   {
    "symbol": "JPM",
-   "n": 1033,
-   "iv_bias": -0.35,
-   "iv_mae": 2.08,
-   "price_bias": -2.4,
-   "price_mae": 18.7,
-   "inside_spread": 28.6,
+   "n": 1133,
+   "iv_bias": -0.72,
+   "iv_mae": 2.25,
+   "price_bias": -5.3,
+   "price_mae": 18.8,
+   "inside_spread": 28.7,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 30.6,
-    "market": 26.1
+    "model": 29.0,
+    "market": 31.3
    },
    "note": null
   },
   {
    "symbol": "META",
-   "n": 4378,
-   "iv_bias": -11.89,
-   "iv_mae": 11.89,
-   "price_bias": -51.9,
-   "price_mae": 52.0,
+   "n": 4788,
+   "iv_bias": -12.78,
+   "iv_mae": 12.78,
+   "price_bias": -52.7,
+   "price_mae": 52.8,
    "inside_spread": 0.4,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 36.6,
-    "market": 43.6
+    "model": 37.2,
+    "market": 51.8
    },
    "note": null
   },
   {
    "symbol": "MSFT",
-   "n": 2984,
-   "iv_bias": 0.91,
-   "iv_mae": 3.04,
-   "price_bias": 6.0,
-   "price_mae": 25.6,
-   "inside_spread": 16.8,
+   "n": 3327,
+   "iv_bias": 0.19,
+   "iv_mae": 3.36,
+   "price_bias": 1.2,
+   "price_mae": 26.5,
+   "inside_spread": 15.7,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 39.5,
-    "market": 34.8
+    "model": 36.2,
+    "market": 41.9
    },
    "note": null
   },
   {
    "symbol": "NVDA",
-   "n": 1991,
-   "iv_bias": -16.12,
-   "iv_mae": 16.12,
-   "price_bias": -45.3,
-   "price_mae": 45.4,
-   "inside_spread": 2.6,
+   "n": 2264,
+   "iv_bias": -17.39,
+   "iv_mae": 17.39,
+   "price_bias": -46.1,
+   "price_mae": 46.3,
+   "inside_spread": 2.3,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 53.1,
-    "market": 52.8
+    "model": 64.3,
+    "market": 78.6
    },
    "note": null
   },
   {
    "symbol": "QQQ",
-   "n": 12130,
-   "iv_bias": 0.55,
-   "iv_mae": 2.16,
-   "price_bias": 5.0,
-   "price_mae": 23.0,
-   "inside_spread": 7.0,
+   "n": 13475,
+   "iv_bias": 0.13,
+   "iv_mae": 2.42,
+   "price_bias": 1.1,
+   "price_mae": 24.7,
+   "inside_spread": 6.5,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 37.9,
-    "market": 32.3
+    "model": 37.4,
+    "market": 43.9
    },
    "note": null
   },
   {
    "symbol": "RDW",
-   "n": 233,
-   "iv_bias": 21.94,
-   "iv_mae": 21.94,
-   "price_bias": 37.3,
-   "price_mae": 38.0,
-   "inside_spread": 17.6,
+   "n": 248,
+   "iv_bias": 23.32,
+   "iv_mae": 23.32,
+   "price_bias": 39.1,
+   "price_mae": 39.4,
+   "inside_spread": 16.5,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 132.5,
-    "market": 81.0
+    "model": 128.4,
+    "market": 89.0
    },
    "note": "no earnings dates: priced without an earnings premium"
   },
   {
    "symbol": "SOFI",
-   "n": 718,
-   "iv_bias": -5.81,
-   "iv_mae": 7.7,
-   "price_bias": -18.8,
-   "price_mae": 22.8,
-   "inside_spread": 11.8,
+   "n": 775,
+   "iv_bias": -6.69,
+   "iv_mae": 8.69,
+   "price_bias": -21.0,
+   "price_mae": 24.7,
+   "inside_spread": 11.0,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 53.4,
-    "market": 57.7
+    "model": 53.2,
+    "market": 67.9
    },
    "note": null
   },
   {
    "symbol": "SPY",
-   "n": 10989,
-   "iv_bias": -0.3,
-   "iv_mae": 1.44,
-   "price_bias": -3.8,
-   "price_mae": 24.1,
-   "inside_spread": 3.4,
+   "n": 12588,
+   "iv_bias": -0.72,
+   "iv_mae": 1.7,
+   "price_bias": -11.1,
+   "price_mae": 28.9,
+   "inside_spread": 3.0,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 24.3,
-    "market": 23.1
+    "model": 24.5,
+    "market": 32.3
    },
    "note": null
   },
   {
    "symbol": "TSLA",
-   "n": 3331,
-   "iv_bias": 2.44,
-   "iv_mae": 5.86,
-   "price_bias": 9.8,
-   "price_mae": 28.3,
-   "inside_spread": 6.5,
+   "n": 3664,
+   "iv_bias": 1.62,
+   "iv_mae": 5.7,
+   "price_bias": 6.2,
+   "price_mae": 26.7,
+   "inside_spread": 8.4,
    "atm": {
-    "day": "2026-11-19",
+    "day": "2026-11-20",
     "expiry": "2026-12-18",
-    "model": 62.2,
-    "market": 51.6
+    "model": 59.4,
+    "market": 63.0
    },
    "note": null
   }
@@ -404,6 +405,12 @@
     "expiry": "2026-12-18",
     "model": 27.2,
     "market": 24.9
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 26.0,
+    "market": 31.5
    }
   ],
   "AMZN": [
@@ -466,6 +473,12 @@
     "expiry": "2026-12-18",
     "model": 47.3,
     "market": 38.7
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 41.8,
+    "market": 46.7
    }
   ],
   "GOOGL": [
@@ -528,6 +541,12 @@
     "expiry": "2026-12-18",
     "model": 33.1,
     "market": 37.8
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 28.6,
+    "market": 45.8
    }
   ],
   "JPM": [
@@ -590,6 +609,12 @@
     "expiry": "2026-12-18",
     "model": 30.6,
     "market": 26.1
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 29.0,
+    "market": 31.3
    }
   ],
   "META": [
@@ -652,6 +677,12 @@
     "expiry": "2026-12-18",
     "model": 36.6,
     "market": 43.6
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 37.2,
+    "market": 51.8
    }
   ],
   "MSFT": [
@@ -714,6 +745,12 @@
     "expiry": "2026-12-18",
     "model": 39.5,
     "market": 34.8
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 36.2,
+    "market": 41.9
    }
   ],
   "NVDA": [
@@ -776,6 +813,12 @@
     "expiry": "2026-12-18",
     "model": 53.1,
     "market": 52.8
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 64.3,
+    "market": 78.6
    }
   ],
   "QQQ": [
@@ -838,6 +881,12 @@
     "expiry": "2026-12-18",
     "model": 37.9,
     "market": 32.3
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 37.4,
+    "market": 43.9
    }
   ],
   "RDW": [
@@ -900,6 +949,12 @@
     "expiry": "2026-12-18",
     "model": 132.5,
     "market": 81.0
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 128.4,
+    "market": 89.0
    }
   ],
   "SOFI": [
@@ -962,6 +1017,12 @@
     "expiry": "2026-12-18",
     "model": 53.4,
     "market": 57.7
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 53.2,
+    "market": 67.9
    }
   ],
   "SPY": [
@@ -1024,6 +1085,12 @@
     "expiry": "2026-12-18",
     "model": 24.3,
     "market": 23.1
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 24.5,
+    "market": 32.3
    }
   ],
   "TSLA": [
@@ -1086,6 +1153,12 @@
     "expiry": "2026-12-18",
     "model": 62.2,
     "market": 51.6
+   },
+   {
+    "day": "2026-11-20",
+    "expiry": "2026-12-18",
+    "model": 59.4,
+    "market": 63.0
    }
   ]
  },
@@ -1093,220 +1166,213 @@
  "calibration": {
   "days": [
    "2026-11-06",
-   "2026-11-19"
+   "2026-11-20"
   ],
-  "n_days": 10,
+  "n_days": 11,
   "tickers": {
    "AAPL": {
-    "factor": 1.023,
-    "contracts": 354
+    "factor": 1.04,
+    "contracts": 407
    },
    "AMZN": {
-    "factor": 0.958,
-    "contracts": 395
+    "factor": 0.972,
+    "contracts": 453
    },
    "GOOGL": {
-    "factor": 1.44,
-    "contracts": 409
+    "factor": 1.488,
+    "contracts": 472
    },
    "JPM": {
-    "factor": 0.991,
-    "contracts": 319
+    "factor": 1.006,
+    "contracts": 358
    },
    "META": {
-    "factor": 1.363,
-    "contracts": 1029
+    "factor": 1.372,
+    "contracts": 1156
    },
    "MSFT": {
-    "factor": 0.933,
-    "contracts": 654
+    "factor": 0.944,
+    "contracts": 758
    },
    "NVDA": {
-    "factor": 1.011,
-    "contracts": 98
+    "factor": 1.18,
+    "contracts": 196
    },
    "RDW": {
-    "factor": 0.793,
-    "contracts": 163
+    "factor": 0.786,
+    "contracts": 176
    },
    "SOFI": {
-    "factor": 1.136,
-    "contracts": 295
+    "factor": 1.162,
+    "contracts": 325
    },
    "TSLA": {
-    "factor": 0.912,
-    "contracts": 754
+    "factor": 0.923,
+    "contracts": 860
    }
   },
   "validation": {
    "fit_days": [
     "2026-11-06",
-    "2026-11-12"
+    "2026-11-13"
    ],
    "test_days": [
-    "2026-11-13",
-    "2026-11-19"
+    "2026-11-16",
+    "2026-11-20"
    ],
-   "before": 5.95,
-   "after": 4.27,
-   "improved": 6,
+   "before": 6.62,
+   "after": 4.97,
+   "improved": 5,
    "by_symbol": {
     "AAPL": {
-     "fit_factor": 1.088,
-     "before": 1.49,
-     "after": 2.22,
-     "contracts": 932
+     "fit_factor": 1.081,
+     "before": 2.09,
+     "after": 2.56,
+     "contracts": 960
     },
     "AMZN": {
-     "fit_factor": 0.958,
-     "before": 4.01,
-     "after": 3.84,
-     "contracts": 937
+     "fit_factor": 0.965,
+     "before": 4.8,
+     "after": 5.29,
+     "contracts": 966
     },
     "GOOGL": {
-     "fit_factor": 1.546,
-     "before": 11.09,
-     "after": 7.04,
-     "contracts": 881
+     "fit_factor": 1.548,
+     "before": 13.53,
+     "after": 6.34,
+     "contracts": 908
     },
     "JPM": {
-     "fit_factor": 1.012,
-     "before": 1.92,
-     "after": 2.04,
-     "contracts": 475
+     "fit_factor": 1.011,
+     "before": 2.54,
+     "after": 2.61,
+     "contracts": 485
     },
     "META": {
-     "fit_factor": 1.371,
-     "before": 12.53,
-     "after": 7.08,
-     "contracts": 2122
+     "fit_factor": 1.379,
+     "before": 14.22,
+     "after": 6.42,
+     "contracts": 2131
     },
     "MSFT": {
-     "fit_factor": 0.92,
-     "before": 2.78,
-     "after": 3.04,
-     "contracts": 1468
+     "fit_factor": 0.925,
+     "before": 4.0,
+     "after": 4.46,
+     "contracts": 1546
     },
     "RDW": {
-     "fit_factor": 0.85,
-     "before": 29.44,
-     "after": 13.86,
-     "contracts": 111
+     "fit_factor": 0.851,
+     "before": 33.67,
+     "after": 16.44,
+     "contracts": 106
     },
     "SOFI": {
-     "fit_factor": 1.065,
-     "before": 8.59,
-     "after": 5.7,
-     "contracts": 339
+     "fit_factor": 1.086,
+     "before": 10.26,
+     "after": 6.5,
+     "contracts": 330
     },
     "TSLA": {
-     "fit_factor": 0.917,
-     "before": 6.26,
-     "after": 4.41,
-     "contracts": 1600
+     "fit_factor": 0.923,
+     "before": 5.88,
+     "after": 5.72,
+     "contracts": 1653
     }
    }
   },
   "method": "Median ratio of market to model implied volatility, near-the-money contracts (25-60 delta) 11-60 days out that do not span a report; single stocks only."
  },
  "earnings_moves": {
-  "n": 13,
-  "median_ratio": 1.14,
+  "n": 12,
+  "median_ratio": 1.19,
   "iqr": [
-   0.8,
-   1.26
+   0.86,
+   1.29
   ],
   "rows": [
    {
     "symbol": "ADBE",
     "report": "2026-12-09",
-    "market": 9.77,
+    "market": 10.48,
     "model": 8.56,
-    "ratio": 1.141
+    "ratio": 1.223
    },
    {
     "symbol": "AVGO",
     "report": "2026-12-09",
-    "market": 8.94,
+    "market": 6.89,
     "model": 11.25,
-    "ratio": 0.795
+    "ratio": 0.612
    },
    {
     "symbol": "BAC",
     "report": "2027-01-15",
-    "market": 4.62,
+    "market": 4.14,
     "model": 3.11,
-    "ratio": 1.487
+    "ratio": 1.331
    },
    {
     "symbol": "C",
     "report": "2027-01-14",
-    "market": 5.23,
+    "market": 4.87,
     "model": 4.35,
-    "ratio": 1.203
+    "ratio": 1.12
    },
    {
     "symbol": "COST",
     "report": "2026-12-10",
-    "market": 3.8,
+    "market": 4.47,
     "model": 3.24,
-    "ratio": 1.174
+    "ratio": 1.379
    },
    {
     "symbol": "CRM",
     "report": "2026-12-02",
-    "market": 10.97,
+    "market": 11.68,
     "model": 8.7,
-    "ratio": 1.261
+    "ratio": 1.343
    },
    {
     "symbol": "JPM",
     "report": "2027-01-14",
-    "market": 4.84,
+    "market": 3.18,
     "model": 2.48,
-    "ratio": 1.951
+    "ratio": 1.282
    },
    {
     "symbol": "MS",
     "report": "2027-01-14",
-    "market": 6.86,
+    "market": 4.11,
     "model": 3.53,
-    "ratio": 1.945
+    "ratio": 1.167
    },
    {
     "symbol": "NKE",
     "report": "2026-12-17",
-    "market": 7.57,
+    "market": 7.21,
     "model": 9.45,
-    "ratio": 0.801
+    "ratio": 0.762
    },
    {
     "symbol": "ORCL",
     "report": "2026-12-14",
-    "market": 11.32,
+    "market": 11.02,
     "model": 13.45,
-    "ratio": 0.841
+    "ratio": 0.819
    },
    {
     "symbol": "SNOW",
     "report": "2026-12-02",
-    "market": 16.3,
+    "market": 15.99,
     "model": 18.28,
-    "ratio": 0.891
-   },
-   {
-    "symbol": "UNH",
-    "report": "2027-01-12",
-    "market": 2.99,
-    "model": 12.57,
-    "ratio": 0.238
+    "ratio": 0.874
    },
    {
     "symbol": "WFC",
     "report": "2027-01-14",
-    "market": 3.85,
+    "market": 6.02,
     "model": 4.95,
-    "ratio": 0.776
+    "ratio": 1.214
    }
   ]
  },
