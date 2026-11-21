@@ -58,45 +58,6 @@ const REGIME_COLORS = {
   HIGH_VOLATILITY: '#ff9f0a',
 }
 
-// Every trade is turned into a plain-English reason a beginner can follow — what
-// the strategy saw, in which market regime, and why it acted. Used by the
-// backtest trades table.
-const REGIME_PHRASE = {
-  TRENDING_UP:     'an up-trending market',
-  TRENDING_DOWN:   'a down-trending market',
-  RANGING:         'a sideways, range-bound market',
-  HIGH_VOLATILITY: 'a high-volatility market',
-}
-const BUY_REASON = {
-  ma_crossover: 'the 20-day average crossed above the 50-day — momentum turning up',
-  rsi:          'RSI dropped into oversold territory — a mean-reversion bounce setup',
-  macd:         'MACD crossed above its signal line on rising volume',
-  ml:           'the ML transformer put the odds on the upside',
-  dip_buyer:    'the stock was trading near its 52-week low — a value entry',
-  custom:       'your custom buy conditions were met',
-}
-const SELL_REASON = {
-  stop_loss:    'price fell back to the trailing stop — locking in the move and capping downside',
-  take_profit:  'price hit the take-profit target',
-  sell_signal:  'the strategy flipped to a sell signal',
-  signal:       'the strategy flipped to a sell signal',
-  recovered:    'it recovered toward its 52-week high — locking in the gain',
-}
-function tradeWhy(t) {
-  const where = REGIME_PHRASE[t.regime] || 'the current market'
-  if (t.action === 'BUY') {
-    if (t.reason === 'scale_in')
-      return `Averaged down — bought more as it fell further toward its 52-week low.`
-    const base = BUY_REASON[t.strategy] || 'the strategy flagged a buy signal'
-    return `Bought because ${base}, in ${where}.`
-  }
-  const why = SELL_REASON[t.reason] || 'an exit rule triggered'
-  let pnl = ''
-  if (t.pnl != null) pnl = ` Booked a ${t.pnl >= 0 ? 'gain' : 'loss'} of ${fmt$(Math.abs(t.pnl))}` +
-    (t.pnl_pct != null ? ` (${fmtPct(t.pnl_pct)})` : '') + '.'
-  return `Sold because ${why}.${pnl}`
-}
-
 // ── Connection state (free-tier cold-start UX) ───────────────────────────────
 // Render's free instance sleeps after inactivity and takes ~30-75s to wake.
 // While it boots, Render holds the request open, so a slow answer is a cold

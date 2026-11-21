@@ -16,7 +16,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
-import pytz
+from zoneinfo import ZoneInfo
 
 from app import (
     KEEPALIVE_END_MIN,
@@ -24,12 +24,12 @@ from app import (
     _within_keepalive_window,
 )
 
-ET = pytz.timezone('America/New_York')
+ET = ZoneInfo('America/New_York')
 
 
 def et(year, month, day, hour, minute=0):
     """An aware America/New_York datetime with the right DST offset."""
-    return ET.localize(datetime(year, month, day, hour, minute))
+    return datetime(year, month, day, hour, minute, tzinfo=ET)
 
 
 # 2026-10-20 is a Tuesday (EDT); 2026-01-20 a Tuesday (EST);
