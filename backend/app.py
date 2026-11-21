@@ -71,13 +71,13 @@ def _client_ip() -> str:
     Real client IP for rate limiting. Render's edge network sits in front of
     the app and its proxy IP *rotates* between requests, so keying on
     remote_addr (even via ProxyFix) puts every request in a different bucket
-    and the limits never bite. The original visitor is the left-most entry of
-    X-Forwarded-For, which is stable per client — so key on that.
+    and the limits never bite. The left-most X-Forwarded-For entry is no good
+    either: the client writes it, so a script could send a new one per request.
+    Render serves through Cloudflare, which sets CF-Connecting-IP and overwrites
+    any value a client sends. Locally the header is absent and this falls back
+    to the socket address.
     """
-    fwd = request.headers.get('X-Forwarded-For', '')
-    if fwd:
-        return fwd.split(',')[0].strip()
-    return get_remote_address()
+    return request.headers.get('CF-Connecting-IP') or get_remote_address()
 
 
 # Per-IP rate limiting. The scanner and backtest pages make a handful of calls
@@ -228,6 +228,11 @@ _start_cache_warmup()
 
 VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive', 'custom')
 
+# The UI never sends more than 20 tickers, but the server must not trust that:
+# each ticker is a price download and a backtest, and one request holds one of
+# only four threads until it finishes.
+MAX_TICKERS = 20
+
 # Whitelist for user-built custom strategies (no eval — only these are allowed).
 _CUSTOM_INDICATORS = {'close', 'volume', 'sma20', 'sma50', 'rsi14', 'macd_line',
                       'macd_signal', 'macd_hist', 'vol_ma20', 'return_1d',
@@ -299,7 +304,7 @@ def scan():
     """
     raw = request.args.get('tickers', '')
     tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or list(strategies.WATCHLIST)
-    tickers = tickers[:20]
+    tickers = tickers[:MAX_TICKERS]
 
     ml_loaded = ml_runtime.get_info().get('loaded')
     out = []
@@ -398,7 +403,7 @@ def predict_calibration():
     years) but cached, so repeat loads are instant.
     """
     raw = request.args.get('tickers', '')
-    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or None
+    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()][:MAX_TICKERS] or None
     oos = request.args.get('oos', '1') != '0'
     try:
         return jsonify(calib.compute_calibration(tickers, oos_only=oos))
@@ -414,7 +419,7 @@ def research_pead():
     basket: cumulative abnormal return by surprise tercile + a beat-minus-miss
     t-test. Heavy but cached."""
     raw = request.args.get('tickers', '')
-    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()] or None
+    tickers = [t.strip().upper() for t in raw.split(',') if t.strip()][:MAX_TICKERS] or None
     try:
         return jsonify(pead_study.compute_pead(tickers))
     except Exception as exc:
@@ -470,7 +475,7 @@ def research_cost_sensitivity():
     data           = request.get_json() or {}
     strategy       = data.get('strategy', 'ma_crossover')
     tickers        = [t.strip().upper() for t in (data.get('tickers') or [])
-                      if isinstance(t, str) and t.strip()]
+                      if isinstance(t, str) and t.strip()][:MAX_TICKERS]
     start_date     = data.get('start_date',
                               (datetime.now() - timedelta(days=365 * 3)).strftime('%Y-%m-%d'))
     end_date       = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
@@ -514,7 +519,7 @@ def compare_strategies():
     """
     data            = request.get_json() or {}
     tickers         = [t.strip().upper() for t in (data.get('tickers') or [])
-                       if isinstance(t, str) and t.strip()]
+                       if isinstance(t, str) and t.strip()][:MAX_TICKERS]
     start_date      = data.get('start_date',
                                (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date        = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
@@ -600,7 +605,7 @@ def run_backtest():
     data            = request.get_json() or {}
     strategy        = data.get('strategy', 'adaptive')
     tickers         = [t.strip().upper() for t in (data.get('tickers') or [])
-                       if isinstance(t, str) and t.strip()]
+                       if isinstance(t, str) and t.strip()][:MAX_TICKERS]
     start_date      = data.get('start_date',
                                (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date        = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
@@ -838,11 +843,12 @@ def optimize_portfolio():
         n_points   — frontier resolution     (default: 60)
     """
     data       = request.get_json() or {}
-    tickers    = data.get('tickers', strategies.WATCHLIST)
+    tickers    = data.get('tickers', strategies.WATCHLIST)[:MAX_TICKERS]
     start_date = data.get('start_date',
                           (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date   = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
-    n_points   = int(data.get('n_points', 60))
+    # One optimizer run per point: unbounded, a single request never finishes.
+    n_points   = max(10, min(200, int(data.get('n_points', 60))))
     shrink     = bool(data.get('shrink', False))
 
     if not tickers or len(tickers) < 2:
