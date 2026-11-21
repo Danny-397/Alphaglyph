@@ -49,3 +49,12 @@ def test_optimize_clamps_tickers_and_frontier_points(client, monkeypatch):
                     json={'tickers': [f'T{i}' for i in range(300)], 'n_points': 10_000_000})
     assert r.status_code == 200
     assert seen == {'tickers': app_module.MAX_TICKERS, 'n_points': 200}
+
+
+def test_a_field_that_is_not_a_number_is_a_400_naming_it(client):
+    for path, body, field in (('/api/backtest', {'tickers': ['SPY'], 'initial_capital': 'lots'}, 'initial_capital'),
+                              ('/api/research/datamine', {'n_strategies': 'many'}, 'n_strategies'),
+                              ('/api/portfolio/optimize', {'tickers': ['A', 'B'], 'n_points': 'NaN'}, 'n_points')):
+        r = client.post(path, json=body)
+        assert r.status_code == 400, path
+        assert field in r.get_json()['error']

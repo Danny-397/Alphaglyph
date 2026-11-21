@@ -39,7 +39,6 @@ jobs:
           python -m py_compile regime.py
           python -m py_compile monte_carlo.py
           python -m py_compile portfolio.py
-          python -m py_compile simulator.py
           python -m py_compile stats.py
           python -m py_compile ml_features.py
           python -m py_compile ml_runtime.py
@@ -53,8 +52,8 @@ jobs:
           pip install flake8
           flake8 .
 
-      - name: Smoke test — DB + simulator init
-        run: python -c "import database, simulator; database.init_db(); simulator.init_simulator(); print('DB + simulator init OK')"
+      - name: Smoke test — DB init
+        run: python -c "import database; database.init_db(); print('DB init OK')"
 
       - name: Unit tests (pytest)
         run: |

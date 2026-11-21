@@ -1,14 +1,15 @@
 """
 Flask REST API for AlphaGlyph.
-All endpoints return JSON.  The frontend polls these on a 10-second interval.
+All endpoints return JSON. The pages call them on user action; nothing polls.
 """
 
 import logging
+import math
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
-import pytz
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -118,7 +119,7 @@ def _within_keepalive_window(now=None) -> bool:
     if os.getenv('KEEPALIVE_ALWAYS', '').strip().lower() in ('1', 'true', 'yes'):
         return True
     if now is None:
-        now = datetime.now(pytz.timezone('America/New_York'))
+        now = datetime.now(ZoneInfo('America/New_York'))
     if now.weekday() >= 5:
         return False
     minutes = now.hour * 60 + now.minute
@@ -143,9 +144,8 @@ def _start_keepalive():
     QuantumSafe, Tradeski and RL-Trader backends and has already taken them
     down together once. The market-hours window costs ~165 h/month instead.
 
-    Nothing is lost by narrowing it: the bot trades US equities and risk.py
-    declines to trade when the market is shut, so an off-hours ping woke the
-    instance only to decline. Outside the window the service sleeps and the
+    Market hours are when quotes move and most visitors come. Outside the
+    window the service sleeps and the
     first visitor pays one ~50s cold start, which the frontend already covers
     with a "waking the backend" pill.
 
@@ -232,6 +232,28 @@ VALID_STRATEGIES = strategies.VALID_STRATEGIES + ('adaptive', 'custom')
 # each ticker is a price download and a backtest, and one request holds one of
 # only four threads until it finishes.
 MAX_TICKERS = 20
+
+
+class _BadInput(ValueError):
+    """A request field that is not a usable number."""
+
+
+@app.errorhandler(_BadInput)
+def _bad_input(exc):
+    # A typo in a field is the caller's mistake: say which field, don't crash with a 500.
+    return jsonify({'error': str(exc)}), 400
+
+
+def _float(data, key, default):
+    """data[key] as a finite float, or _BadInput (-> 400) naming the field."""
+    try:
+        v = float(data.get(key, default))
+    except (TypeError, ValueError):
+        raise _BadInput(f'{key} must be a number')
+    if not math.isfinite(v):
+        raise _BadInput(f'{key} must be a finite number')
+    return v
+
 
 # Whitelist for user-built custom strategies (no eval — only these are allowed).
 _CUSTOM_INDICATORS = {'close', 'volume', 'sma20', 'sma50', 'rsi14', 'macd_line',
@@ -437,7 +459,7 @@ def research_datamine():
     """
     data    = request.get_json() or {}
     ticker  = (data.get('ticker') or 'AAPL').strip().upper()
-    n       = int(data.get('n_strategies', 200))
+    n       = int(_float(data, 'n_strategies', 200))
     try:
         return jsonify(datamining.run_sweep(ticker, n))
     except Exception as exc:
@@ -456,7 +478,7 @@ def research_cpcv():
     """
     data     = request.get_json() or {}
     ticker   = (data.get('ticker') or 'SPY').strip().upper()
-    n_groups = int(data.get('n_groups', 10))
+    n_groups = int(_float(data, 'n_groups', 10))
     try:
         return jsonify(cpcv.compute_cpcv(ticker, n_groups=n_groups))
     except Exception as exc:
@@ -479,7 +501,7 @@ def research_cost_sensitivity():
     start_date     = data.get('start_date',
                               (datetime.now() - timedelta(days=365 * 3)).strftime('%Y-%m-%d'))
     end_date       = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
-    initial_capital = float(data.get('initial_capital', 100_000))
+    initial_capital = _float(data, 'initial_capital', 100_000)
     risk_tolerance = data.get('risk_tolerance', 'moderate')
 
     if strategy not in VALID_STRATEGIES:
@@ -523,7 +545,7 @@ def compare_strategies():
     start_date      = data.get('start_date',
                                (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date        = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
-    initial_capital = float(data.get('initial_capital', 100_000))
+    initial_capital = _float(data, 'initial_capital', 100_000)
     risk_tolerance  = data.get('risk_tolerance', 'moderate')
 
     if not tickers:
@@ -609,14 +631,14 @@ def run_backtest():
     start_date      = data.get('start_date',
                                (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date        = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
-    initial_capital = float(data.get('initial_capital', 100_000))
+    initial_capital = _float(data, 'initial_capital', 100_000)
     walk_forward    = bool(data.get('walk_forward', False))
     risk_tolerance  = data.get('risk_tolerance', 'moderate')
     # Realistic costs for liquid US large-caps in the commission-free era:
     # ~0.03% commission/fees + ~0.03% slippage per side. The old 0.10%/0.05%
     # default badly overstated costs and unfairly dragged active strategies.
-    commission_pct  = float(data.get('commission_pct', 0.0003))
-    slippage_pct    = float(data.get('slippage_pct',   0.0003))
+    commission_pct  = _float(data, 'commission_pct', 0.0003)
+    slippage_pct    = _float(data, 'slippage_pct',   0.0003)
     use_markowitz   = bool(data.get('use_markowitz', False))
     range_sizing    = bool(data.get('range_sizing', False))
     cash_in_market  = bool(data.get('cash_in_market', False))
@@ -848,7 +870,7 @@ def optimize_portfolio():
                           (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
     end_date   = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
     # One optimizer run per point: unbounded, a single request never finishes.
-    n_points   = max(10, min(200, int(data.get('n_points', 60))))
+    n_points   = max(10, min(200, int(_float(data, 'n_points', 60))))
     shrink     = bool(data.get('shrink', False))
 
     if not tickers or len(tickers) < 2:
