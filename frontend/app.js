@@ -1252,6 +1252,14 @@ function initBacktest() {
     }
   }
 
+  // The backtester's exit codes (backend/backtest.py), in words a reader follows.
+  const EXIT_REASON = {
+    stop_loss:   'Trailing stop',
+    take_profit: 'Profit target',
+    sell_signal: 'Sell signal',
+    recovered:   'Recovered toward 52-week high',
+  }
+
   function renderTradesTable(trades) {
     const tbody = el('trades-tbody')
     const sells = trades.filter(t => t.action === 'SELL')
@@ -1268,7 +1276,7 @@ function initBacktest() {
         <td>${t.shares}</td>
         <td class="${clr(t.pnl)}">${fmt$(t.pnl)}</td>
         <td class="${clr(t.pnl_pct)}">${fmtPct(t.pnl_pct)}</td>
-        <td style="color:var(--muted);font-size:11px;">${t.reason || '—'}</td>
+        <td style="color:var(--muted);font-size:11px;">${EXIT_REASON[t.reason] || t.reason || '—'}</td>
         <td style="color:${REGIME_COLORS[t.regime] || 'var(--muted)'};font-size:11px;">${t.regime || '—'}</td>
       </tr>`).join('')
   }
