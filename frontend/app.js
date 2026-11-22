@@ -689,6 +689,7 @@ function initBacktest() {
       el('empty-state').querySelector('.empty-title').textContent =
         failMsg(data, 'The comparison failed. Please try again.')
       el('empty-state').querySelector('.empty-hint')?.setAttribute('hidden', '')
+      el('empty-state').querySelector('.empty-state')?.classList.add('is-error')
       return
     }
     renderCompare(data)
@@ -816,6 +817,7 @@ function initBacktest() {
       el('empty-state').querySelector('.empty-title').textContent =
         failMsg(data, 'The backtest failed. Please try again.')
       el('empty-state').querySelector('.empty-hint')?.setAttribute('hidden', '')
+      el('empty-state').querySelector('.empty-state')?.classList.add('is-error')
       return
     }
 

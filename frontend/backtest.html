@@ -46,7 +46,7 @@
 
         <!-- Examples: one tap fills the form and runs it (BT_PRESETS in app.js) -->
         <div class="form-group">
-          <span class="form-label" id="bt-presets-label">Start from an example</span>
+          <span class="form-label" id="bt-presets-label">New here? One click runs an example</span>
           <div class="preset-list" id="bt-presets" role="group" aria-labelledby="bt-presets-label">
             <button type="button" class="preset-btn" data-preset="dip" title="Dip Buyer on six mega-caps, 3 years">Buy the dip</button>
             <button type="button" class="preset-btn" data-preset="trend" title="SMA 20/50 crossover on SPY and QQQ, 5 years">Ride the trend</button>
@@ -56,9 +56,9 @@
           </div>
         </div>
 
-        <!-- Strategy -->
+        <div class="form-step"><span class="form-step-n">1</span>Pick a strategy</div>
         <div class="form-group">
-          <label class="form-label" for="bt-strategy">Strategy</label>
+          <label class="form-label sr-only" for="bt-strategy">Strategy</label>
           <select id="bt-strategy">
             <option value="ml" disabled>ML Transformer (not trained yet)</option>
             <option value="dip_buyer" selected>Dip Buyer (52-Week Value)</option>
@@ -72,9 +72,9 @@
           <div class="rule-builder" id="bt-rule-builder" hidden></div>
         </div>
 
-        <!-- Tickers -->
+        <div class="form-step"><span class="form-step-n">2</span>Choose stocks</div>
         <div class="form-group">
-          <label class="form-label" for="bt-ticker-input">Tickers</label>
+          <label class="form-label sr-only" for="bt-ticker-input">Tickers</label>
           <div class="ticker-input-row">
             <input type="text" id="bt-ticker-input" placeholder="Add a ticker, e.g. AAPL"
                    maxlength="8" autocomplete="off" spellcheck="false">
@@ -84,7 +84,7 @@
           <div class="chip-grid" id="bt-tickers"></div>
         </div>
 
-        <!-- Date range -->
+        <div class="form-step"><span class="form-step-n">3</span>Set the period and money</div>
         <div class="form-row-2">
           <div class="form-group">
             <label class="form-label" for="bt-start">Start</label>
@@ -159,12 +159,54 @@
       <!-- ── RIGHT: Results area ─────────────────────────────────────────── -->
       <div class="results-area">
 
-        <!-- Empty state -->
+        <!-- Empty state: the question, then an animated example of a finished
+             backtest (backtest-preview.js) so a first-time visitor sees what a
+             run produces. app.js reuses this box for error messages and adds
+             .is-error, which hides the example. -->
         <div id="empty-state">
-          <div class="empty-state">
+          <div class="empty-state bt-intro">
             <h2 class="empty-title">Is the edge real, or luck?</h2>
             <p class="empty-sub">Run a strategy on real market history. You get every trade, the result against the S&amp;P 500,
-              and a verdict from three statistical tests.</p>
+              and a verdict from three statistical tests. Here is what a finished run looks like.</p>
+
+            <figure class="bt-demo" id="bt-demo" aria-label="Example of a finished backtest, with made-up numbers">
+              <div class="bt-demo-head">
+                <span class="bt-demo-tag">Example result, made-up numbers</span>
+                <button type="button" class="btn btn-sm" id="bt-demo-replay">Replay</button>
+              </div>
+
+              <div class="bt-demo-stats">
+                <div><span class="stat-label">Total return</span><span class="stat-value positive" id="bt-demo-ret">&hellip;</span></div>
+                <div><span class="stat-label">Final value</span><span class="stat-value" id="bt-demo-value">&hellip;</span></div>
+                <div><span class="stat-label">Sharpe ratio</span><span class="stat-value" id="bt-demo-sharpe">&hellip;</span></div>
+                <div><span class="stat-label">Max drawdown</span><span class="stat-value negative" id="bt-demo-dd">&hellip;</span></div>
+              </div>
+
+              <div class="bt-demo-legend" aria-hidden="true">
+                <span class="lg-strat">Your strategy</span>
+                <span class="lg-spy">S&amp;P 500</span>
+                <span class="lg-buy">Buy</span>
+                <span class="lg-sell">Sell</span>
+              </div>
+              <canvas id="bt-demo-chart" class="bt-demo-chart" role="img"
+                      aria-label="Example equity curve: the strategy against the S&amp;P 500 over one year, with buy and sell points"></canvas>
+
+              <div class="bt-demo-verdict" id="bt-demo-verdict">
+                <div class="bt-demo-verdict-main"><span class="verdict-dot" aria-hidden="true"></span>Promising, but needs more data</div>
+                <ul class="bt-demo-tests">
+                  <li class="bt-demo-test pass">Monte Carlo: beat 96% of random-timing runs</li>
+                  <li class="bt-demo-test pass">Deflated Sharpe: still significant after luck is removed</li>
+                  <li class="bt-demo-test fail">Fama-French: no alpha beyond market factors</li>
+                </ul>
+              </div>
+
+              <ol class="bt-demo-steps">
+                <li><b>Your strategy against the market.</b> It trades day by day on real prices, costs included.</li>
+                <li><b>Every trade, with its reason.</b> Each dot is a buy or a sell you can inspect in the Trades tab.</li>
+                <li><b>Skill or luck.</b> Three tests decide whether the result could have been chance.</li>
+              </ol>
+            </figure>
+
             <p class="empty-hint">The settings are ready. Press <strong>Run backtest</strong>, or start from an example.</p>
           </div>
         </div>
@@ -305,6 +347,7 @@
 
   <script src="config.js" defer></script>
   <script src="app.js" defer></script>
+<script src="backtest-preview.js" defer></script>
 <script src="scroll-focus.js" defer></script>
 </body>
 </html>
