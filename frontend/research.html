@@ -45,34 +45,13 @@
     </header>
 
     <div class="tab-list" role="tablist">
-      <button type="button" class="tab-btn active" data-tab="rtab-pead">Earnings drift</button>
-      <button type="button" class="tab-btn" data-tab="rtab-overfit">Overfitting</button>
+      <button type="button" class="tab-btn active" data-tab="rtab-overfit">Overfitting</button>
+      <button type="button" class="tab-btn" data-tab="rtab-pead">Earnings drift</button>
       <button type="button" class="tab-btn" data-tab="rtab-costs">Trading costs</button>
     </div>
 
-    <!-- ── EARNINGS DRIFT ───────────────────────────────────────────────── -->
-    <div class="tab-panel active" id="rtab-pead">
-      <!-- PEAD event study -->
-      <section class="card">
-        <div class="section-header">
-          Post-earnings drift
-          <button type="button" class="btn btn-sm btn-primary" id="pead-run">Run study</button>
-        </div>
-        <p class="card-desc">
-          After a company reports, its stock tends to keep drifting in the direction of the surprise. This pools every earnings event across a basket of names, plots the average <strong>market-adjusted return</strong> over the next 20 days by surprise tercile, and tests whether the beat-minus-miss drift clears the noise. If the free data can't prove it, the verdict says so.
-        </p>
-        <div id="pead-loading" hidden>
-          <div class="loading-state"><div class="spinner"></div>
-            <strong>Pooling earnings events</strong>
-            <p>Collecting reports and post-announcement returns across the basket.</p>
-          </div>
-        </div>
-        <div id="pead-result" hidden class="mt-4"></div>
-      </section>
-    </div>
-
     <!-- ── OVERFITTING ──────────────────────────────────────────────────── -->
-    <div class="tab-panel" id="rtab-overfit">
+    <div class="tab-panel active" id="rtab-overfit">
       <!-- Data-mining lab -->
       <section class="card">
         <h2 class="section-header">How a backtest fools you</h2>
@@ -92,8 +71,9 @@
         </div>
         <div id="dm-error" class="error-banner mt-4" hidden></div>
         <div id="dm-loading" hidden>
-          <div class="loading-state"><div class="spinner"></div>
-            <strong>Backtesting the search</strong></div>
+          <div class="loading-state">
+            <strong>Backtesting the search</strong>
+            <div class="progress" data-expect="10" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div><span class="progress-eta"></span></div></div>
         </div>
         <div id="dm-result" hidden class="mt-4"></div>
       </section>
@@ -113,12 +93,35 @@
         </div>
         <div id="cpcv-error" class="error-banner mt-4" hidden></div>
         <div id="cpcv-loading" hidden>
-          <div class="loading-state"><div class="spinner"></div>
+          <div class="loading-state">
             <strong>Cross-validating the grid</strong>
+            <div class="progress" data-expect="15" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div><span class="progress-eta"></span></div>
             <p>Fitting the champion on every combination of splits and ranking it out of sample.</p>
           </div>
         </div>
         <div id="cpcv-result" hidden class="mt-4"></div>
+      </section>
+    </div>
+
+    <!-- ── EARNINGS DRIFT ───────────────────────────────────────────────── -->
+    <div class="tab-panel" id="rtab-pead">
+      <!-- PEAD event study -->
+      <section class="card">
+        <div class="section-header">
+          Post-earnings drift
+          <button type="button" class="btn btn-sm btn-primary" id="pead-run">Run study</button>
+        </div>
+        <p class="card-desc">
+          After a company reports, its stock tends to keep drifting in the direction of the surprise. This pools every earnings event across a basket of names, plots the average <strong>market-adjusted return</strong> over the next 20 days by surprise tercile, and tests whether the beat-minus-miss drift clears the noise. If the free data can't prove it, the verdict says so.
+        </p>
+        <div id="pead-loading" hidden>
+          <div class="loading-state">
+            <strong>Pooling earnings events</strong>
+            <div class="progress" data-expect="20" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div><span class="progress-eta"></span></div>
+            <p>Collecting reports and post-announcement returns across the basket.</p>
+          </div>
+        </div>
+        <div id="pead-result" hidden class="mt-4"></div>
       </section>
     </div>
 
@@ -149,8 +152,9 @@
         </div>
         <div id="cost-error" class="error-banner mt-4" hidden></div>
         <div id="cost-loading" hidden>
-          <div class="loading-state"><div class="spinner"></div>
+          <div class="loading-state">
             <strong>Sweeping cost levels</strong>
+            <div class="progress" data-expect="10" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div><span class="progress-eta"></span></div>
             <p>Rerunning the backtest at ten different friction levels.</p>
           </div>
         </div>
@@ -174,6 +178,7 @@
 
   <script src="config.js" defer></script>
   <script src="app.js" defer></script>
+<script src="progress.js" defer></script>
 <script src="scroll-focus.js" defer></script>
 </body>
 </html>

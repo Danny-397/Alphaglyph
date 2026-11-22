@@ -230,6 +230,7 @@ async function obRun(presetKey) {
   if (key === 'custom') { body.legs = obState.legs; body.name = el('ob-name').value.trim() || 'Custom strategy' }
   else body.preset = key
   el('ob-loading-title').firstChild.textContent = 'Running options backtest '
+  el('ob-loading').querySelector('.progress').dataset.expect = '12'
   el('ob-loading').querySelector('p').textContent =
     'Fetching prices, volatility and rates, then pricing every leg day by day.'
   obShow('loading')
@@ -546,6 +547,7 @@ function obDrawPayoff(ex) {
 
 async function obCompare() {
   el('ob-loading-title').firstChild.textContent = 'Comparing every strategy '
+  el('ob-loading').querySelector('.progress').dataset.expect = '50'
   el('ob-loading').querySelector('p').textContent =
     'Runs all 20 strategies on the same history and ranks them. This usually takes one to three minutes.'
   obShow('loading')

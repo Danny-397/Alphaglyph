@@ -58,8 +58,9 @@
 
     <div id="pred-loading" hidden>
       <div class="loading-state">
-        <div class="spinner"></div>
+        
         <strong>Reading the signals</strong>
+            <div class="progress" data-expect="8" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div><span class="progress-eta"></span></div>
         <p>Forecasting price, weighing the last earnings report, and sampling news tone.</p>
       </div>
     </div>
@@ -76,8 +77,9 @@
         A "60% up" call is only worth something if the market rises about 60% of the time it's made. This replays the predictor <strong>out of sample</strong>, on data the model never trained on. Points on the diagonal are perfectly calibrated.
       </p>
       <div id="cal-loading" hidden>
-        <div class="loading-state"><div class="spinner"></div>
+        <div class="loading-state">
           <strong>Replaying years of forecasts</strong>
+            <div class="progress" data-expect="10" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div><span class="progress-eta"></span></div>
           <p>Recovering the model's probability and the realised outcome for every historical window.</p>
         </div>
       </div>
@@ -94,8 +96,9 @@
         Every trading day near the close, the Predictor's call for a fixed basket of ten tickers is <strong>committed to GitHub</strong> (ticker, probability, price), and graded once its horizon passes. The commit lands before the outcome exists and a graded row is never edited, so the hit rate is a forward record that can't be fitted in hindsight. <a href="https://github.com/Danny-397/Alphaglyph/commits/main/frontend/data/forward_ledger.csv" target="_blank" rel="noopener">See every commit</a>.
       </p>
       <div id="ledger-loading" hidden>
-        <div class="loading-state"><div class="spinner"></div>
+        <div class="loading-state">
           <strong>Reading the ledger</strong>
+            <div class="progress" data-expect="4" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div><span class="progress-eta"></span></div>
           <p>Grading any predictions whose horizon has now elapsed.</p>
         </div>
       </div>
@@ -118,6 +121,7 @@
 
   <script src="config.js" defer></script>
   <script src="app.js" defer></script>
+<script src="progress.js" defer></script>
 <script src="scroll-focus.js" defer></script>
 </body>
 </html>
