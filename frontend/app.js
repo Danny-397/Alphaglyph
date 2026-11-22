@@ -1528,7 +1528,7 @@ function initSignals() {
     const tbody = el('sig-tbody')
     if (!tickers.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Add a ticker to scan.</td></tr>'; return }
     if (regimeFromSave) { regimeFromSave = false; loadRegime() }   // Rescan refreshes both
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">Scanning <span class="dots"><span></span><span></span><span></span></span></td></tr>`
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">Scanning <div class="progress is-inline" data-expect="15" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-row"><div class="progress-track"><div class="progress-fill"></div></div><span class="progress-pct">0%</span></div></div></td></tr>`
     const data = await api('/api/scan?tickers=' + encodeURIComponent(tickers.join(',')))
     if (!data || !data.scanned) { tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Couldn’t scan right now — try Rescan.</td></tr>'; return }
     renderScan(data)
