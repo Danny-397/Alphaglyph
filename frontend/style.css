@@ -1348,3 +1348,27 @@ main:focus { outline: none; }
 .progress-eta { display: block; min-height: 1.4em; margin-top: 6px; font-size: 12px; color: var(--faint); text-align: center; }
 .progress.is-inline { display: inline-block; width: 160px; margin: 0 0 0 10px; vertical-align: middle; }
 @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
+
+/* ── Touch screens: finger-sized targets (about 44px) ───────────────────────
+   Desktop is unchanged. Controls grow; text links keep their look and get a
+   larger invisible hit area via ::after, so nothing reflows. Nav links grow
+   by padding instead, because the nav scrolls sideways and would clip an
+   overhanging hit area. */
+@media (pointer: coarse) {
+  .nav-link { display: inline-flex; align-items: center; min-height: 44px; }
+  .preset-btn, .btn-sm { height: 40px; }
+  .opt-quick .btn { min-height: 40px; }
+  .seg-btn, .opt-gallery-head .seg-btn { min-height: 40px; }
+  .chip-x { position: relative; }
+  .chip-x::after { content: ""; position: absolute; inset: -6px -4px; }
+  .nav-brand, .site-footer a, .lp-more a, #ob-picked + a { position: relative; }
+  .nav-brand::after, .site-footer a::after, .lp-more a::after, #ob-picked + a::after {
+    content: ""; position: absolute; inset: -12px -6px;
+  }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+}
+/* Phones: nothing smaller than 12px, including sizes set inline by app.js. */
+@media (max-width: 640px) {
+  .badge, .cpcv-cell, .opt-learn-axis, .opt-heat-sub, .meter-scale, .opt-side { font-size: 12px; }
+  [style*="font-size:11px"], [style*="font-size: 11px"] { font-size: 12px !important; }
+}
