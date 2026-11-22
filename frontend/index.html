@@ -23,12 +23,11 @@
   <meta name="twitter:image" content="https://alphaglyph.org/og-image.png">
 
   <!-- Fonts are self-hosted: the Google Fonts stylesheet blocked first paint for ~0.9 s on a mobile connection (Lighthouse, 2026-10-30). -->
-  <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <style>@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-greek.woff2) format('woff2');unicode-range:U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF}</style>
-  <meta name="theme-color" content="#121821">
+  <meta name="theme-color" content="#0e1411">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="preload" href="/fonts/newsreader-latin-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <style>@font-face{font-family:'Newsreader';font-style:normal;font-weight:200 800;font-display:swap;src:url(/fonts/newsreader-latin-normal.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}@font-face{font-family:'Newsreader';font-style:italic;font-weight:200 800;font-display:swap;src:url(/fonts/newsreader-latin-italic.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}</style>
+  <link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <style>@font-face{font-family:'Geist';font-style:normal;font-weight:100 900;font-display:swap;src:url(/fonts/geist-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}</style>
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="home">
@@ -84,16 +83,22 @@
               <span class="val">72%</span>
               <span class="lbl">Overfitting risk</span>
               <span class="ctx">Chance the in-sample winner lands in the bottom half out of sample</span>
+              <span class="meter" style="--v:.72;--r:.5" aria-hidden="true"><span class="meter-fill is-warn"></span><span class="meter-ref"></span></span>
+              <span class="meter-scale" aria-hidden="true"><span>0%</span><span>50%, a coin flip</span><span>100%</span></span>
             </div>
             <div class="verdict-row">
               <span class="val">1.26</span>
               <span class="lbl">In-sample Sharpe</span>
               <span class="ctx">Looks like a good strategy</span>
+              <span class="meter" style="--v:.84" aria-hidden="true"><span class="meter-fill"></span></span>
+              <span class="meter-scale" aria-hidden="true"><span>0</span><span>1.5</span></span>
             </div>
             <div class="verdict-row">
               <span class="val">0.65</span>
               <span class="lbl">Out-of-sample Sharpe</span>
               <span class="ctx">About half the edge survives</span>
+              <span class="meter" style="--v:.4333;--r:.84" aria-hidden="true"><span class="meter-fill"></span><span class="meter-ref is-ghost"></span></span>
+              <span class="meter-scale" aria-hidden="true"><span>0</span><span>dashed: in-sample</span><span>1.5</span></span>
             </div>
           </div>
           <figcaption class="verdict-note">Measured with combinatorially symmetric cross-validation.
