@@ -293,7 +293,7 @@
     "model": 161.9,
     "market": 89.0
    },
-   "note": null
+   "note": "no earnings dates: priced without an earnings premium"
   },
   {
    "symbol": "SOFI",
@@ -1163,18 +1163,14 @@
   ]
  },
  "skipped": [
-  "AAPL 2026-11-24: no close in the price data yet",
-  "AMZN 2026-11-24: no close in the price data yet",
-  "GOOGL 2026-11-24: no close in the price data yet",
-  "JPM 2026-11-24: no close in the price data yet",
-  "META 2026-11-24: no close in the price data yet",
-  "MSFT 2026-11-24: no close in the price data yet",
-  "NVDA 2026-11-24: no close in the price data yet",
-  "QQQ 2026-11-24: no close in the price data yet",
-  "RDW 2026-11-24: no close in the price data yet",
-  "SOFI 2026-11-24: no close in the price data yet",
-  "SPY 2026-11-24: no close in the price data yet",
-  "TSLA 2026-11-24: no close in the price data yet"
+  "AAPL 2026-11-24: archive spot 349.08 vs close 354.07",
+  "AMZN 2026-11-24: archive spot 255.39 vs close 252.29",
+  "GOOGL 2026-11-24: archive spot 282.10 vs close 279.05",
+  "META 2026-11-24: archive spot 597.60 vs close 589.82",
+  "NVDA 2026-11-24: archive spot 165.05 vs close 155.38",
+  "QQQ 2026-11-24: archive spot 651.03 vs close 638.10",
+  "RDW 2026-11-24: archive spot 6.42 vs close 5.90",
+  "SOFI 2026-11-24: archive spot 13.09 vs close 12.86"
  ],
  "calibration": {
   "days": [
