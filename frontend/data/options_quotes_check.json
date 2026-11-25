@@ -31,10 +31,10 @@
  ],
  "overall": {
   "n": 53404,
-  "iv_bias": -0.67,
-  "iv_mae": 3.1,
-  "price_bias": -6.0,
-  "price_mae": 28.3,
+  "iv_bias": -0.68,
+  "iv_mae": 3.11,
+  "price_bias": -6.1,
+  "price_mae": 28.2,
   "inside_spread": 7.8
  },
  "by_moneyness": [
@@ -43,17 +43,17 @@
    "n": 2563,
    "iv_bias": 0.84,
    "iv_mae": 3.55,
-   "price_bias": 3.9,
+   "price_bias": 3.8,
    "price_mae": 12.4,
-   "inside_spread": 9.2
+   "inside_spread": 9.4
   },
   {
    "label": "calls, at the money (40-60 delta)",
    "n": 4302,
-   "iv_bias": 0.53,
+   "iv_bias": 0.5,
    "iv_mae": 3.72,
-   "price_bias": 2.1,
-   "price_mae": 14.4,
+   "price_bias": 1.9,
+   "price_mae": 14.3,
    "inside_spread": 7.8
   },
   {
@@ -63,7 +63,7 @@
    "iv_mae": 3.12,
    "price_bias": 2.8,
    "price_mae": 16.9,
-   "inside_spread": 9.8
+   "inside_spread": 9.7
   },
   {
    "label": "calls, 15-40 delta",
@@ -71,25 +71,25 @@
    "iv_bias": -1.96,
    "iv_mae": 3.6,
    "price_bias": -14.7,
-   "price_mae": 27.7,
+   "price_mae": 27.6,
    "inside_spread": 7.5
   },
   {
    "label": "puts, under 15 delta",
    "n": 13473,
-   "iv_bias": -1.88,
-   "iv_mae": 3.44,
-   "price_bias": -21.1,
+   "iv_bias": -1.89,
+   "iv_mae": 3.45,
+   "price_bias": -21.2,
    "price_mae": 35.8,
    "inside_spread": 7.8
   },
   {
    "label": "calls, under 15 delta",
    "n": 12802,
-   "iv_bias": -0.44,
-   "iv_mae": 2.34,
-   "price_bias": -10.5,
-   "price_mae": 54.8,
+   "iv_bias": -0.45,
+   "iv_mae": 2.33,
+   "price_bias": -10.7,
+   "price_mae": 54.7,
    "inside_spread": 6.1
   }
  ],
@@ -97,7 +97,7 @@
   {
    "label": "2-10 days",
    "n": 22088,
-   "iv_bias": -2.08,
+   "iv_bias": -2.09,
    "iv_mae": 3.53,
    "price_bias": -20.1,
    "price_mae": 31.2,
@@ -106,8 +106,8 @@
   {
    "label": "11-35 days",
    "n": 22608,
-   "iv_bias": 0.35,
-   "iv_mae": 2.55,
+   "iv_bias": 0.34,
+   "iv_mae": 2.54,
    "price_bias": 3.5,
    "price_mae": 25.4,
    "inside_spread": 8.3
@@ -118,7 +118,7 @@
    "iv_bias": 0.36,
    "iv_mae": 3.63,
    "price_bias": 2.8,
-   "price_mae": 29.0,
+   "price_mae": 28.9,
    "inside_spread": 7.8
   }
  ],
@@ -144,11 +144,11 @@
   {
    "label": "index ETFs (no reports)",
    "n": 28884,
-   "iv_bias": 0.26,
-   "iv_mae": 1.91,
+   "iv_bias": 0.25,
+   "iv_mae": 1.9,
    "price_bias": 2.8,
    "price_mae": 23.5,
-   "inside_spread": 5.7
+   "inside_spread": 5.8
   }
  ],
  "by_symbol": [
@@ -207,7 +207,7 @@
    "iv_mae": 2.27,
    "price_bias": -2.2,
    "price_mae": 18.9,
-   "inside_spread": 27.4,
+   "inside_spread": 27.5,
    "atm": {
     "day": "2026-11-24",
     "expiry": "2026-12-24",
@@ -294,7 +294,7 @@
     "model": 108.2,
     "market": 87.5
    },
-   "note": null
+   "note": "no earnings dates: priced without an earnings premium"
   },
   {
    "symbol": "SOFI",
@@ -315,15 +315,15 @@
   {
    "symbol": "SPY",
    "n": 14042,
-   "iv_bias": -0.29,
-   "iv_mae": 1.5,
-   "price_bias": -3.5,
-   "price_mae": 23.3,
-   "inside_spread": 4.2,
+   "iv_bias": -0.31,
+   "iv_mae": 1.49,
+   "price_bias": -3.8,
+   "price_mae": 23.2,
+   "inside_spread": 4.3,
    "atm": {
     "day": "2026-11-24",
     "expiry": "2026-12-24",
-    "model": 22.9,
+    "model": 22.6,
     "market": 20.1
    },
    "note": null
@@ -333,7 +333,7 @@
    "n": 4013,
    "iv_bias": 3.37,
    "iv_mae": 6.09,
-   "price_bias": 13.0,
+   "price_bias": 13.1,
    "price_mae": 28.5,
    "inside_spread": 6.8,
    "atm": {
@@ -1156,7 +1156,7 @@
    {
     "day": "2026-11-24",
     "expiry": "2026-12-24",
-    "model": 22.9,
+    "model": 22.6,
     "market": 20.1
    }
   ],
@@ -1342,7 +1342,7 @@
     "SOFI": {
      "fit_factor": 1.086,
      "before": 8.35,
-     "after": 6.03,
+     "after": 6.02,
      "contracts": 387
     },
     "TSLA": {
@@ -1387,7 +1387,7 @@
    {
     "symbol": "C",
     "report": "2027-01-14",
-    "market": 2.93,
+    "market": 2.92,
     "model": 4.35,
     "ratio": 0.673
    },
