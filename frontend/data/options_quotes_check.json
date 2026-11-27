@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-26",
+ "generated": "2026-11-27",
  "source": "Tradeski data/options-archive (closing chains saved after each US close)",
  "days": [
   "2026-11-06",
@@ -295,7 +295,7 @@
     "model": 105.5,
     "market": 87.8
    },
-   "note": "no earnings dates: priced without an earnings premium"
+   "note": null
   },
   {
    "symbol": "SOFI",
@@ -1308,7 +1308,20 @@
    }
   ]
  },
- "skipped": [],
+ "skipped": [
+  "AAPL 2026-11-26: no close in the price data yet",
+  "AMZN 2026-11-26: no close in the price data yet",
+  "GOOGL 2026-11-26: no close in the price data yet",
+  "JPM 2026-11-26: no close in the price data yet",
+  "META 2026-11-26: no close in the price data yet",
+  "MSFT 2026-11-26: no close in the price data yet",
+  "NVDA 2026-11-26: no close in the price data yet",
+  "QQQ 2026-11-26: no close in the price data yet",
+  "RDW 2026-11-26: no close in the price data yet",
+  "SOFI 2026-11-26: no close in the price data yet",
+  "SPY 2026-11-26: no close in the price data yet",
+  "TSLA 2026-11-26: no close in the price data yet"
+ ],
  "calibration": {
   "days": [
    "2026-11-06",
@@ -1430,88 +1443,88 @@
  },
  "earnings_moves": {
   "n": 11,
-  "median_ratio": 0.99,
+  "median_ratio": 0.96,
   "iqr": [
-   0.92,
-   1.11
+   0.88,
+   1.07
   ],
   "rows": [
    {
     "symbol": "ADBE",
     "report": "2026-12-09",
-    "market": 9.37,
+    "market": 9.01,
     "model": 8.56,
-    "ratio": 1.094
+    "ratio": 1.052
    },
    {
     "symbol": "AVGO",
     "report": "2026-12-09",
-    "market": 11.08,
+    "market": 10.84,
     "model": 11.25,
-    "ratio": 0.986
+    "ratio": 0.964
    },
    {
     "symbol": "BAC",
     "report": "2027-01-15",
-    "market": 2.85,
+    "market": 2.66,
     "model": 3.11,
-    "ratio": 0.919
+    "ratio": 0.857
    },
    {
     "symbol": "C",
     "report": "2027-01-14",
-    "market": 2.9,
+    "market": 2.67,
     "model": 4.35,
-    "ratio": 0.668
+    "ratio": 0.614
    },
    {
     "symbol": "COST",
     "report": "2026-12-10",
-    "market": 3.64,
+    "market": 3.43,
     "model": 3.24,
-    "ratio": 1.123
+    "ratio": 1.058
    },
    {
     "symbol": "JPM",
     "report": "2027-01-14",
-    "market": 3.03,
+    "market": 2.87,
     "model": 2.48,
-    "ratio": 1.222
+    "ratio": 1.157
    },
    {
     "symbol": "MS",
     "report": "2027-01-14",
-    "market": 4.15,
+    "market": 3.97,
     "model": 3.53,
-    "ratio": 1.178
+    "ratio": 1.125
    },
    {
     "symbol": "NKE",
     "report": "2026-12-17",
-    "market": 8.91,
+    "market": 8.78,
     "model": 9.45,
-    "ratio": 0.942
+    "ratio": 0.929
    },
    {
     "symbol": "ORCL",
     "report": "2026-12-14",
-    "market": 12.41,
+    "market": 12.05,
     "model": 13.45,
-    "ratio": 0.923
+    "ratio": 0.895
    },
    {
     "symbol": "UNH",
     "report": "2027-01-12",
-    "market": 1.56,
+    "market": 0.92,
     "model": 12.57,
-    "ratio": 0.124
+    "ratio": 0.073
    },
    {
     "symbol": "WFC",
     "report": "2027-01-14",
-    "market": 5.45,
+    "market": 5.35,
     "model": 4.95,
-    "ratio": 1.099
+    "ratio": 1.081
    }
   ]
  },
