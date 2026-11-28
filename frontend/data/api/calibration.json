@@ -1,96 +1,96 @@
 {
  "available": true,
- "base_rate": 0.5605,
+ "base_rate": 0.5609,
  "bin_mode": "quantile",
  "bins": [
   {
    "bin_hi": 0.5405,
    "bin_lo": 0.5187,
-   "count": 1010,
-   "frac_up": 0.5545,
+   "count": 1011,
+   "frac_up": 0.5549,
    "mean_pred": 0.5352
   },
   {
    "bin_hi": 0.545,
    "bin_lo": 0.5405,
-   "count": 1009,
-   "frac_up": 0.5322,
+   "count": 1010,
+   "frac_up": 0.5327,
    "mean_pred": 0.5428
   },
   {
-   "bin_hi": 0.5484,
+   "bin_hi": 0.5485,
    "bin_lo": 0.545,
-   "count": 1009,
-   "frac_up": 0.559,
+   "count": 1010,
+   "frac_up": 0.5584,
    "mean_pred": 0.5468
   },
   {
    "bin_hi": 0.5512,
-   "bin_lo": 0.5484,
-   "count": 1009,
-   "frac_up": 0.5233,
+   "bin_lo": 0.5485,
+   "count": 1011,
+   "frac_up": 0.5232,
    "mean_pred": 0.5498
   },
   {
-   "bin_hi": 0.5536,
+   "bin_hi": 0.5537,
    "bin_lo": 0.5512,
-   "count": 1009,
-   "frac_up": 0.561,
+   "count": 1010,
+   "frac_up": 0.5634,
    "mean_pred": 0.5525
   },
   {
-   "bin_hi": 0.5556,
-   "bin_lo": 0.5536,
-   "count": 1009,
-   "frac_up": 0.5263,
+   "bin_hi": 0.5557,
+   "bin_lo": 0.5537,
+   "count": 1010,
+   "frac_up": 0.5238,
    "mean_pred": 0.5547
   },
   {
    "bin_hi": 0.5577,
-   "bin_lo": 0.5556,
-   "count": 1009,
-   "frac_up": 0.5758,
+   "bin_lo": 0.5557,
+   "count": 1011,
+   "frac_up": 0.5776,
    "mean_pred": 0.5567
   },
   {
    "bin_hi": 0.5605,
    "bin_lo": 0.5577,
-   "count": 1009,
-   "frac_up": 0.5837,
+   "count": 1010,
+   "frac_up": 0.5832,
    "mean_pred": 0.559
   },
   {
    "bin_hi": 0.5644,
    "bin_lo": 0.5605,
-   "count": 1009,
-   "frac_up": 0.5778,
+   "count": 1010,
+   "frac_up": 0.5782,
    "mean_pred": 0.5623
   },
   {
    "bin_hi": 0.5862,
    "bin_lo": 0.5644,
-   "count": 1010,
-   "frac_up": 0.6119,
+   "count": 1011,
+   "frac_up": 0.6133,
    "mean_pred": 0.5693
   }
  ],
- "eval_end": "2026-11-18",
+ "eval_end": "2026-11-19",
  "eval_start": "2023-07-17",
  "horizon": 5,
  "metrics": {
-  "accuracy": 0.5605,
+  "accuracy": 0.5609,
   "brier": 0.2461,
   "brier_base": 0.2463,
   "brier_skill": 0.0008,
-  "log_loss": 0.6854,
-  "log_loss_base": 0.6858,
+  "log_loss": 0.6853,
+  "log_loss_base": 0.6857,
   "model_test_auc": 0.5118
  },
- "n_predictions": 10092,
+ "n_predictions": 10104,
  "n_tickers": 12,
  "note": "Out-of-sample reliability of the ML price forecaster on data after the validation cutoff. Points on the diagonal = perfectly calibrated. The model lives near a coin flip by design \u2014 a humble, honest forecaster is the goal, not an over-confident one.",
  "oos_only": true,
- "snapshot_at": "2026-11-27T09:53Z",
+ "snapshot_at": "2026-11-28T03:27Z",
  "tickers": [
   "AAPL",
   "MSFT",

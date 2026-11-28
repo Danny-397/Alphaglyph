@@ -92,7 +92,7 @@
  "n_events": 294,
  "n_tickers": 15,
  "note": "Pooled, market-adjusted CAR by earnings-surprise tercile. A positive beat-minus-miss spread that clears its t-test is PEAD showing up. With only a few hundred free-data events, treat this as a demonstration of the method \u2014 the drift is real in the literature but the sample here is small, the timing coarse, and the basket survivorship-biased. Earnings dates come from a saved snapshot (2026-10-25) because the live feed was unavailable.",
- "snapshot_at": "2026-11-27T09:53Z",
+ "snapshot_at": "2026-11-28T03:27Z",
  "spread": {
   "beat_minus_miss_pct": 4.523,
   "p_value": 0.0023,
